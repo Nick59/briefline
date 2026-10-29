@@ -1,0 +1,16 @@
+{
+	"$schema": "https://shadcn-svelte.com/schema.json",
+	"tailwind": {
+		"css": "src/routes/layout.css",
+		"baseColor": "zinc"
+	},
+	"aliases": {
+		"lib": "#lib",
+		"components": "#lib/shared/ui",
+		"utils": "#lib/shared/lib/utils",
+		"hooks": "#lib/shared/lib/hooks",
+		"ui": "#lib/shared/ui/primitives"
+	},
+	"typescript": true,
+	"registry": "https://shadcn-svelte.com/registry"
+}
