@@ -5,7 +5,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>{data.task.key} {data.task.title} · project/ai</title></svelte:head>
+<svelte:head><title>{data.task.key} {data.task.title} · Briefline</title></svelte:head>
 <TaskPage
 	project={data.project}
 	task={data.task}

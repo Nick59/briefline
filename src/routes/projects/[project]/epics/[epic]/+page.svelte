@@ -5,7 +5,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>{data.epic.key} {data.epic.title} · project/ai</title></svelte:head>
+<svelte:head><title>{data.epic.key} {data.epic.title} · Briefline</title></svelte:head>
 <EpicPage
 	project={data.project}
 	epic={data.epic}

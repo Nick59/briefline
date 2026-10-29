@@ -3,6 +3,7 @@
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
+	import Brand from '#lib/shared/ui/brand/Brand.svelte';
 
 	let { error, next }: { error?: string; next: string } = $props();
 </script>
@@ -10,9 +11,7 @@
 <div class="grid min-h-dvh place-items-center px-4">
 	<form method="POST" use:enhance class="grid w-full max-w-sm gap-4 rounded-xl border bg-card p-6">
 		<div class="space-y-1">
-			<p class="font-mono text-sm font-semibold">
-				project<span class="text-muted-foreground">/</span>ai
-			</p>
+			<div class="mb-5"><Brand /></div>
 			<h1 class="text-lg font-semibold">Sign in</h1>
 			<p class="text-sm text-muted-foreground">Enter the server's API token (PM_API_TOKEN).</p>
 		</div>

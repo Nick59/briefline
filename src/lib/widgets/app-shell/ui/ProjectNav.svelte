@@ -50,13 +50,13 @@
 				aria-current={path === projectHref ? 'page' : undefined}
 				class={cn(
 					'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent',
-					active && 'bg-sidebar-accent font-medium'
+					active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
 				)}
 			>
 				<span
 					class={cn(
 						'grid size-6 shrink-0 place-items-center rounded font-mono text-[9px] font-semibold',
-						active ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground'
+						active ? 'bg-brand text-brand-foreground' : 'bg-muted text-muted-foreground'
 					)}
 				>
 					{project.key.slice(0, 3)}

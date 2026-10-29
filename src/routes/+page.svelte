@@ -5,5 +5,5 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>Projects · project/ai</title></svelte:head>
+<svelte:head><title>Projects · Briefline</title></svelte:head>
 <HomePage projects={data.projects} activity={data.activity} />

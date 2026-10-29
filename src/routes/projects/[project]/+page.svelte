@@ -5,7 +5,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>{data.project.name} · project/ai</title></svelte:head>
+<svelte:head><title>{data.project.name} · Briefline</title></svelte:head>
 <ProjectPage
 	project={data.project}
 	epics={data.epics}

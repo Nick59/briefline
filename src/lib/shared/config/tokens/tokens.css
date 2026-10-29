@@ -1,3 +1,5 @@
+/* Hallmark · brand refresh: Briefline · tone: quiet workbench · anchor hue: forest green
+ * Pre-emit critique: Philosophy 4 · Hierarchy 4 · Execution 4 · Specificity 4 · Restraint 5 · Variety 3 */
 /*
  * Design tokens, in three tiers:
  * 1. primitives  (--p-*): raw palette and scales. Never used by components directly.
@@ -6,21 +8,21 @@
  */
 
 :root {
-	/* Primitives: neutral scale with a slight cool tint */
+	/* Primitives: warm paper and forest-tinted charcoal */
 	--p-gray-0: oklch(1 0 0);
-	--p-gray-25: oklch(0.988 0.002 260);
-	--p-gray-50: oklch(0.975 0.003 260);
-	--p-gray-100: oklch(0.955 0.004 260);
-	--p-gray-200: oklch(0.915 0.006 260);
-	--p-gray-300: oklch(0.86 0.008 260);
-	--p-gray-400: oklch(0.72 0.012 260);
-	--p-gray-500: oklch(0.58 0.014 260);
-	--p-gray-600: oklch(0.46 0.014 260);
-	--p-gray-700: oklch(0.36 0.012 260);
-	--p-gray-800: oklch(0.27 0.01 260);
-	--p-gray-850: oklch(0.225 0.009 260);
-	--p-gray-900: oklch(0.19 0.008 260);
-	--p-gray-950: oklch(0.155 0.006 260);
+	--p-gray-25: oklch(0.986 0.006 95);
+	--p-gray-50: oklch(0.971 0.008 95);
+	--p-gray-100: oklch(0.949 0.011 95);
+	--p-gray-200: oklch(0.891 0.014 95);
+	--p-gray-300: oklch(0.829 0.016 95);
+	--p-gray-400: oklch(0.67 0.018 145);
+	--p-gray-500: oklch(0.5 0.018 145);
+	--p-gray-600: oklch(0.43 0.018 145);
+	--p-gray-700: oklch(0.35 0.019 145);
+	--p-gray-800: oklch(0.28 0.018 145);
+	--p-gray-850: oklch(0.24 0.016 145);
+	--p-gray-900: oklch(0.205 0.015 145);
+	--p-gray-950: oklch(0.165 0.013 145);
 
 	/* Primitives: hues */
 	--p-blue-500: oklch(0.6 0.19 258);
@@ -37,6 +39,12 @@
 	--p-red-500: oklch(0.58 0.22 25);
 	--p-red-400: oklch(0.7 0.18 25);
 
+	--p-forest-600: oklch(0.4 0.085 162);
+	--p-forest-300: oklch(0.79 0.105 162);
+	--p-forest-50: oklch(0.93 0.025 155);
+	--p-forest-900: oklch(0.29 0.035 162);
+	--p-gray-975: oklch(0.14 0.012 145);
+
 	/* Primitives: scales */
 	--p-radius-sm: 0.25rem;
 	--p-radius-md: 0.5rem;
@@ -52,8 +60,8 @@
 	--card-foreground: var(--p-gray-900);
 	--popover: var(--p-gray-0);
 	--popover-foreground: var(--p-gray-900);
-	--primary: var(--p-gray-900);
-	--primary-foreground: var(--p-gray-25);
+	--primary: var(--p-forest-600);
+	--primary-foreground: var(--p-gray-0);
 	--secondary: var(--p-gray-100);
 	--secondary-foreground: var(--p-gray-900);
 	--muted: var(--p-gray-100);
@@ -63,9 +71,9 @@
 	--destructive: var(--p-red-500);
 	--border: var(--p-gray-200);
 	--input: var(--p-gray-200);
-	--ring: var(--p-blue-500);
+	--ring: var(--p-forest-600);
 	--sunken: var(--p-gray-50);
-	--brand: var(--p-blue-500);
+	--brand: var(--p-forest-600);
 	--brand-foreground: var(--p-gray-0);
 
 	--chart-1: var(--p-blue-500);
@@ -76,12 +84,12 @@
 
 	--sidebar: var(--p-gray-50);
 	--sidebar-foreground: var(--p-gray-900);
-	--sidebar-primary: var(--p-gray-900);
+	--sidebar-primary: var(--p-forest-600);
 	--sidebar-primary-foreground: var(--p-gray-25);
-	--sidebar-accent: var(--p-gray-100);
-	--sidebar-accent-foreground: var(--p-gray-900);
+	--sidebar-accent: var(--p-forest-50);
+	--sidebar-accent-foreground: var(--p-forest-600);
 	--sidebar-border: var(--p-gray-200);
-	--sidebar-ring: var(--p-blue-500);
+	--sidebar-ring: var(--p-forest-600);
 
 	/* Semantic: work status */
 	--status-todo: var(--p-gray-400);
@@ -119,7 +127,7 @@
 	--card-foreground: var(--p-gray-50);
 	--popover: var(--p-gray-900);
 	--popover-foreground: var(--p-gray-50);
-	--primary: var(--p-gray-50);
+	--primary: var(--p-forest-300);
 	--primary-foreground: var(--p-gray-900);
 	--secondary: var(--p-gray-850);
 	--secondary-foreground: var(--p-gray-50);
@@ -130,19 +138,19 @@
 	--destructive: var(--p-red-400);
 	--border: var(--p-gray-800);
 	--input: var(--p-gray-800);
-	--ring: var(--p-blue-400);
-	--sunken: oklch(0.13 0.006 260);
-	--brand: var(--p-blue-400);
+	--ring: var(--p-forest-300);
+	--sunken: var(--p-gray-975);
+	--brand: var(--p-forest-300);
 	--brand-foreground: var(--p-gray-950);
 
 	--sidebar: var(--p-gray-900);
 	--sidebar-foreground: var(--p-gray-50);
-	--sidebar-primary: var(--p-gray-50);
+	--sidebar-primary: var(--p-forest-300);
 	--sidebar-primary-foreground: var(--p-gray-900);
-	--sidebar-accent: var(--p-gray-850);
-	--sidebar-accent-foreground: var(--p-gray-50);
+	--sidebar-accent: var(--p-forest-900);
+	--sidebar-accent-foreground: var(--p-forest-300);
 	--sidebar-border: var(--p-gray-800);
-	--sidebar-ring: var(--p-blue-400);
+	--sidebar-ring: var(--p-forest-300);
 
 	--status-todo: var(--p-gray-500);
 	--status-in-progress: var(--p-blue-400);

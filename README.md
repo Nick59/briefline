@@ -1,4 +1,4 @@
-# project/ai — AI project manager
+# Briefline — AI work. Human clarity.
 
 A dev dashboard that tracks work planned and executed by AI agents, and translates their specs for humans.
 

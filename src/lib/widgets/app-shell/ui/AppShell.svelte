@@ -11,6 +11,7 @@
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { ThemeToggle } from '#lib/features/theme-toggle/index.ts';
 	import ProjectNav from './ProjectNav.svelte';
+	import Brand from '#lib/shared/ui/brand/Brand.svelte';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -43,13 +44,9 @@
 		<a
 			href={resolve('/')}
 			onclick={onnavigate}
-			class="flex items-center gap-2 px-2 pt-1 font-mono text-sm font-semibold tracking-tight"
+			class="flex items-center rounded-md px-2 py-2 focus-visible:outline-2 focus-visible:outline-ring"
 		>
-			<span
-				class="grid size-6 place-items-center rounded-md bg-foreground text-[10px] text-background"
-				>pm</span
-			>
-			<span>project<span class="text-muted-foreground">/</span>ai</span>
+			<Brand />
 		</a>
 		<nav class="space-y-0.5" aria-label="Main">
 			{#each links as link (link.href)}
@@ -60,7 +57,7 @@
 					aria-current={active ? 'page' : undefined}
 					class={cn(
 						'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground',
-						active && 'bg-sidebar-accent text-foreground'
+						active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
 					)}
 				>
 					<link.icon class="size-4" />{link.label}
@@ -99,9 +96,7 @@
 					{@render sidebar(() => (mobileOpen = false))}
 				</Sheet.Content>
 			</Sheet.Root>
-			<span class="font-mono text-sm font-semibold"
-				>project<span class="text-muted-foreground">/</span>ai</span
-			>
+			<a href={resolve('/')} aria-label="Briefline home"><Brand compact /></a>
 		</header>
 		<main class="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 md:px-8 md:py-8">
 			{@render children()}

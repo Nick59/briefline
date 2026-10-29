@@ -12,7 +12,12 @@
 </script>
 
 <svelte:head>
-	<link rel="icon" href={favicon} />
+	<link rel="icon" type="image/svg+xml" href={favicon} />
+	<meta name="application-name" content="Briefline" />
+	<meta
+		name="description"
+		content="Track what AI agents plan and ship, with clear specs, progress, and human briefs."
+	/>
 </svelte:head>
 
 <ModeWatcher />

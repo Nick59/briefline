@@ -5,5 +5,5 @@
 	let { data, form }: PageProps = $props();
 </script>
 
-<svelte:head><title>Sign in · project/ai</title></svelte:head>
+<svelte:head><title>Sign in · Briefline</title></svelte:head>
 <LoginPage next={data.next} error={form?.error} />
