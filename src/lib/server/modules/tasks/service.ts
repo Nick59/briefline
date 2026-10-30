@@ -41,7 +41,13 @@ export class TaskService {
 		const phase = task.phaseId ? repos.phases.find(task.phaseId) : undefined;
 		return {
 			...task,
-			epic: { id: epic.id, key: epic.key, title: epic.title, projectId: epic.projectId },
+			epic: {
+				id: epic.id,
+				key: epic.key,
+				title: epic.title,
+				projectId: epic.projectId,
+				externalRef: epic.externalRef
+			},
 			project: { id: project.id, key: project.key, name: project.name },
 			phase: phase ? { id: phase.id, name: phase.name } : null,
 			specs: repos.specs.listByEpic(epic.id, task.id).map(toSpecSummary)
@@ -209,6 +215,9 @@ export class TaskService {
 				});
 			}
 			if (transferring) {
+				repos.tasks.listByEpic(source.id).forEach((t, position) => {
+					if (t.position !== position) repos.tasks.setPosition(t.id, position);
+				});
 				this.#emit('task.updated', source, task, actor, ['epicId']);
 				this.#emit('task.updated', target, this.get(task.id), actor, ['epicId', 'phaseId']);
 			}

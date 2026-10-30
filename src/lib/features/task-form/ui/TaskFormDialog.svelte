@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
@@ -75,7 +76,7 @@
 	<Dialog.Content class="sm:max-w-2xl">
 		<form class="grid gap-4" onsubmit={submit}>
 			<Dialog.Header>
-				<Dialog.Title>{task ? `Edit ${task.key}` : 'New task'}</Dialog.Title>
+				<Dialog.Title>{task ? `Edit ${displayKey(task)}` : 'New task'}</Dialog.Title>
 			</Dialog.Header>
 			<Field label="Title" for="task-title">
 				<Input id="task-title" bind:value={title} required maxlength={200} />

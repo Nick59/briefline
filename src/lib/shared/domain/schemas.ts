@@ -14,7 +14,7 @@ export const externalRefSchema = z
 	.object({
 		provider: text(40)
 			.min(1)
-			.describe('Ticket provider id, e.g. github, jira, linear, webhook, dry-run'),
+			.describe('Ticket provider id, e.g. github, jira, linear, plane, webhook, dry-run'),
 		key: text(200)
 			.min(1)
 			.describe('Ticket identifier in the provider, e.g. PROJ-12 or owner/repo#42'),

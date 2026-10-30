@@ -6,7 +6,7 @@ A dev dashboard that tracks work planned and executed by AI agents, and translat
   **stages — Dev, Tests, Deploy** — and each stage is **To do, In progress or Done**.
 - **Specs** (markdown, any number per epic or task) are shown in an extensible viewer, and translated into a
   **human brief**: what changes, why, how we know it is done, risks, open questions, and a glossary.
-- **External tickets** (optional) in GitHub Issues, Jira, Linear or any system behind a webhook are updated when
+- **External tickets** (optional) in GitHub Issues, Jira, Linear, Plane or any system behind a webhook are updated when
   work moves on the dashboard.
 - **API first.** Every action is a REST operation and an **MCP tool**, so agents such as Claude Code can plan
   epics and report progress directly.
@@ -81,6 +81,7 @@ is a **sync job**: visible in the sync log, with its error, and retryable.
 | `github`  | Done → issue closed, otherwise open                        | `GITHUB_TOKEN`                 |
 | `jira`    | To do / In progress / Done → status category transition    | `JIRA_EMAIL`, `JIRA_API_TOKEN` |
 | `linear`  | → first workflow state of type unstarted/started/completed | `LINEAR_API_KEY`               |
+| `plane`   | → first state of group unstarted/started/completed         | `PLANE_API_KEY`                |
 | `webhook` | POSTs JSON, signed with `x-pm-signature: sha256=…`         | `PM_WEBHOOK_SECRET` (optional) |
 | `dry-run` | Records the update without calling anything                | —                              |
 

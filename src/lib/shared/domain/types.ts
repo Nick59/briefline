@@ -168,7 +168,7 @@ export interface ProjectSummary extends Project {
 }
 
 export interface TaskDetail extends Task {
-	epic: Pick<Epic, 'id' | 'key' | 'title' | 'projectId'>;
+	epic: Pick<Epic, 'id' | 'key' | 'title' | 'projectId' | 'externalRef'>;
 	project: Pick<Project, 'id' | 'key' | 'name'>;
 	phase: Pick<Phase, 'id' | 'name'> | null;
 	specs: SpecSummary[];

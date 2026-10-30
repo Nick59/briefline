@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import * as DropdownMenu from '#lib/shared/ui/primitives/dropdown-menu/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
@@ -25,7 +26,7 @@
 				{...props}
 				variant="ghost"
 				size="icon-xs"
-				aria-label="Change status of {task.key}"
+				aria-label="Change status of {displayKey(task)}"
 				class="opacity-60 group-hover:opacity-100"
 			>
 				<EllipsisIcon />

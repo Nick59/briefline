@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { resolve } from '$app/paths';
 	import type {
@@ -30,7 +31,7 @@
 	}
 
 	let { project, epic, selectedSpec, activity, syncJobs, ticketUrl }: Props = $props();
-	const taskKeys = $derived(new Map(epic.tasks.map((t) => [t.id, t.key])));
+	const taskKeys = $derived(new Map(epic.tasks.map((t) => [t.id, displayKey(t)])));
 	const ownerLabel = (spec: SpecSummary) =>
 		spec.taskId ? (taskKeys.get(spec.taskId) ?? null) : null;
 </script>
@@ -40,7 +41,7 @@
 		<Crumbs
 			items={[
 				{ label: project.name, href: resolve('/projects/[project]', { project: project.key }) },
-				{ label: epic.key, mono: true }
+				{ label: displayKey(epic), mono: true }
 			]}
 		/>
 		<EpicHeader {epic} {project} {ticketUrl} />

@@ -8,8 +8,7 @@
 
 {#snippet content()}
 	<TicketIcon class="size-3.5 text-muted-foreground" />
-	<span class="text-muted-foreground">{ref.provider}</span>
-	<span class="font-mono font-medium">{ref.key}</span>
+	<span class="font-medium">{ref.provider}</span>
 {/snippet}
 
 {#if url}

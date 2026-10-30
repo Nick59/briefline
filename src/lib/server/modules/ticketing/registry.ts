@@ -3,6 +3,7 @@ import { dryRunProvider } from './providers/dry-run.ts';
 import { githubProvider } from './providers/github.ts';
 import { jiraProvider } from './providers/jira.ts';
 import { linearProvider } from './providers/linear.ts';
+import { planeProvider } from './providers/plane.ts';
 import { webhookProvider } from './providers/webhook.ts';
 
 export class TicketProviderRegistry {
@@ -33,6 +34,7 @@ export function createDefaultRegistry(): TicketProviderRegistry {
 		.register(githubProvider)
 		.register(jiraProvider)
 		.register(linearProvider)
+		.register(planeProvider)
 		.register(webhookProvider)
 		.register(dryRunProvider);
 }

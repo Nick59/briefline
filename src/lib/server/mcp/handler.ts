@@ -14,7 +14,7 @@ Typical flow for an agent:
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
 4. Attach your specs/plans as markdown with add_epic_spec or add_task_spec, then translate_spec so humans get a plain-language brief.
    Add diagrams as \`\`\`mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
-Linked tickets in Jira, GitHub, Linear or a webhook are updated automatically when ticket sync is on.
+Linked tickets in Jira, GitHub, Linear, Plane or a webhook are updated automatically when ticket sync is on.
 Ids and keys are interchangeable: PMA, PMA-E1 and PMA-12 work wherever an id is expected.`;
 
 interface JsonRpcRequest {

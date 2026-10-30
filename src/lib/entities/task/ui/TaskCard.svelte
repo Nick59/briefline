@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import UserIcon from '@lucide/svelte/icons/user-round';
@@ -27,7 +28,7 @@
 >
 	<div class="mb-1.5 flex items-center justify-between gap-2">
 		<div class="flex items-center gap-2">
-			<KeyChip value={task.key} />
+			<KeyChip value={displayKey(task)} title={displayKeyTitle(task)} />
 			<TaskStageStrip stages={task.stages} size={12} />
 		</div>
 		{#if actions}
@@ -53,9 +54,6 @@
 		{/if}
 		{#if phaseName}
 			<span class="truncate">{phaseName}</span>
-		{/if}
-		{#if task.externalRef}
-			<span class="font-mono">{task.externalRef.key}</span>
 		{/if}
 	</div>
 </article>

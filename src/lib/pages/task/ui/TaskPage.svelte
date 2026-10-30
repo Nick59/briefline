@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import UserIcon from '@lucide/svelte/icons/user-round';
@@ -42,13 +43,13 @@
 		<Crumbs
 			items={[
 				{ label: project.name, href: resolve('/projects/[project]', { project: project.key }) },
-				{ label: task.epic.key, href: epicHref, mono: true },
-				{ label: task.key, mono: true }
+				{ label: displayKey(task.epic), href: epicHref, mono: true },
+				{ label: displayKey(task), mono: true }
 			]}
 		/>
 		<PageHeader title={task.title}>
 			{#snippet eyebrow()}
-				<KeyChip value={task.key} />
+				<KeyChip value={displayKey(task)} title={displayKeyTitle(task)} />
 				<StatusBadge status={taskOverallStatus(task.stages)} />
 				<PriorityBadge priority={task.priority} />
 				{#if task.assignee}<span class="inline-flex items-center gap-1 text-xs"
@@ -76,7 +77,7 @@
 				<DeleteButton
 					operation="delete_task"
 					input={{ task: task.id }}
-					what="task {task.key}"
+					what="task {displayKey(task)}"
 					consequence="Its specs are deleted too."
 					redirectTo={epicHref}
 				/>

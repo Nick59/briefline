@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
@@ -28,7 +29,7 @@
 <div class="space-y-6">
 	<PageHeader title={epic.title}>
 		{#snippet eyebrow()}
-			<KeyChip value={epic.key} />
+			<KeyChip value={displayKey(epic)} title={displayKeyTitle(epic)} />
 			<StatusBadge status={epic.progress.status} />
 			{#if epic.progress.currentStage}<StageBadge
 					stage={epic.progress.currentStage}
@@ -58,7 +59,7 @@
 			<DeleteButton
 				operation="delete_epic"
 				input={{ epic: epic.id }}
-				what="epic {epic.key}"
+				what="epic {displayKey(epic)}"
 				consequence="Its phases, tasks and specs are deleted too. Linked tickets are not touched."
 				redirectTo={resolve('/projects/[project]', { project: project.key })}
 			/>

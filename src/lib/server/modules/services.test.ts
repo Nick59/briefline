@@ -155,6 +155,33 @@ describe('moving tasks on the board', () => {
 		expect(app.activity.forEpic(epic.key).some((a) => a.action === 'task.updated')).toBe(false);
 	});
 
+	const positions = (app: ReturnType<typeof testApp>['app'], epicKey: string) =>
+		app.tasks.list(epicKey).map((t) => t.position);
+
+	it('appends new tasks and moves a task up, down and to the end with dense positions', () => {
+		const { app, epic } = withEpic();
+		app.tasks.create(epic.key, { title: 'Docs' }, 'test');
+		app.tasks.create(epic.key, { title: 'More' }, 'test');
+		expect(order(app, epic.key)).toEqual(['PMA-1', 'PMA-2', 'PMA-3', 'PMA-4']);
+		app.tasks.move('PMA-4', { beforeTask: 'PMA-2' }, 'test');
+		expect(order(app, epic.key)).toEqual(['PMA-1', 'PMA-4', 'PMA-2', 'PMA-3']);
+		app.tasks.move('PMA-1', { beforeTask: 'PMA-3' }, 'test');
+		expect(order(app, epic.key)).toEqual(['PMA-4', 'PMA-2', 'PMA-1', 'PMA-3']);
+		app.tasks.move('PMA-4', { beforeTask: null }, 'test');
+		expect(order(app, epic.key)).toEqual(['PMA-2', 'PMA-1', 'PMA-3', 'PMA-4']);
+		expect(positions(app, epic.key)).toEqual([0, 1, 2, 3]);
+	});
+
+	it('keeps the position when only the status changes', () => {
+		const { app, epic } = withEpic();
+		app.tasks.create(epic.key, { title: 'Docs' }, 'test');
+		const before = positions(app, epic.key);
+		app.tasks.move('PMA-1', { stage: 'dev', status: 'done' }, 'test');
+		app.tasks.setStage('PMA-3', { stage: 'test', status: 'in_progress' }, 'test');
+		expect(order(app, epic.key)).toEqual(['PMA-1', 'PMA-2', 'PMA-3']);
+		expect(positions(app, epic.key)).toEqual(before);
+	});
+
 	it('changes column and position in one step', () => {
 		const { app, epic } = withEpic();
 		const moved = app.tasks.move(
@@ -201,6 +228,24 @@ describe('moving tasks between epics', () => {
 		expect(app.tasks.list(target.id).map((t) => t.key)).toEqual(['PMA-2', 'PMA-1']);
 		expect(app.epics.detail(target.id).progress.status).toBe('in_progress');
 		expect(app.epics.detail(epic.id).tasks).toHaveLength(0);
+	});
+	it('compacts the source epic and inserts at the drop point in the target', () => {
+		const { app, epic } = withEpic();
+		app.tasks.create(epic.key, { title: 'Docs' }, 'test');
+		const target = app.epics.create('PMA', { title: 'Destination' }, 'test');
+		app.tasks.create(target.key, { title: 'A' }, 'test');
+		app.tasks.create(target.key, { title: 'B' }, 'test');
+		const [a, b] = app.tasks.list(target.key);
+		app.tasks.move('PMA-1', { epic: target.id, beforeTask: b.key }, 'test');
+		expect(app.tasks.list(target.key).map((t) => [t.key, t.position])).toEqual([
+			[a.key, 0],
+			['PMA-1', 1],
+			[b.key, 2]
+		]);
+		expect(app.tasks.list(epic.key).map((t) => [t.key, t.position])).toEqual([
+			['PMA-2', 0],
+			['PMA-3', 1]
+		]);
 	});
 	it('rejects other projects and invalid insertion targets without changing the task', () => {
 		const { app, epic } = withEpic();

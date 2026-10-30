@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import type { Sortable } from '#lib/shared/lib/dnd/index.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
-	import TicketIcon from '@lucide/svelte/icons/ticket';
 	import type { EpicSummary, Task } from '#lib/shared/domain/types.ts';
 	import { formatDate, pluralize } from '#lib/shared/lib/format.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
@@ -9,7 +9,7 @@
 	import { resolve } from '$app/paths';
 	import TimelineTaskRow from '../../epic-timeline/ui/TimelineTaskRow.svelte';
 	import { PhaseMarker } from '#lib/entities/phase/index.ts';
-	import { StatusBadge } from '#lib/entities/work-status/index.ts';
+	import { StageBadge, StatusBadge } from '#lib/entities/work-status/index.ts';
 
 	interface Props {
 		taskSortable: Sortable;
@@ -22,6 +22,11 @@
 
 	let { epic, index, isLast, href, projectKey, taskSortable }: Props = $props();
 	const status = $derived(epic.progress.status);
+	const stage = $derived(
+		status === 'in_progress' && epic.progress.currentStage && epic.progress.currentStage !== 'dev'
+			? epic.progress.currentStage
+			: null
+	);
 </script>
 
 <li class="group/epic relative grid grid-cols-[1.75rem_1fr] gap-x-3">
@@ -34,27 +39,26 @@
 			aria-hidden="true"
 		></span>
 	{/if}
-	<PhaseMarker {status} {index} />
+	<PhaseMarker {status} {index} {stage} />
 	<div class="min-w-0 pb-8">
 		<div class="flex min-h-7 flex-wrap items-center gap-2">
-			<KeyChip value={epic.key} />
+			<KeyChip value={displayKey(epic)} title={displayKeyTitle(epic)} />
 			<h3 class="min-w-0 truncate text-sm font-semibold">
 				<a {href} class="hover:underline focus-visible:underline focus-visible:outline-none"
 					>{epic.title}</a
 				>
 			</h3>
-			<StatusBadge {status} />
+			{#if stage}
+				<StageBadge {stage} />
+			{:else}
+				<StatusBadge {status} />
+			{/if}
 		</div>
 		<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 			<span>{pluralize(epic.phaseCount, 'phase')} · {pluralize(epic.taskCount, 'task')}</span>
 			{#if epic.targetDate}
 				<span class="inline-flex items-center gap-1"
 					><CalendarIcon class="size-3" />{formatDate(epic.targetDate, true)}</span
-				>
-			{/if}
-			{#if epic.externalRef}
-				<span class="inline-flex items-center gap-1 font-mono"
-					><TicketIcon class="size-3" />{epic.externalRef.key}</span
 				>
 			{/if}
 		</p>
