@@ -1,4 +1,6 @@
 import type { Priority, Stage, WorkStatus } from '#lib/shared/domain/constants.ts';
+import { taskCurrentStage, taskOverallStatus } from '#lib/shared/domain/progress.ts';
+import type { StageStatuses } from '#lib/shared/domain/types.ts';
 
 /**
  * A tone is a semantic color token. Components receive a tone and turn it into classes,
@@ -155,3 +157,31 @@ export const toneClasses: Record<
 		dot: 'bg-brand'
 	}
 };
+
+/** Subtle row/card tint: faint background, stronger on hover, and a left accent. */
+const tintClasses = {
+	'status-in-progress':
+		'bg-status-in-progress/10 hover:bg-status-in-progress/15 border-l-[3px] border-l-status-in-progress hover:border-l-status-in-progress',
+	'status-done':
+		'bg-status-done/8 hover:bg-status-done/12 border-l-[3px] border-l-status-done/70 hover:border-l-status-done/70',
+	'stage-test':
+		'bg-stage-test/10 hover:bg-stage-test/15 border-l-[3px] border-l-stage-test hover:border-l-stage-test',
+	'stage-deploy':
+		'bg-stage-deploy/10 hover:bg-stage-deploy/15 border-l-[3px] border-l-stage-deploy hover:border-l-stage-deploy'
+} as const;
+
+/** Tone a task is tinted with, or null for a task that has not started. */
+export function taskTintTone(stages: StageStatuses): keyof typeof tintClasses | null {
+	const status = taskOverallStatus(stages);
+	if (status === 'todo') return null;
+	if (status === 'done') return statusTone.done as 'status-done';
+	const stage = taskCurrentStage(stages);
+	if (stage === 'test' || stage === 'deploy')
+		return stageTone[stage] as 'stage-test' | 'stage-deploy';
+	return statusTone.in_progress as 'status-in-progress';
+}
+
+export function taskTintClass(stages: StageStatuses): string {
+	const tone = taskTintTone(stages);
+	return tone ? tintClasses[tone] : '';
+}

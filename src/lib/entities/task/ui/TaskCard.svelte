@@ -5,6 +5,7 @@
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import type { Task } from '#lib/shared/domain/types.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
+	import { taskTintClass } from '#lib/shared/config/tokens/index.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import PriorityBadge from './PriorityBadge.svelte';
 	import TaskStageStrip from './TaskStageStrip.svelte';
@@ -22,6 +23,7 @@
 <article
 	class={cn(
 		'group relative rounded-lg border bg-card p-3 shadow-xs transition-[border-color,box-shadow] duration-(--duration-fast) hover:border-foreground/20 hover:shadow-sm',
+		taskTintClass(task.stages),
 		className
 	)}
 	{...rest}
