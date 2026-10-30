@@ -16,6 +16,7 @@
 		Project,
 		StatusMapping,
 		TicketingConnection,
+		TicketingProject,
 		TicketingState,
 		TicketProviderInfo
 	} from '#lib/shared/domain/types.ts';
@@ -40,6 +41,9 @@
 	let loadingStates = $state(false);
 	let statesError = $state<string | null>(null);
 	let loadToken = 0;
+	let projects = $state<TicketingProject[]>([]);
+	let projectsError = $state<string | null>(null);
+	let projectsToken = 0;
 
 	$effect.pre(() => {
 		const ticketing = project.ticketing;
@@ -92,9 +96,34 @@
 		}
 	}
 
+	async function loadProjects() {
+		projects = [];
+		projectsError = null;
+		if (!connection || !provider?.supportsProjects) return;
+		const token = ++projectsToken;
+		const outcome = await runOperation<TicketingProject[]>(
+			'list_ticketing_projects',
+			{ connection: connection.id },
+			{ refresh: false, silent: true }
+		);
+		if (token !== projectsToken) return;
+		if (outcome.ok) projects = outcome.result;
+		else projectsError = outcome.message;
+	}
+
+	function projectOptions(current: string | undefined) {
+		const options = projects.map((p) => ({ value: p.id, label: `${p.name} · ${p.identifier}` }));
+		return current && !projects.some((p) => p.id === current)
+			? [{ value: current, label: current }, ...options]
+			: options;
+	}
+
 	$effect(() => {
 		void connectionId;
-		untrack(() => void loadStates());
+		untrack(() => {
+			void loadProjects();
+			void loadStates();
+		});
 	});
 
 	function cleanTarget() {
@@ -178,12 +207,28 @@
 					for="target-{field.name}"
 					hint={field.help}
 				>
-					<Input
-						id="target-{field.name}"
-						bind:value={target[field.name]}
-						required={field.required}
-						placeholder={field.placeholder}
-					/>
+					{#if field.picker === 'projects' && projects.length}
+						<ChoiceSelect
+							id="target-{field.name}"
+							bind:value={target[field.name]}
+							options={projectOptions(target[field.name])}
+							placeholder="Select a project"
+							class="sm:w-96"
+							onchange={() => void loadStates()}
+						/>
+					{:else}
+						<Input
+							id="target-{field.name}"
+							bind:value={target[field.name]}
+							required={field.required}
+							placeholder={field.placeholder}
+						/>
+						{#if field.picker === 'projects' && projectsError}
+							<p class="mt-1 text-sm text-destructive">
+								Could not load the project list ({projectsError}). Enter the ID by hand.
+							</p>
+						{/if}
+					{/if}
 				</Field>
 			{/each}
 

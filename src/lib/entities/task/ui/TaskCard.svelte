@@ -7,6 +7,7 @@
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { taskTintClass } from '#lib/shared/config/tokens/index.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
+	import { useLiveActivity } from '#lib/shared/lib/live-activity/index.ts';
 	import PriorityBadge from './PriorityBadge.svelte';
 	import TaskStageStrip from './TaskStageStrip.svelte';
 
@@ -17,12 +18,15 @@
 	}
 
 	let { task, href, actions, class: className, ...rest }: Props = $props();
+	const live = useLiveActivity();
 </script>
 
 <article
 	class={cn(
-		'group relative rounded-lg border bg-card p-3 shadow-xs transition-[border-color,box-shadow] duration-(--duration-fast) hover:border-foreground/20 hover:shadow-sm',
+		'group relative rounded-lg border bg-card p-3 shadow-xs transition-[border-color,box-shadow,background-color] duration-(--duration-fast) hover:border-foreground/20 hover:shadow-sm',
 		taskTintClass(task.stages),
+		live?.isChanged(task.key) &&
+			'bg-brand/15 duration-1500 motion-reduce:transition-none',
 		className
 	)}
 	{...rest}

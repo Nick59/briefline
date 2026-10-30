@@ -1,12 +1,14 @@
 import type { WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	expectOk,
+	providerFetch,
 	requireSecret,
 	requireSetting,
 	resolveMapped,
 	TicketProviderError,
 	TIMEOUT_MS,
 	type ProviderContext,
+	type ProviderProject,
 	type ProviderState,
 	type TicketProvider
 } from '../provider.ts';
@@ -29,17 +31,28 @@ function appBase(settings: Record<string, string>) {
 	return api === CLOUD_API ? CLOUD_APP : api;
 }
 
+const HINT = 'Check the base URL and project ID.';
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const IDENTIFIER = /^[a-z0-9_]{1,12}$/i;
+
 async function request(ctx: ProviderContext, path: string, init: RequestInit = {}) {
 	const slug = encodeURIComponent(requireSetting(ctx, 'workspaceSlug'));
-	const response = await ctx.fetch(`${apiBase(ctx.settings)}/api/v1/workspaces/${slug}${path}`, {
-		...init,
-		headers: {
-			accept: 'application/json',
-			'content-type': 'application/json',
-			'x-api-key': requireSecret(ctx)
+	const url = `${apiBase(ctx.settings)}/api/v1/workspaces/${slug}${path}`;
+	const response = await providerFetch(
+		ctx,
+		'Plane',
+		url,
+		{
+			...init,
+			headers: {
+				accept: 'application/json',
+				'content-type': 'application/json',
+				'x-api-key': requireSecret(ctx)
+			},
+			signal: AbortSignal.timeout(TIMEOUT_MS)
 		},
-		signal: AbortSignal.timeout(TIMEOUT_MS)
-	});
+		{ hint: HINT }
+	);
 	// Plane allows 60 requests a minute; the job can be retried once the window passes.
 	if (response.status === 429)
 		throw new TicketProviderError('Plane rate limit reached (HTTP 429); retry in a minute');
@@ -50,8 +63,29 @@ function pageResults<T>(body: T[] | { results: T[] }): T[] {
 	return Array.isArray(body) ? body : body.results;
 }
 
+async function fetchProjects(ctx: ProviderContext): Promise<ProviderProject[]> {
+	const response = await request(ctx, '/projects/');
+	await expectOk(response, 'Plane list projects');
+	const body = (await response.json()) as ProviderProject[] | { results: ProviderProject[] };
+	return pageResults(body).map(({ id, name, identifier }) => ({ id, name, identifier }));
+}
+
+/** Accepts the project UUID, a Plane URL containing it, or the project identifier (e.g. SOFT). */
+async function resolveProjectId(ctx: ProviderContext): Promise<string> {
+	const raw = requireSetting(ctx, 'projectId');
+	const uuid = raw.match(UUID)?.[0];
+	if (uuid) return uuid.toLowerCase();
+	if (IDENTIFIER.test(raw)) {
+		const match = (await fetchProjects(ctx)).find(
+			(p) => p.identifier.toLowerCase() === raw.toLowerCase()
+		);
+		if (match) return match.id;
+	}
+	throw new TicketProviderError('Use the Plane project ID (UUID), not the identifier.');
+}
+
 async function fetchStates(ctx: ProviderContext): Promise<ProviderState[]> {
-	const projectId = encodeURIComponent(requireSetting(ctx, 'projectId'));
+	const projectId = await resolveProjectId(ctx);
 	const response = await request(ctx, `/projects/${projectId}/states/`);
 	await expectOk(response, 'Plane list states');
 	const body = (await response.json()) as ProviderState[] | { results: ProviderState[] };
@@ -83,7 +117,8 @@ export const planeProvider: TicketProvider = {
 			label: 'Project ID (UUID)',
 			required: true,
 			scope: 'project',
-			placeholder: '3f1c2a5e-0000-0000-0000-000000000000'
+			placeholder: '3f1c2a5e-0000-0000-0000-000000000000',
+			picker: 'projects'
 		}
 	],
 	envVars: ['PLANE_API_KEY'],
@@ -101,8 +136,9 @@ export const planeProvider: TicketProvider = {
 		await expectOk(response, 'Plane check');
 	},
 	listStates: fetchStates,
+	listProjects: fetchProjects,
 	async push(ctx, update) {
-		const projectId = encodeURIComponent(requireSetting(ctx, 'projectId'));
+		const projectId = await resolveProjectId(ctx);
 		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);
 		await expectOk(lookup, 'Plane find work item');
 		const { id } = (await lookup.json()) as { id: string };

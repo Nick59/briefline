@@ -40,13 +40,21 @@ export interface PushResult {
 	note?: string;
 }
 
-export interface TicketProvider extends TicketProviderInfo {
+export interface TicketProvider extends Omit<TicketProviderInfo, 'supportsProjects'> {
 	ticketUrl(ref: ExternalRef, settings: Record<string, string>): string | null;
 	push(ctx: TicketContext, update: TicketUpdate): Promise<PushResult | void>;
 	/** States an issue can be moved to. Group values: backlog, unstarted, started, completed. */
 	listStates(ctx: ProviderContext): Promise<ProviderState[]>;
 	/** Cheap authenticated request; throws TicketProviderError when the connection does not work. */
 	testConnection(ctx: ProviderContext): Promise<void>;
+	/** Projects of the external system, when the project target can be picked from a list. */
+	listProjects?(ctx: ProviderContext): Promise<ProviderProject[]>;
+}
+
+export interface ProviderProject {
+	id: string;
+	name: string;
+	identifier: string;
 }
 
 export class TicketProviderError extends Error {}
@@ -87,3 +95,76 @@ export async function expectOk(response: Response, what: string) {
 }
 
 export const TIMEOUT_MS = 10_000;
+
+function redact(text: string, ctx: ProviderContext) {
+	return ctx.secret ? text.split(ctx.secret).join('***') : text;
+}
+
+function safeUrl(url: string) {
+	try {
+		const parsed = new URL(url);
+		parsed.username = '';
+		parsed.password = '';
+		return parsed.toString();
+	} catch {
+		return url;
+	}
+}
+
+export interface FetchOptions {
+	/** Reject a successful response that carries a body that is not JSON. Default true. */
+	json?: boolean;
+	/** Appended to the error message when the response is not JSON. */
+	hint?: string;
+}
+
+/**
+ * Sends a provider request, logs failures (and every request with BRIEFLINE_DEBUG_TICKETING=1),
+ * and rejects a response whose body is not JSON, such as the HTML page of a web app.
+ */
+export async function providerFetch(
+	ctx: ProviderContext,
+	provider: string,
+	url: string,
+	init: RequestInit = {},
+	options: FetchOptions = {}
+): Promise<Response> {
+	const method = init.method ?? 'GET';
+	const shown = safeUrl(url);
+	const started = Date.now();
+	let response: Response;
+	try {
+		response = await ctx.fetch(url, init);
+	} catch (error) {
+		const reason = error instanceof Error ? error.message : String(error);
+		console.warn(`[ticketing] ${provider} ${method} ${shown} -> network error ${reason}`);
+		throw new TicketProviderError(`${provider} ${method} ${shown} failed: ${reason}`);
+	}
+	const contentType = response.headers.get('content-type') ?? '';
+	const isJson = /json/i.test(contentType);
+	const needsBody = !response.ok || (options.json !== false && !isJson);
+	const text = needsBody
+		? await response
+				.clone()
+				.text()
+				.catch(() => '')
+		: '';
+	const wrongType = response.ok && options.json !== false && !isJson && text.trim() !== '';
+
+	if (!response.ok || wrongType) {
+		const snippet = redact(text.replace(/\s+/g, ' ').trim().slice(0, 300), ctx);
+		console.warn(
+			`[ticketing] ${provider} ${method} ${shown} -> ${response.status} ${contentType || '-'} ${snippet}`
+		);
+	} else if (ctx.env.BRIEFLINE_DEBUG_TICKETING === '1') {
+		console.debug(
+			`[ticketing] ${provider} ${method} ${shown} -> ${response.status} ${Date.now() - started}ms`
+		);
+	}
+	if (wrongType) {
+		throw new TicketProviderError(
+			`${provider} returned ${response.status} ${contentType || 'no content-type'} for ${method} ${shown}.${options.hint ? ` ${options.hint}` : ''}`
+		);
+	}
+	return response;
+}

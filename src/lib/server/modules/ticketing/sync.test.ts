@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { planeProvider } from './providers/plane.ts';
 import { connectProject, testApp, type FetchCall } from '../../testing/app.ts';
 
+const PROJECT_UUID = '3f1c2a5e-1111-4222-8333-444455556666';
+
 function setup(
 	provider: string,
 	settings: Record<string, string>,
@@ -174,7 +176,7 @@ describe('status mapping on other providers', () => {
 });
 
 describe('plane provider', () => {
-	const settings = { workspaceSlug: 'acme', projectId: 'proj-1' };
+	const settings = { workspaceSlug: 'acme', projectId: PROJECT_UUID };
 	const states = [
 		{ id: 's-back', name: 'Backlog', group: 'backlog' },
 		{ id: 's-todo', name: 'Todo', group: 'unstarted' },
@@ -222,7 +224,7 @@ describe('plane provider', () => {
 		expect((calls[0].init.headers as Record<string, string>)['x-api-key']).toBe('k');
 		const patch = calls.find((c) => c.init.method === 'PATCH')!;
 		expect(patch.url).toBe(
-			'https://api.plane.so/api/v1/workspaces/acme/projects/proj-1/issues/issue-uuid/'
+			`https://api.plane.so/api/v1/workspaces/acme/projects/${PROJECT_UUID}/issues/issue-uuid/`
 		);
 		expect(JSON.parse(String(patch.init.body))).toEqual({ state: 's-doing' });
 		expect(calls.some((c) => c.url.endsWith('/issues/issue-uuid/comments/'))).toBe(true);

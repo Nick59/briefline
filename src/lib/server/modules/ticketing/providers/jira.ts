@@ -1,6 +1,7 @@
 import type { WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	expectOk,
+	providerFetch,
 	requireSecret,
 	requireSetting,
 	TicketProviderError,
@@ -35,7 +36,7 @@ function request(ctx: ProviderContext, path: string, init: RequestInit = {}) {
 	const email = ctx.settings.email?.trim() || ctx.env.JIRA_EMAIL;
 	if (!email) throw new TicketProviderError('Missing Jira account email');
 	const auth = Buffer.from(`${email}:${requireSecret(ctx)}`).toString('base64');
-	return ctx.fetch(`${base}${path}`, {
+	return providerFetch(ctx, 'Jira', `${base}${path}`, {
 		...init,
 		headers: {
 			accept: 'application/json',

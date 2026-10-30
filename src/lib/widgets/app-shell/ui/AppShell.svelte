@@ -11,6 +11,7 @@
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { ThemeToggle } from '#lib/features/theme-toggle/index.ts';
+	import LiveActivityPanel from './LiveActivityPanel.svelte';
 	import ProjectNav from './ProjectNav.svelte';
 	import Brand from '#lib/shared/ui/brand/Brand.svelte';
 
@@ -74,6 +75,9 @@
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			<ProjectNav {projects} {activeProjectKey} {activeEpics} {onnavigate} />
 		</div>
+		{#if activeProjectKey}
+			<LiveActivityPanel projectKey={activeProjectKey} {onnavigate} />
+		{/if}
 		<div class="flex items-center justify-between border-t pt-3">
 			<span class="px-2 text-[11px] text-muted-foreground">Theme</span>
 			<ThemeToggle />

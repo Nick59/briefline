@@ -1,12 +1,13 @@
 import type { z } from 'zod';
 import type { Container } from '../container.ts';
+import type { Transport } from '../core/events.ts';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface OperationContext {
 	actor: string;
 	/** Set when the call arrives as an MCP tool call. */
-	transport?: 'mcp';
+	transport?: Transport;
 }
 
 export interface Operation<S extends z.ZodObject = z.ZodObject> {

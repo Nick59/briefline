@@ -8,6 +8,7 @@ import { readConfig } from '../../config.ts';
 import { migrate } from '../../db/connection.ts';
 import { connectProject, testApp } from '../../testing/app.ts';
 
+const PROJECT_UUID = '3f1c2a5e-1111-4222-8333-444455556666';
 const KEY = randomBytes(32).toString('base64');
 const SECRET = 'sk-live-very-secret-123';
 
@@ -23,7 +24,7 @@ function setup(env: Record<string, string> = { BRIEFLINE_SECRET_KEY: KEY }) {
 	return ctx;
 }
 
-const planeSettings = { workspaceSlug: 'acme', projectId: 'proj-1' };
+const planeSettings = { workspaceSlug: 'acme', projectId: PROJECT_UUID };
 
 describe('ticketing connections', () => {
 	it('stores the secret encrypted and uses it for pushes', async () => {
@@ -202,8 +203,8 @@ describe('migration to ticketing connections', () => {
 				autoSync: false,
 				postComments: true
 			});
-		insert.run('1', 'ONE', 'One', plane('proj-a'));
-		insert.run('2', 'TWO', 'Two', plane('proj-b'));
+		insert.run('1', 'ONE', 'One', plane('aaaaaaaa-1111-4222-8333-444455556666'));
+		insert.run('2', 'TWO', 'Two', plane('bbbbbbbb-1111-4222-8333-444455556666'));
 		insert.run(
 			'3',
 			'THR',
@@ -244,8 +245,12 @@ describe('migration to ticketing connections', () => {
 		const byKey = Object.fromEntries(projects.map((p) => [p.key as string, p]));
 		expect(byKey.ONE.ticketing_connection_id).toBe(plane.id);
 		expect(byKey.TWO.ticketing_connection_id).toBe(plane.id);
-		expect(JSON.parse(byKey.ONE.ticketing_target as string)).toEqual({ projectId: 'proj-a' });
-		expect(JSON.parse(byKey.TWO.ticketing_target as string)).toEqual({ projectId: 'proj-b' });
+		expect(JSON.parse(byKey.ONE.ticketing_target as string)).toEqual({
+			projectId: 'aaaaaaaa-1111-4222-8333-444455556666'
+		});
+		expect(JSON.parse(byKey.TWO.ticketing_target as string)).toEqual({
+			projectId: 'bbbbbbbb-1111-4222-8333-444455556666'
+		});
 		expect(byKey.ONE.ticketing_auto_sync).toBe(0);
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
 		expect(byKey.THR.ticketing_post_comments).toBe(0);
@@ -268,7 +273,7 @@ describe('migration to ticketing connections', () => {
 		const project = app.projects.get('ONE');
 		expect(project.ticketing).toMatchObject({
 			provider: 'plane',
-			target: { projectId: 'proj-a' },
+			target: { projectId: 'aaaaaaaa-1111-4222-8333-444455556666' },
 			autoSync: false
 		});
 		expect(app.connections.list().find((c) => c.provider === 'plane')).toMatchObject({
@@ -279,6 +284,8 @@ describe('migration to ticketing connections', () => {
 			]
 		});
 		await app.connections.listStates('ONE');
-		expect(calls[0]).toBe('https://api.plane.so/api/v1/workspaces/acme/projects/proj-a/states/');
+		expect(calls[0]).toBe(
+			'https://api.plane.so/api/v1/workspaces/acme/projects/aaaaaaaa-1111-4222-8333-444455556666/states/'
+		);
 	});
 });

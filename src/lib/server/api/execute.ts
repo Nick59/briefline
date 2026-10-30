@@ -1,6 +1,7 @@
 import { ZodError, z } from 'zod';
 import type { Container } from '../container.ts';
 import { DomainError } from '../core/errors.ts';
+import { runWithTransport } from '../core/operation-context.ts';
 import type { Operation, OperationContext } from './operation.ts';
 
 export interface ApiErrorBody {
@@ -26,7 +27,7 @@ export async function execute(
 		const input = op.input.parse(rawInput ?? {});
 		const refusal = ctx.transport === 'mcp' ? op.mcp?.check?.(input) : null;
 		if (refusal) throw new ApiFailure(400, { error: { code: 'invalid_input', message: refusal } });
-		return await op.run(app, input, ctx);
+		return await runWithTransport(ctx.transport, () => op.run(app, input, ctx));
 	} catch (error) {
 		throw toFailure(error);
 	}

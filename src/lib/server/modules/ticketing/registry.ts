@@ -28,7 +28,8 @@ export class TicketProviderRegistry {
 				envVars,
 				secretLabel,
 				secretEnvVar,
-				supportsStates
+				supportsStates,
+				listProjects
 			}) => ({
 				id,
 				label,
@@ -37,7 +38,8 @@ export class TicketProviderRegistry {
 				envVars,
 				secretLabel,
 				secretEnvVar,
-				supportsStates
+				supportsStates,
+				supportsProjects: Boolean(listProjects)
 			})
 		);
 	}

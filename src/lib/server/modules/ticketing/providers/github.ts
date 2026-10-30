@@ -1,5 +1,6 @@
 import {
 	expectOk,
+	providerFetch,
 	requireSecret,
 	resolveMapped,
 	TicketProviderError,
@@ -31,17 +32,23 @@ const STATES: ProviderState[] = [
 ];
 
 async function call(ctx: ProviderContext, path: string, method: string, body?: unknown) {
-	const response = await ctx.fetch(`https://api.github.com${path}`, {
-		method,
-		headers: {
-			accept: 'application/vnd.github+json',
-			authorization: `Bearer ${requireSecret(ctx)}`,
-			'content-type': 'application/json',
-			'x-github-api-version': '2022-11-28'
+	const response = await providerFetch(
+		ctx,
+		'GitHub',
+		`https://api.github.com${path}`,
+		{
+			method,
+			headers: {
+				accept: 'application/vnd.github+json',
+				authorization: `Bearer ${requireSecret(ctx)}`,
+				'content-type': 'application/json',
+				'x-github-api-version': '2022-11-28'
+			},
+			body: body === undefined ? undefined : JSON.stringify(body),
+			signal: AbortSignal.timeout(TIMEOUT_MS)
 		},
-		body: body === undefined ? undefined : JSON.stringify(body),
-		signal: AbortSignal.timeout(TIMEOUT_MS)
-	});
+		{ json: false }
+	);
 	await expectOk(response, `GitHub ${method} ${path}`);
 }
 

@@ -1,6 +1,7 @@
 import type { WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	expectOk,
+	providerFetch,
 	requireSecret,
 	requireSetting,
 	resolveMapped,
@@ -22,7 +23,7 @@ async function graphql<T>(
 	query: string,
 	variables: Record<string, unknown> = {}
 ): Promise<T> {
-	const response = await ctx.fetch('https://api.linear.app/graphql', {
+	const response = await providerFetch(ctx, 'Linear', 'https://api.linear.app/graphql', {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/json',

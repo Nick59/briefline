@@ -15,7 +15,8 @@ const names = [
 	'JIRA_EMAIL',
 	'JIRA_API_TOKEN',
 	'LINEAR_API_KEY',
-	'PLANE_API_KEY'
+	'PLANE_API_KEY',
+	'BRIEFLINE_DEBUG_TICKETING'
 ] as const;
 
 export const variables = defineEnvVars(

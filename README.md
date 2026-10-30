@@ -190,14 +190,15 @@ Pass it with `<MarkdownViewer source={md} extensions={[jiraKeys]} />` (or `exten
 
 ## Configuration
 
-| Variable               | Default                   | Purpose                                                               |
-| ---------------------- | ------------------------- | --------------------------------------------------------------------- |
-| `PM_DATABASE_PATH`     | `data/project-manager.db` | SQLite file                                                           |
-| `PM_API_TOKEN`         | —                         | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in |
-| `PM_PUBLIC_URL`        | —                         | Dashboard URL used in ticket comments                                 |
-| `PM_SEED_DEMO`         | `true`                    | Create the demo project when the database is empty                    |
-| `BRIEFLINE_SECRET_KEY` | —                         | Encrypts API keys saved on ticketing connections                      |
-| `ANTHROPIC_API_KEY`    | —                         | Use Claude for human briefs                                           |
-| `PM_BRIEF_MODEL`       | `claude-opus-5-5`         | Claude model for briefs                                               |
+| Variable                    | Default                   | Purpose                                                                   |
+| --------------------------- | ------------------------- | ------------------------------------------------------------------------- |
+| `PM_DATABASE_PATH`          | `data/project-manager.db` | SQLite file                                                               |
+| `PM_API_TOKEN`              | —                         | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in     |
+| `PM_PUBLIC_URL`             | —                         | Dashboard URL used in ticket comments                                     |
+| `PM_SEED_DEMO`              | `true`                    | Create the demo project when the database is empty                        |
+| `BRIEFLINE_SECRET_KEY`      | —                         | Encrypts API keys saved on ticketing connections                          |
+| `BRIEFLINE_DEBUG_TICKETING` | —                         | Set to `1` to log every ticketing request (failed ones are always logged) |
+| `ANTHROPIC_API_KEY`         | —                         | Use Claude for human briefs                                               |
+| `PM_BRIEF_MODEL`            | `claude-opus-5-5`         | Claude model for briefs                                                   |
 
 Requests with an `Origin` header from another site are refused on `/api` and `/mcp`.

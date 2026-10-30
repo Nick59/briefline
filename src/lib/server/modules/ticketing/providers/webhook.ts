@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import {
 	expectOk,
+	providerFetch,
 	requireSetting,
 	TicketProviderError,
 	TIMEOUT_MS,
@@ -65,12 +66,13 @@ export const webhookProvider: TicketProvider = {
 		if (secret)
 			headers['x-pm-signature'] =
 				`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
-		const response = await ctx.fetch(url, {
-			method: 'POST',
-			headers,
-			body,
-			signal: AbortSignal.timeout(TIMEOUT_MS)
-		});
+		const response = await providerFetch(
+			ctx,
+			'Webhook',
+			String(url),
+			{ method: 'POST', headers, body, signal: AbortSignal.timeout(TIMEOUT_MS) },
+			{ json: false }
+		);
 		await expectOk(response, 'Webhook');
 	}
 };

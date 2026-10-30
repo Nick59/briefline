@@ -11,6 +11,7 @@ import type {
 	ProviderSetting,
 	SecretSource,
 	TicketingConnection,
+	TicketingProject,
 	TicketingState
 } from '#lib/shared/domain/types.ts';
 import { SecretError, type SecretBox } from '../../crypto/secrets.ts';
@@ -167,6 +168,17 @@ export class TicketingConnectionService {
 			);
 			if (!provider.supportsStates) return [];
 			return await provider.listStates(context);
+		} catch (error) {
+			throw asProviderFailure(error);
+		}
+	}
+
+	/** Projects of the external system behind a connection, for picking the project target. */
+	async listProjects(connectionId: string): Promise<TicketingProject[]> {
+		try {
+			const { provider, context } = this.resolve(this.#require(connectionId), {});
+			if (!provider.listProjects) return [];
+			return await provider.listProjects(context);
 		} catch (error) {
 			throw asProviderFailure(error);
 		}

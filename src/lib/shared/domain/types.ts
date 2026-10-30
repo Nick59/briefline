@@ -212,6 +212,14 @@ export interface ProviderSetting {
 	scope: 'connection' | 'project';
 	placeholder?: string;
 	help?: string;
+	/** The value can be picked from the external system's projects (list_ticketing_projects). */
+	picker?: 'projects';
+}
+
+export interface TicketingProject {
+	id: string;
+	name: string;
+	identifier: string;
 }
 
 export interface TicketProviderInfo {
@@ -227,4 +235,6 @@ export interface TicketProviderInfo {
 	secretEnvVar: string | null;
 	/** False when the provider has no states that Briefline statuses can map to. */
 	supportsStates: boolean;
+	/** True when the provider can list its projects for the project target field. */
+	supportsProjects: boolean;
 }

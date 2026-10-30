@@ -462,6 +462,18 @@ export const operations: Operation[] = [
 			app.connections.listStates(project, { connectionId, target })
 	}),
 	defineOperation({
+		name: 'list_ticketing_projects',
+		method: 'GET',
+		path: '/ticketing/connections/{connection}/projects',
+		tag: 'Ticketing',
+		summary: 'List the projects of the external system behind a connection',
+		description:
+			'Returns { id, name, identifier } for providers that support it (Plane); the id is the value for the project target field. Other providers return an empty list.',
+		input: z.object({ connection }),
+		readOnly: true,
+		run: (app, { connection }) => app.connections.listProjects(connection)
+	}),
+	defineOperation({
 		name: 'set_project_ticketing',
 		method: 'PUT',
 		path: '/projects/{project}/ticketing',

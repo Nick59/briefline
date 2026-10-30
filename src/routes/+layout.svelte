@@ -6,9 +6,20 @@
 	import { Toaster } from '#lib/shared/ui/primitives/sonner/index.js';
 	import { TooltipProvider } from '#lib/shared/ui/primitives/tooltip/index.js';
 	import { AppShell } from '#lib/widgets/app-shell/index.ts';
+	import { LiveActivity, provideLiveActivity } from '#lib/shared/lib/live-activity/index.ts';
 	import type { LayoutProps } from './$types';
 
 	let { data, children }: LayoutProps = $props();
+
+	const live = new LiveActivity();
+	provideLiveActivity(live);
+
+	$effect(() => {
+		const projectKey = data.activeProjectKey;
+		if (!projectKey) return;
+		live.connect(projectKey);
+		return () => live.disconnect();
+	});
 </script>
 
 <svelte:head>

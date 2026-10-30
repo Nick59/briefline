@@ -1,10 +1,15 @@
+import { currentTransport } from './operation-context.ts';
 import type { Stage, WorkStatus } from '#lib/shared/domain/constants.ts';
+
+export type Transport = 'mcp';
 
 interface Scope {
 	projectId: string;
 	epicId: string | null;
 	taskId: string | null;
 	actor: string;
+	/** Set from the operation that caused the event; absent for dashboard and background work. */
+	transport?: Transport;
 }
 
 export type DomainEvent = Scope &
@@ -50,7 +55,9 @@ export class EventBus {
 		return () => this.#listeners.delete(listener);
 	}
 
-	emit(event: DomainEvent) {
+	emit(raw: DomainEvent) {
+		const transport = raw.transport ?? currentTransport();
+		const event = transport ? { ...raw, transport } : raw;
 		for (const listener of this.#listeners) {
 			try {
 				listener(event);
