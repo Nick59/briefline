@@ -51,7 +51,7 @@ curl -X PUT ${origin}/api/v1/tasks/SHOP-3/stages/dev \\
 - Errors are JSON: \`{ "error": { "code", "message", "issues" } }\`.
 
 > [!TIP]
-> Create a whole plan in one call: \`create_epic\` accepts \`phases[].tasks[].specs[]\` and \`specs[]\`.
+> Create a whole plan in one call: \`create_epic\` accepts \`tasks[].specs[]\` and \`specs[]\`.
 `);
 </script>
 

@@ -4,12 +4,18 @@ import {
 	taskCurrentStage,
 	taskOverallStatus
 } from '#lib/shared/domain/progress.ts';
+import {
+	mappingKeyFor,
+	mappingKeyForEpic,
+	mappingKeyForTask
+} from '#lib/shared/domain/status-mapping.ts';
 import type { Epic, ExternalRef, Project, SyncJob, Task } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { InvalidInputError, NotFoundError } from '../../core/errors.ts';
 import type { DomainEvent } from '../../core/events.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
+import type { TicketingConnectionService } from './connections.ts';
 import type { TicketProviderInfo, TicketUpdate } from './provider.ts';
 import type { TicketProviderRegistry } from './registry.ts';
 import type { SyncJobFilter } from './repository.ts';
@@ -40,6 +46,7 @@ export class TicketSyncService {
 	constructor(
 		private readonly deps: ServiceDeps,
 		private readonly registry: TicketProviderRegistry,
+		private readonly connections: TicketingConnectionService,
 		private readonly options: TicketSyncOptions
 	) {
 		deps.events.subscribe((event) => this.#onEvent(event));
@@ -51,8 +58,14 @@ export class TicketSyncService {
 
 	ticketUrl(project: Project, ref: ExternalRef): string | null {
 		if (ref.url) return ref.url;
-		const settings = project.ticketing?.provider === ref.provider ? project.ticketing.settings : {};
-		return this.registry.get(ref.provider)?.ticketUrl(ref, settings) ?? null;
+		const resolved = project.ticketing.provider === ref.provider ? this.#settingsOf(project) : {};
+		return this.registry.get(ref.provider)?.ticketUrl(ref, resolved) ?? null;
+	}
+
+	#settingsOf(project: Project): Record<string, string> {
+		const connectionId = project.ticketing.connectionId;
+		const connection = connectionId ? this.deps.repos.connections.find(connectionId) : undefined;
+		return { ...connection?.settings, ...project.ticketing.target };
 	}
 
 	jobs(filter: SyncJobFilter): SyncJob[] {
@@ -86,7 +99,7 @@ export class TicketSyncService {
 	#onEvent(event: DomainEvent) {
 		if (!SYNC_TRIGGERS.has(event.type) || !event.epicId || event.actor === 'ticket-sync') return;
 		const project = this.deps.repos.projects.find(event.projectId);
-		if (!project?.ticketing?.autoSync) return;
+		if (!project?.ticketing.connectionId || !project.ticketing.autoSync) return;
 		const epic = this.deps.repos.epics.find(event.epicId);
 		if (!epic) return;
 		if (event.type === 'epic.updated' && !event.data.fields?.includes('externalRef')) return;
@@ -127,6 +140,7 @@ export class TicketSyncService {
 		return {
 			status: progress.status,
 			stage: progress.currentStage,
+			mappingKey: mappingKeyForEpic(progress),
 			progress: progress.percent,
 			title: epic.title,
 			comment: comment && `${comment}\n\n${summary}`,
@@ -139,6 +153,7 @@ export class TicketSyncService {
 		return {
 			status: taskOverallStatus(task.stages),
 			stage: taskCurrentStage(task.stages),
+			mappingKey: mappingKeyForTask(task.stages),
 			progress: Math.round((done / 3) * 100),
 			title: task.title,
 			comment,
@@ -166,6 +181,7 @@ export class TicketSyncService {
 			status: 'pending',
 			attempts: 0,
 			lastError: null,
+			message: null,
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -191,7 +207,7 @@ export class TicketSyncService {
 		const { ref, update } = job.payload as { ref: ExternalRef; update: TicketUpdate };
 		const provider = this.registry.get(job.provider);
 		const project = repos.projects.find(job.projectId);
-		const result: SyncJob = { ...job, attempts: job.attempts + 1, updatedAt: now() };
+		const result: SyncJob = { ...job, attempts: job.attempts + 1, message: null, updatedAt: now() };
 
 		if (!provider || !project) {
 			result.status = 'skipped';
@@ -200,14 +216,24 @@ export class TicketSyncService {
 				: `Unknown ticket provider '${job.provider}'`;
 		} else {
 			try {
-				const settings =
-					project.ticketing?.provider === provider.id ? project.ticketing.settings : {};
-				await provider.push(
-					{ ref, settings, env: this.options.env, fetch: this.options.fetch },
-					update
-				);
-				result.status = 'succeeded';
-				result.lastError = null;
+				const resolved = this.connections.forProject(project);
+				if (!resolved || resolved.provider.id !== provider.id) {
+					result.status = 'skipped';
+					result.lastError = 'Project has no ticketing connection for this provider';
+				} else {
+					const key = update.mappingKey ?? mappingKeyFor(update.status, update.stage);
+					const outcome = await provider.push(
+						{
+							...resolved.context,
+							ref,
+							mapped: project.ticketing.statusMapping[key] ?? null
+						},
+						update
+					);
+					result.status = 'succeeded';
+					result.lastError = null;
+					result.message = outcome?.note ?? null;
+				}
 			} catch (error) {
 				result.status = 'failed';
 				result.lastError = error instanceof Error ? error.message : String(error);

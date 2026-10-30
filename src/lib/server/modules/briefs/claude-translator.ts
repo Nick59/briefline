@@ -1,24 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import { z } from 'zod';
-import { EFFORTS } from '#lib/shared/domain/constants.ts';
+import { briefSchema } from '#lib/shared/domain/schemas.ts';
 import type { BriefDraft, BriefInput, BriefTranslator } from './translator.ts';
-
-const briefSchema = z.object({
-	summary: z.string().describe('Two sentences a product manager understands, no jargon'),
-	whyItMatters: z.string().describe('The user or business reason for this work'),
-	whatChanges: z
-		.array(z.string())
-		.describe('What will be different once this ships, from the user point of view'),
-	acceptance: z.array(z.string()).describe('How a human can check that it is done'),
-	risks: z.array(z.string()),
-	openQuestions: z.array(z.string()).describe('Decisions a human still needs to make'),
-	glossary: z
-		.array(z.object({ term: z.string(), meaning: z.string() }))
-		.describe('Technical terms used, explained simply'),
-	effort: z.enum(EFFORTS).describe('T-shirt size of the work'),
-	readingMinutes: z.number().int()
-});
 
 const SYSTEM = `You translate engineering specs written by AI coding agents into briefs for humans who are not engineers:
 product managers, designers, and stakeholders. Describe outcomes and impact, not code. Keep each list item to one

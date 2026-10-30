@@ -148,6 +148,7 @@
 }
 
 .md .md-mermaid {
+	position: relative;
 	margin: 1.25em 0;
 	padding: 1rem;
 	border: 1px solid var(--border);
@@ -185,4 +186,41 @@
 	font-size: 0.8rem;
 	color: var(--danger);
 	white-space: pre-wrap;
+}
+
+.md .md-mermaid[data-state='ready'] {
+	cursor: zoom-in;
+}
+
+.md .md-mermaid-zoom {
+	position: absolute;
+	top: 0.5rem;
+	right: 0.5rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.75rem;
+	height: 1.75rem;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	background: var(--background);
+	color: var(--muted-foreground);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity 120ms;
+}
+
+.md .md-mermaid:hover .md-mermaid-zoom,
+.md .md-mermaid-zoom:focus-visible {
+	opacity: 1;
+}
+
+.md .md-mermaid-zoom:hover {
+	color: var(--foreground);
+}
+
+@media (hover: none) {
+	.md .md-mermaid-zoom {
+		opacity: 1;
+	}
 }

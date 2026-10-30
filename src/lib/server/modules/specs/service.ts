@@ -1,16 +1,25 @@
 import {
 	createSpecSchema,
+	type BriefInput,
 	updateSpecSchema,
 	type CreateSpecInput,
+	setSpecBriefSchema,
+	type SetSpecBriefInput,
 	type UpdateSpecInput
 } from '#lib/shared/domain/schemas.ts';
-import type { Epic, Spec, SpecSummary } from '#lib/shared/domain/types.ts';
+import type { Epic, HumanBrief, Spec, SpecSummary } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { NotFoundError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireTask } from '../../core/lookup.ts';
 import type { BriefService } from '../briefs/service.ts';
 import { toSpecSummary } from './repository.ts';
+
+const agentBrief = (brief: BriefInput, actor = 'agent'): HumanBrief => ({
+	...brief,
+	source: actor === 'agent' ? 'agent' : `agent:${actor}`,
+	generatedAt: now()
+});
 
 export class SpecService {
 	constructor(
@@ -37,7 +46,7 @@ export class SpecService {
 	}
 
 	/** Inserts without emitting an event; callers emit their own. */
-	insert(epicId: string, taskId: string | null, input: CreateSpecInput): Spec {
+	insert(epicId: string, taskId: string | null, input: CreateSpecInput, actor?: string): Spec {
 		const data = createSpecSchema.parse(input);
 		const timestamp = now();
 		const spec: Spec = {
@@ -47,7 +56,7 @@ export class SpecService {
 			title: data.title,
 			kind: data.kind,
 			content: data.content,
-			brief: null,
+			brief: data.brief ? agentBrief(data.brief, actor) : null,
 			position: this.deps.repos.specs.nextPosition(epicId, taskId),
 			createdAt: timestamp,
 			updatedAt: timestamp
@@ -58,16 +67,18 @@ export class SpecService {
 
 	createForEpic(epicIdOrKey: string, input: CreateSpecInput, actor: string): Spec {
 		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		const spec = this.insert(epic.id, null, input);
+		const spec = this.insert(epic.id, null, input, actor);
 		this.#emit('spec.created', epic, spec, actor);
+		if (spec.brief) this.#emit('spec.translated', epic, spec, actor);
 		return spec;
 	}
 
 	createForTask(taskIdOrKey: string, input: CreateSpecInput, actor: string): Spec {
 		const task = requireTask(this.deps.repos, taskIdOrKey);
 		const epic = requireEpic(this.deps.repos, task.epicId);
-		const spec = this.insert(epic.id, task.id, input);
+		const spec = this.insert(epic.id, task.id, input, actor);
 		this.#emit('spec.created', epic, spec, actor);
+		if (spec.brief) this.#emit('spec.translated', epic, spec, actor);
 		return spec;
 	}
 
@@ -82,11 +93,21 @@ export class SpecService {
 			content: data.content ?? current.content,
 			position: data.position ?? current.position,
 			// A brief describes one version of the content; it is stale once the content changes.
-			brief: contentChanged ? null : current.brief,
+			brief: data.brief ? agentBrief(data.brief, actor) : contentChanged ? null : current.brief,
 			updatedAt: now()
 		};
 		this.deps.repos.specs.update(spec);
-		this.#emit('spec.updated', requireEpic(this.deps.repos, spec.epicId), spec, actor);
+		const epic = requireEpic(this.deps.repos, spec.epicId);
+		this.#emit('spec.updated', epic, spec, actor);
+		if (data.brief) this.#emit('spec.translated', epic, spec, actor);
+		return spec;
+	}
+
+	setBrief(id: string, input: SetSpecBriefInput, actor: string): Spec {
+		const { brief } = setSpecBriefSchema.parse(input);
+		const spec: Spec = { ...this.get(id), brief: agentBrief(brief, actor), updatedAt: now() };
+		this.deps.repos.specs.update(spec);
+		this.#emit('spec.translated', requireEpic(this.deps.repos, spec.epicId), spec, actor);
 		return spec;
 	}
 

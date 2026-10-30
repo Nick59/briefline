@@ -15,10 +15,6 @@ export type DomainEvent = Scope &
 				data: { key: string; title: string; fields?: string[] };
 		  }
 		| {
-				type: 'phase.created' | 'phase.updated' | 'phase.deleted';
-				data: { name: string; fields?: string[] };
-		  }
-		| {
 				type: 'task.created' | 'task.updated' | 'task.deleted';
 				data: { key: string; title: string; fields?: string[] };
 		  }

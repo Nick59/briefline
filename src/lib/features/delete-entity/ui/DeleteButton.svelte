@@ -6,7 +6,12 @@
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 
 	interface Props {
-		operation: 'delete_project' | 'delete_epic' | 'delete_phase' | 'delete_task' | 'delete_spec';
+		operation:
+			| 'delete_project'
+			| 'delete_epic'
+			| 'delete_task'
+			| 'delete_spec'
+			| 'delete_ticketing_connection';
 		input: Record<string, string>;
 		what: string;
 		consequence: string;

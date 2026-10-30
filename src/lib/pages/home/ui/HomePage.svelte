@@ -16,8 +16,8 @@
 <div class="space-y-8">
 	<PageHeader title="Projects">
 		{#snippet description()}
-			Track what AI agents plan and ship. Each epic shows a timeline of phases and a Dev → Tests →
-			Deploy board, with specs translated for humans.
+			Track what AI agents plan and ship. Each epic shows a Dev → Tests → Deploy board, with specs
+			translated for humans.
 		{/snippet}
 		{#snippet actions()}<CreateProjectDialog />{/snippet}
 	</PageHeader>
@@ -47,6 +47,8 @@
 			items={activity.items}
 			page={activity.page}
 			pageCount={activity.pageCount}
+			total={activity.total}
+			pageSize={activity.pageSize}
 			title="Recent activity"
 		/>
 	</div>

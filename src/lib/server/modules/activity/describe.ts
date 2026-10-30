@@ -14,12 +14,6 @@ export function describeEvent(event: DomainEvent): string {
 			return `Updated ${event.data.fields?.join(', ') || 'details'} of epic ${event.data.key}`;
 		case 'epic.deleted':
 			return `Deleted epic ${event.data.key} "${event.data.title}"`;
-		case 'phase.created':
-			return `Added phase "${event.data.name}"`;
-		case 'phase.updated':
-			return `Updated phase "${event.data.name}"`;
-		case 'phase.deleted':
-			return `Removed phase "${event.data.name}"`;
 		case 'task.created':
 			return `Created task ${event.data.key} "${event.data.title}"`;
 		case 'task.updated':

@@ -38,7 +38,14 @@ export class ProjectService {
 			key: data.key,
 			name: data.name,
 			description: data.description,
-			ticketing: data.ticketing ?? null,
+			ticketing: {
+				connectionId: null,
+				provider: null,
+				target: {},
+				statusMapping: {},
+				autoSync: true,
+				postComments: true
+			},
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -61,7 +68,6 @@ export class ProjectService {
 			...current,
 			name: data.name ?? current.name,
 			description: data.description ?? current.description,
-			ticketing: data.ticketing === undefined ? current.ticketing : data.ticketing,
 			updatedAt: now()
 		};
 		this.deps.repos.projects.update(project);

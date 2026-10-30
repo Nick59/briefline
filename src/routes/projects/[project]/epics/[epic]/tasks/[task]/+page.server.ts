@@ -31,7 +31,6 @@ export const load: PageServerLoad = ({ params, url }) => {
 	return {
 		project,
 		task,
-		phases: services.epics.detail(task.epicId).phases.map(({ id, name }) => ({ id, name })),
 		selectedSpec: specId ? services.specs.get(specId) : null,
 		activity: loadPage(url, 'activity', (paging) => services.activity.forTask(task.id, paging)),
 		ticketUrl: task.externalRef ? services.ticketing.ticketUrl(project, task.externalRef) : null

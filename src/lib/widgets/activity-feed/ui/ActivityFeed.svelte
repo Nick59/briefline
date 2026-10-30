@@ -9,11 +9,24 @@
 		items: Activity[];
 		page: number;
 		pageCount: number;
+		total: number;
+		pageSize: number;
 		title?: string;
 		param?: string;
 	}
 
-	let { items, page, pageCount, title = 'Activity', param = 'activity' }: Props = $props();
+	let {
+		items,
+		page,
+		pageCount,
+		total,
+		pageSize,
+		title = 'Activity',
+		param = 'activity'
+	}: Props = $props();
+
+	const first = $derived((page - 1) * pageSize + 1);
+	const last = $derived((page - 1) * pageSize + items.length);
 
 	const pageHref = (target: number) => {
 		const url = new URL(current.url.href);
@@ -32,30 +45,35 @@
 				<ActivityItem {activity} />
 			{/each}
 		</ol>
-		{#if pageCount > 1}
-			<nav class="mt-3 flex items-center justify-between gap-2" aria-label="{title} pages">
-				<Button
-					variant="outline"
-					size="sm"
-					href={pageHref(page - 1)}
-					disabled={page <= 1}
-					data-sveltekit-noscroll
-					data-sveltekit-keepfocus
-				>
-					Previous
-				</Button>
-				<span class="text-sm text-muted-foreground">Page {page} of {pageCount}</span>
-				<Button
-					variant="outline"
-					size="sm"
-					href={pageHref(page + 1)}
-					disabled={page >= pageCount}
-					data-sveltekit-noscroll
-					data-sveltekit-keepfocus
-				>
-					Next
-				</Button>
-			</nav>
-		{/if}
+		<div class="mt-3 flex flex-col gap-2">
+			<p class="text-sm text-muted-foreground" data-testid="activity-range">
+				Showing {first}–{last} of {total}
+			</p>
+			{#if pageCount > 1}
+				<nav class="flex items-center justify-between gap-2" aria-label="{title} pages">
+					<Button
+						variant="outline"
+						size="sm"
+						href={pageHref(page - 1)}
+						disabled={page <= 1}
+						data-sveltekit-noscroll
+						data-sveltekit-keepfocus
+					>
+						Previous
+					</Button>
+					<span class="text-sm text-muted-foreground">Page {page} of {pageCount}</span>
+					<Button
+						variant="outline"
+						size="sm"
+						href={pageHref(page + 1)}
+						disabled={page >= pageCount}
+						data-sveltekit-noscroll
+						data-sveltekit-keepfocus
+					>
+						Next
+					</Button>
+				</nav>
+			{/if}
+		</div>
 	{/if}
 </Section>

@@ -10,14 +10,26 @@ export const dryRunProvider: TicketProvider = {
 			name: 'ticketUrlTemplate',
 			label: 'Ticket URL template',
 			required: false,
+			scope: 'connection',
 			placeholder: 'https://tracker/browse/{key}'
 		}
 	],
 	envVars: [],
+	secretLabel: null,
+	secretEnvVar: null,
+	supportsStates: true,
 	ticketUrl(ref, settings) {
 		return settings.ticketUrlTemplate
 			? settings.ticketUrlTemplate.replace('{key}', encodeURIComponent(ref.key))
 			: null;
+	},
+	async testConnection() {},
+	async listStates() {
+		return [
+			{ id: 'todo', name: 'To do', group: 'unstarted' },
+			{ id: 'in_progress', name: 'In progress', group: 'started' },
+			{ id: 'done', name: 'Done', group: 'completed' }
+		];
 	},
 	async push() {}
 };

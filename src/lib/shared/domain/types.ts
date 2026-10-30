@@ -1,4 +1,12 @@
-import type { Effort, Priority, SpecKind, Stage, SyncJobStatus, WorkStatus } from './constants.ts';
+import type {
+	Effort,
+	MappingKey,
+	Priority,
+	SpecKind,
+	Stage,
+	SyncJobStatus,
+	WorkStatus
+} from './constants.ts';
 
 export type ISODate = string;
 
@@ -8,11 +16,44 @@ export interface ExternalRef {
 	url: string | null;
 }
 
-export interface TicketingConfig {
-	provider: string;
-	settings: Record<string, string>;
+export interface MappedState {
+	id: string;
+	name: string;
+}
+
+export type StatusMapping = Partial<Record<MappingKey, MappedState>>;
+
+export interface ProjectTicketing {
+	connectionId: string | null;
+	/** Provider of the selected connection. */
+	provider: string | null;
+	/** Project-level provider fields, such as a Plane project id. */
+	target: Record<string, string>;
+	statusMapping: StatusMapping;
 	autoSync: boolean;
 	postComments: boolean;
+}
+
+export type SecretSource = 'stored' | 'env' | 'none';
+
+/** A configured account in an external ticketing system. The secret itself is never exposed. */
+export interface TicketingConnection {
+	id: string;
+	name: string;
+	provider: string;
+	settings: Record<string, string>;
+	/** True when an encrypted API key is stored for this connection. */
+	hasSecret: boolean;
+	secretSource: SecretSource;
+	usedBy: { key: string; name: string }[];
+	createdAt: ISODate;
+	updatedAt: ISODate;
+}
+
+export interface TicketingState {
+	id: string;
+	name: string;
+	group?: string;
 }
 
 export interface Project {
@@ -20,7 +61,7 @@ export interface Project {
 	key: string;
 	name: string;
 	description: string;
-	ticketing: TicketingConfig | null;
+	ticketing: ProjectTicketing;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }
@@ -37,26 +78,11 @@ export interface Epic {
 	updatedAt: ISODate;
 }
 
-export interface Phase {
-	id: string;
-	epicId: string;
-	name: string;
-	description: string;
-	position: number;
-	startDate: ISODate | null;
-	endDate: ISODate | null;
-	/** Used only while the phase has no tasks; otherwise the status is derived. */
-	status: WorkStatus;
-	createdAt: ISODate;
-	updatedAt: ISODate;
-}
-
 export type StageStatuses = Record<Stage, WorkStatus>;
 
 export interface Task {
 	id: string;
 	epicId: string;
-	phaseId: string | null;
 	key: string;
 	title: string;
 	description: string;
@@ -107,6 +133,7 @@ export interface Page<T> {
 export interface PageView<T> extends Page<T> {
 	page: number;
 	pageCount: number;
+	pageSize: number;
 }
 
 export interface Activity {
@@ -132,6 +159,8 @@ export interface SyncJob {
 	status: SyncJobStatus;
 	attempts: number;
 	lastError: string | null;
+	/** Non-fatal remark about a successful push, e.g. that a mapped state was missing. */
+	message: string | null;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }
@@ -152,22 +181,14 @@ export interface Progress {
 	currentStage: Stage | null;
 }
 
-export interface PhaseWithProgress extends Phase {
-	effectiveStatus: WorkStatus;
-	progress: Progress;
-	taskIds: string[];
-}
-
 export interface EpicSummary extends Epic {
 	progress: Progress;
 	taskCount: number;
-	phaseCount: number;
 }
 
 export interface EpicDetail extends Epic {
 	project: Pick<Project, 'id' | 'key' | 'name'>;
 	progress: Progress;
-	phases: PhaseWithProgress[];
 	tasks: Task[];
 	specs: SpecSummary[];
 }
@@ -180,7 +201,6 @@ export interface ProjectSummary extends Project {
 export interface TaskDetail extends Task {
 	epic: Pick<Epic, 'id' | 'key' | 'title' | 'projectId' | 'externalRef'>;
 	project: Pick<Project, 'id' | 'key' | 'name'>;
-	phase: Pick<Phase, 'id' | 'name'> | null;
 	specs: SpecSummary[];
 }
 
@@ -188,6 +208,8 @@ export interface ProviderSetting {
 	name: string;
 	label: string;
 	required: boolean;
+	/** connection: shared by every project using the connection; project: set per project. */
+	scope: 'connection' | 'project';
 	placeholder?: string;
 	help?: string;
 }
@@ -197,6 +219,12 @@ export interface TicketProviderInfo {
 	label: string;
 	description: string;
 	settings: ProviderSetting[];
-	/** Secrets are read from these environment variables, never stored in the database. */
+	/** Environment variables used as a fallback when a connection has no stored credentials. */
 	envVars: string[];
+	/** Label of the API key field, or null when the provider needs no secret. */
+	secretLabel: string | null;
+	/** Environment variable holding the API key when none is stored. */
+	secretEnvVar: string | null;
+	/** False when the provider has no states that Briefline statuses can map to. */
+	supportsStates: boolean;
 }

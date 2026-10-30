@@ -28,8 +28,6 @@
 			: byPosition(epic.tasks)
 	);
 
-	const phaseNames = $derived(new Map(epic.phases.map((p) => [p.id, p.name])));
-
 	const columns = (s: Stage) =>
 		WORK_STATUSES.map((status) => ({ status, tasks: tasks.filter((t) => t.stages[s] === status) }));
 
@@ -76,7 +74,6 @@
 						stage={s}
 						status={column.status}
 						tasks={column.tasks}
-						{phaseNames}
 						projectKey={epic.project.key}
 						epicKey={epic.key}
 						{sortable}

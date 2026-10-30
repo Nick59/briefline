@@ -9,25 +9,21 @@
 	import { ChoiceSelect } from '#lib/shared/ui/choice-select/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import { PRIORITIES, PRIORITY_LABELS, type Priority } from '#lib/shared/domain/constants.ts';
-	import type { Phase, Task } from '#lib/shared/domain/types.ts';
+	import type { Task } from '#lib/shared/domain/types.ts';
 
 	interface Props {
 		epicId: string;
-		phases: Pick<Phase, 'id' | 'name'>[];
 		/** Edit this task instead of creating one. */
 		task?: Task;
-		defaultPhaseId?: string | null;
 		trigger: Snippet<[{ props: Record<string, unknown> }]>;
 	}
 
-	let { epicId, phases, task, defaultPhaseId = null, trigger }: Props = $props();
+	let { epicId, task, trigger }: Props = $props();
 
-	const NO_PHASE = '__none';
 	let open = $state(false);
 	let title = $state('');
 	let summary = $state('');
 	let description = $state('');
-	let phaseId = $state(NO_PHASE);
 	let priority = $state<Priority>('medium');
 	let assignee = $state('');
 	let busy = $state(false);
@@ -37,16 +33,10 @@
 			title = task?.title ?? '';
 			summary = task?.summary ?? '';
 			description = task?.description ?? '';
-			phaseId = (task ? task.phaseId : defaultPhaseId) ?? NO_PHASE;
 			priority = task?.priority ?? 'medium';
 			assignee = task?.assignee ?? '';
 		}
 	});
-
-	const phaseOptions = $derived([
-		{ value: NO_PHASE, label: 'No phase' },
-		...phases.map((p) => ({ value: p.id, label: p.name }))
-	]);
 
 	async function submit(event: SubmitEvent) {
 		event.preventDefault();
@@ -56,8 +46,7 @@
 			summary,
 			description,
 			priority,
-			assignee: assignee || null,
-			phaseId: phaseId === NO_PHASE ? null : phaseId
+			assignee: assignee || null
 		};
 		const outcome = task
 			? await runOperation('update_task', { task: task.id, ...fields }, { success: 'Task updated' })
@@ -88,10 +77,7 @@
 			>
 				<Input id="task-summary" bind:value={summary} maxlength={500} />
 			</Field>
-			<div class="grid gap-3 sm:grid-cols-3">
-				<Field label="Phase" for="task-phase">
-					<ChoiceSelect id="task-phase" bind:value={phaseId} options={phaseOptions} />
-				</Field>
+			<div class="grid gap-3 sm:grid-cols-2">
 				<Field label="Priority" for="task-priority">
 					<ChoiceSelect
 						id="task-priority"

@@ -13,11 +13,10 @@
 	interface Props extends HTMLAttributes<HTMLElement> {
 		task: Task;
 		href: string;
-		phaseName?: string | null;
 		actions?: Snippet;
 	}
 
-	let { task, href, phaseName, actions, class: className, ...rest }: Props = $props();
+	let { task, href, actions, class: className, ...rest }: Props = $props();
 </script>
 
 <article
@@ -53,9 +52,6 @@
 		<PriorityBadge priority={task.priority} />
 		{#if task.assignee}
 			<span class="inline-flex items-center gap-1"><UserIcon class="size-3" />{task.assignee}</span>
-		{/if}
-		{#if phaseName}
-			<span class="truncate">{phaseName}</span>
 		{/if}
 	</div>
 </article>

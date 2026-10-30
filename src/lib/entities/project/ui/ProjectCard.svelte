@@ -41,7 +41,7 @@
 			tone="status-done"
 			label="{project.name} progress"
 		/>
-		{#if project.ticketing}
+		{#if project.ticketing.provider}
 			<ToneBadge tone="neutral" variant="dot">Synced with {project.ticketing.provider}</ToneBadge>
 		{/if}
 	</div>

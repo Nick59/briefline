@@ -1,9 +1,11 @@
 import {
 	expectOk,
-	requireEnv,
+	requireSecret,
+	resolveMapped,
 	TicketProviderError,
 	TIMEOUT_MS,
-	type TicketContext,
+	type ProviderContext,
+	type ProviderState,
 	type TicketProvider
 } from '../provider.ts';
 
@@ -22,16 +24,22 @@ export function parseGithubRef(key: string, defaultRepo?: string): IssueRef {
 	return { repo, number: match[2] };
 }
 
-async function call(ctx: TicketContext, path: string, method: string, body: unknown) {
+// Issues have only two states, so they double as the mappable states.
+const STATES: ProviderState[] = [
+	{ id: 'open', name: 'Open', group: 'started' },
+	{ id: 'closed', name: 'Closed', group: 'completed' }
+];
+
+async function call(ctx: ProviderContext, path: string, method: string, body?: unknown) {
 	const response = await ctx.fetch(`https://api.github.com${path}`, {
 		method,
 		headers: {
 			accept: 'application/vnd.github+json',
-			authorization: `Bearer ${requireEnv(ctx, 'GITHUB_TOKEN')}`,
+			authorization: `Bearer ${requireSecret(ctx)}`,
 			'content-type': 'application/json',
 			'x-github-api-version': '2022-11-28'
 		},
-		body: JSON.stringify(body),
+		body: body === undefined ? undefined : JSON.stringify(body),
 		signal: AbortSignal.timeout(TIMEOUT_MS)
 	});
 	await expectOk(response, `GitHub ${method} ${path}`);
@@ -41,11 +49,20 @@ export const githubProvider: TicketProvider = {
 	id: 'github',
 	label: 'GitHub Issues',
 	description:
-		'Closes the issue when the work is deployed, reopens it otherwise, and posts progress comments.',
+		'Closes the issue when the work is done, reopens it otherwise, and posts progress comments.',
 	settings: [
-		{ name: 'repo', label: 'Default repository', required: false, placeholder: 'owner/repo' }
+		{
+			name: 'repo',
+			label: 'Default repository',
+			required: false,
+			scope: 'project',
+			placeholder: 'owner/repo'
+		}
 	],
 	envVars: ['GITHUB_TOKEN'],
+	secretLabel: 'Personal access token',
+	secretEnvVar: 'GITHUB_TOKEN',
+	supportsStates: true,
 	ticketUrl(ref, settings) {
 		try {
 			const { repo, number } = parseGithubRef(ref.key, settings.repo);
@@ -54,14 +71,22 @@ export const githubProvider: TicketProvider = {
 			return null;
 		}
 	},
+	async testConnection(ctx) {
+		await call(ctx, '/user', 'GET');
+	},
+	async listStates() {
+		return STATES;
+	},
 	async push(ctx, update) {
 		const { repo, number } = parseGithubRef(ctx.ref.key, ctx.settings.repo);
-		const done = update.status === 'done';
+		const mapped = resolveMapped(ctx, STATES);
+		const done = mapped.state ? mapped.state.id === 'closed' : update.status === 'done';
 		await call(ctx, `/repos/${repo}/issues/${number}`, 'PATCH', {
 			state: done ? 'closed' : 'open',
 			...(done ? { state_reason: 'completed' } : {})
 		});
 		if (update.comment)
 			await call(ctx, `/repos/${repo}/issues/${number}/comments`, 'POST', { body: update.comment });
+		return { note: mapped.note };
 	}
 };

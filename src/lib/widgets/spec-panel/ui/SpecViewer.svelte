@@ -10,6 +10,7 @@
 	import type { Spec } from '#lib/shared/domain/types.ts';
 	import { HumanBrief, SpecKindBadge } from '#lib/entities/spec/index.ts';
 	import { SpecEditorDialog } from '#lib/features/spec-editor/index.ts';
+	import { SpecReadModeButton } from '#lib/features/spec-read-mode/index.ts';
 	import { TranslateSpecButton } from '#lib/features/translate-spec/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
 
@@ -41,6 +42,7 @@
 			<h3 class="text-lg font-semibold tracking-tight">{spec.title}</h3>
 		</div>
 		<div class="flex items-center gap-1">
+			<SpecReadModeButton {spec} {extensions} />
 			<TranslateSpecButton specId={spec.id} hasBrief={spec.brief !== null} />
 			<SpecEditorDialog {owner} {spec}>
 				{#snippet trigger({ props })}

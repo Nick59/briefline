@@ -42,7 +42,7 @@
 	<PageHeader title={project.name}>
 		{#snippet eyebrow()}
 			<KeyChip value={project.key} />
-			{#if project.ticketing}<ToneBadge tone="neutral" variant="dot"
+			{#if project.ticketing.provider}<ToneBadge tone="neutral" variant="dot"
 					>Tickets synced with {project.ticketing.provider}</ToneBadge
 				>{/if}
 		{/snippet}
@@ -71,8 +71,14 @@
 			{/if}
 		</Section>
 		<div class="space-y-8">
-			<ActivityFeed items={activity.items} page={activity.page} pageCount={activity.pageCount} />
-			{#if project.ticketing}<SyncLog jobs={syncJobs} />{/if}
+			<ActivityFeed
+				items={activity.items}
+				page={activity.page}
+				pageCount={activity.pageCount}
+				total={activity.total}
+				pageSize={activity.pageSize}
+			/>
+			{#if project.ticketing.provider}<SyncLog jobs={syncJobs} />{/if}
 		</div>
 	</div>
 </div>

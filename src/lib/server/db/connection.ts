@@ -14,15 +14,28 @@ export function openDatabase(path: string): Db {
 	return db;
 }
 
-function migrate(db: Db) {
+/** Applies pending migrations, up to `target` (a count) when given. */
+export function migrate(db: Db, target = MIGRATIONS.length) {
 	const { user_version: current } = db.prepare('PRAGMA user_version').get() as {
 		user_version: number;
 	};
-	for (let version = current; version < MIGRATIONS.length; version++) {
-		transaction(db, () => {
-			db.exec(MIGRATIONS[version]);
-			db.exec(`PRAGMA user_version = ${version + 1}`);
-		});
+	if (current >= target) return;
+	// The pragma is a no-op inside a transaction, so it is toggled around the whole run.
+	db.exec('PRAGMA foreign_keys = OFF');
+	try {
+		for (let version = current; version < target; version++) {
+			transaction(db, () => {
+				const migration = MIGRATIONS[version];
+				if (typeof migration === 'string') db.exec(migration);
+				else migration(db);
+				if (db.prepare('PRAGMA foreign_key_check').all().length > 0) {
+					throw new Error(`Migration ${version + 1} left broken foreign keys`);
+				}
+				db.exec(`PRAGMA user_version = ${version + 1}`);
+			});
+		}
+	} finally {
+		db.exec('PRAGMA foreign_keys = ON');
 	}
 }
 

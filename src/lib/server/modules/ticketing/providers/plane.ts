@@ -1,11 +1,13 @@
 import type { WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	expectOk,
-	requireEnv,
+	requireSecret,
 	requireSetting,
+	resolveMapped,
 	TicketProviderError,
 	TIMEOUT_MS,
-	type TicketContext,
+	type ProviderContext,
+	type ProviderState,
 	type TicketProvider
 } from '../provider.ts';
 
@@ -18,12 +20,6 @@ const STATE_GROUPS: Record<WorkStatus, string[]> = {
 	done: ['completed']
 };
 
-interface PlaneState {
-	id: string;
-	name: string;
-	group: string;
-}
-
 function apiBase(settings: Record<string, string>) {
 	return (settings.baseUrl?.trim() || CLOUD_API).replace(/\/+$/, '');
 }
@@ -33,14 +29,14 @@ function appBase(settings: Record<string, string>) {
 	return api === CLOUD_API ? CLOUD_APP : api;
 }
 
-async function request(ctx: TicketContext, path: string, init: RequestInit = {}) {
+async function request(ctx: ProviderContext, path: string, init: RequestInit = {}) {
 	const slug = encodeURIComponent(requireSetting(ctx, 'workspaceSlug'));
 	const response = await ctx.fetch(`${apiBase(ctx.settings)}/api/v1/workspaces/${slug}${path}`, {
 		...init,
 		headers: {
 			accept: 'application/json',
 			'content-type': 'application/json',
-			'x-api-key': requireEnv(ctx, 'PLANE_API_KEY')
+			'x-api-key': requireSecret(ctx)
 		},
 		signal: AbortSignal.timeout(TIMEOUT_MS)
 	});
@@ -54,51 +50,67 @@ function pageResults<T>(body: T[] | { results: T[] }): T[] {
 	return Array.isArray(body) ? body : body.results;
 }
 
+async function fetchStates(ctx: ProviderContext): Promise<ProviderState[]> {
+	const projectId = encodeURIComponent(requireSetting(ctx, 'projectId'));
+	const response = await request(ctx, `/projects/${projectId}/states/`);
+	await expectOk(response, 'Plane list states');
+	const body = (await response.json()) as ProviderState[] | { results: ProviderState[] };
+	return pageResults(body).map(({ id, name, group }) => ({ id, name, group }));
+}
+
 export const planeProvider: TicketProvider = {
 	id: 'plane',
 	label: 'Plane',
 	description:
-		'Moves the work item to the first state of the matching group (unstarted, started, completed) and posts progress comments.',
+		'Moves the work item to the state mapped to its progress, or the first state of the matching group, and posts progress comments.',
 	settings: [
 		{
 			name: 'workspaceSlug',
 			label: 'Workspace slug',
 			required: true,
+			scope: 'connection',
 			placeholder: 'acme'
-		},
-		{
-			name: 'projectId',
-			label: 'Project ID (UUID)',
-			required: true,
-			placeholder: '3f1c2a5e-0000-0000-0000-000000000000'
 		},
 		{
 			name: 'baseUrl',
 			label: 'API URL (self-hosted only)',
 			required: false,
+			scope: 'connection',
 			placeholder: CLOUD_API
+		},
+		{
+			name: 'projectId',
+			label: 'Project ID (UUID)',
+			required: true,
+			scope: 'project',
+			placeholder: '3f1c2a5e-0000-0000-0000-000000000000'
 		}
 	],
 	envVars: ['PLANE_API_KEY'],
+	secretLabel: 'API key',
+	secretEnvVar: 'PLANE_API_KEY',
+	supportsStates: true,
 	ticketUrl(ref, settings) {
 		const slug = settings.workspaceSlug?.trim();
 		return slug
 			? `${appBase(settings)}/${encodeURIComponent(slug)}/browse/${encodeURIComponent(ref.key)}/`
 			: null;
 	},
+	async testConnection(ctx) {
+		const response = await request(ctx, '/projects/');
+		await expectOk(response, 'Plane check');
+	},
+	listStates: fetchStates,
 	async push(ctx, update) {
 		const projectId = encodeURIComponent(requireSetting(ctx, 'projectId'));
 		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);
 		await expectOk(lookup, 'Plane find work item');
 		const { id } = (await lookup.json()) as { id: string };
 
-		const statesResponse = await request(ctx, `/projects/${projectId}/states/`);
-		await expectOk(statesResponse, 'Plane list states');
-		const states = pageResults(
-			(await statesResponse.json()) as PlaneState[] | { results: PlaneState[] }
-		);
-		let state: PlaneState | undefined;
-		for (const group of STATE_GROUPS[update.status]) {
+		const states = await fetchStates(ctx);
+		const mapped = resolveMapped(ctx, states);
+		let state = mapped.state ?? undefined;
+		for (const group of state ? [] : STATE_GROUPS[update.status]) {
 			state = states.find((s) => s.group === group);
 			if (state) break;
 		}
@@ -116,6 +128,7 @@ export const planeProvider: TicketProvider = {
 			});
 			await expectOk(commented, 'Plane comment');
 		}
+		return { note: mapped.note };
 	}
 };
 

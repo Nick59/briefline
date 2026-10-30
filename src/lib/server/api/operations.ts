@@ -1,29 +1,32 @@
 import { z } from 'zod';
 import {
 	createEpicSchema,
-	createPhaseSchema,
 	createProjectSchema,
+	createTicketingConnectionSchema,
 	createSpecSchema,
+	setSpecBriefSchema,
 	createTaskSchema,
 	listTasksQuerySchema,
 	moveTaskSchema,
+	setProjectTicketingSchema,
 	setStageStatusSchema,
 	stageSchema,
 	updateEpicSchema,
-	updatePhaseSchema,
 	updateProjectSchema,
 	updateSpecSchema,
+	updateTicketingConnectionSchema,
 	updateTaskSchema,
 	workStatusSchema
 } from '#lib/shared/domain/schemas.ts';
 import { SYNC_JOB_STATUSES } from '#lib/shared/domain/constants.ts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../modules/activity/repository.ts';
+import type { Page } from '#lib/shared/domain/types.ts';
 import { defineOperation, type Operation } from './operation.ts';
 
 const ref = (what: string) => z.string().min(1).describe(`${what} id or key`);
 const project = ref('Project (e.g. PMA)');
 const epic = ref('Epic (e.g. PMA-E1)');
 const task = ref('Task (e.g. PMA-12)');
-const phase = z.string().min(1).describe('Phase id');
 const spec = z.string().min(1).describe('Spec id');
 const limit = z.coerce.number().int().min(1).max(500).optional();
 const pageLimit = z.coerce
@@ -34,6 +37,22 @@ const pageLimit = z.coerce
 	.optional()
 	.describe('Entries per page (default 10, max 100)');
 const offset = z.coerce.number().int().min(0).optional().describe('Entries to skip (default 0)');
+const ACTIVITY_PAGING =
+	'Paginated, newest first. Returns at most `limit` entries (default 10, max 100); use `offset`/`nextOffset` and `hasMore` to fetch older entries.';
+
+const pagedResult = <T>(page: Page<T>, paging: { limit?: number; offset?: number }) => {
+	const limit = Math.min(paging.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+	const offset = paging.offset ?? 0;
+	const end = offset + page.items.length;
+	const hasMore = end < page.total;
+	return { ...page, limit, offset, hasMore, nextOffset: hasMore ? end : null };
+};
+
+const BRIEF_GUIDANCE = `The brief is for humans who are not engineers (product managers, designers, stakeholders): describe outcomes and impact, not code. Keep each list item to one plain sentence. Never invent requirements the spec does not state; leave a list empty when the spec is silent. effort is a T-shirt size (S, M, L or XL); readingMinutes is about the spec's word count divided by 200.`;
+const BRIEF_REQUIRED = `brief is required when an agent creates or changes a spec's content over MCP. Write it for non-engineers: summary, whyItMatters, whatChanges, acceptance, risks, openQuestions, glossary, effort (S, M, L, XL) and readingMinutes. Describe outcomes, not code; one plain sentence per item; never invent requirements; leave a list empty when the spec is silent.`;
+const briefCheck = (input: { brief?: unknown }) => (input.brief ? null : BRIEF_REQUIRED);
+
+const connection = z.string().min(1).describe('Ticketing connection id');
 const pick = <T extends Record<string, unknown>, K extends keyof T>(input: T, ...keys: K[]) =>
 	Object.fromEntries(Object.entries(input).filter(([k]) => !keys.includes(k as K))) as Omit<T, K>;
 
@@ -73,7 +92,7 @@ export const operations: Operation[] = [
 		method: 'PATCH',
 		path: '/projects/{project}',
 		tag: 'Projects',
-		summary: 'Update a project, including its ticketing integration',
+		summary: 'Rename a project or change its description',
 		input: updateProjectSchema.extend({ project }),
 		run: (app, input, { actor }) =>
 			app.projects.update(input.project, pick(input, 'project'), actor)
@@ -95,10 +114,11 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/projects/{project}/activity',
 		tag: 'Activity',
-		summary: 'Recent activity in a project, newest first',
+		summary: 'Recent activity in a project',
+		description: ACTIVITY_PAGING,
 		input: z.object({ project, limit: pageLimit, offset }),
 		run: (app, { project, limit, offset }) =>
-			app.activity.forProject(project, { limit, offset }).items
+			pagedResult(app.activity.forProject(project, { limit, offset }), { limit, offset })
 	}),
 
 	// Epics
@@ -117,9 +137,16 @@ export const operations: Operation[] = [
 		path: '/projects/{project}/epics',
 		tag: 'Epics',
 		summary: 'Create an epic, optionally with its full plan',
-		description:
-			'Pass phases (the vertical timeline), each with tasks, and specs in one call. Use this to turn an AI-generated plan into a trackable epic.',
+		description: `Pass tasks (each with its specs) and epic specs in one call. Use this to turn an AI-generated plan into a trackable epic. Every spec with content needs a brief over MCP. ${BRIEF_GUIDANCE}`,
 		input: createEpicSchema.extend({ project }),
+		mcp: {
+			check: (input) =>
+				[...(input.specs ?? []), ...(input.tasks ?? []).flatMap((t) => t.specs ?? [])].some(
+					(spec) => spec.content && !spec.brief
+				)
+					? BRIEF_REQUIRED
+					: null
+		},
 		successStatus: 201,
 		run: (app, input, { actor }) => app.epics.create(input.project, pick(input, 'project'), actor)
 	}),
@@ -128,7 +155,7 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/epics/{epic}',
 		tag: 'Epics',
-		summary: 'Get an epic with its timeline phases, tasks, specs and progress',
+		summary: 'Get an epic with its tasks, specs and progress',
 		input: z.object({ epic }),
 		run: (app, { epic }) => app.epics.detail(epic)
 	}),
@@ -146,7 +173,7 @@ export const operations: Operation[] = [
 		method: 'DELETE',
 		path: '/epics/{epic}',
 		tag: 'Epics',
-		summary: 'Delete an epic with its phases, tasks and specs',
+		summary: 'Delete an epic with its tasks and specs',
 		input: z.object({ epic }),
 		run: (app, { epic }, { actor }) => {
 			app.epics.delete(epic, actor);
@@ -158,44 +185,11 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/epics/{epic}/activity',
 		tag: 'Activity',
-		summary: 'Recent activity in an epic, newest first',
+		summary: 'Recent activity in an epic',
+		description: ACTIVITY_PAGING,
 		input: z.object({ epic, limit: pageLimit, offset }),
-		run: (app, { epic, limit, offset }) => app.activity.forEpic(epic, { limit, offset }).items
-	}),
-
-	// Phases
-	defineOperation({
-		name: 'create_phase',
-		method: 'POST',
-		path: '/epics/{epic}/phases',
-		tag: 'Phases',
-		summary: 'Add a phase to the epic timeline',
-		input: createPhaseSchema.extend({ epic }),
-		successStatus: 201,
-		run: (app, input, { actor }) => app.phases.create(input.epic, pick(input, 'epic'), actor)
-	}),
-	defineOperation({
-		name: 'update_phase',
-		method: 'PATCH',
-		path: '/phases/{phase}',
-		tag: 'Phases',
-		summary: 'Rename, reorder, date or set the status of a phase',
-		description:
-			'The status only applies while the phase has no tasks; otherwise it is derived from them.',
-		input: updatePhaseSchema.extend({ phase }),
-		run: (app, input, { actor }) => app.phases.update(input.phase, pick(input, 'phase'), actor)
-	}),
-	defineOperation({
-		name: 'delete_phase',
-		method: 'DELETE',
-		path: '/phases/{phase}',
-		tag: 'Phases',
-		summary: 'Remove a phase. Its tasks stay in the epic without a phase.',
-		input: z.object({ phase }),
-		run: (app, { phase }, { actor }) => {
-			app.phases.delete(phase, actor);
-			return { deleted: true };
-		}
+		run: (app, { epic, limit, offset }) =>
+			pagedResult(app.activity.forEpic(epic, { limit, offset }), { limit, offset })
 	}),
 
 	// Tasks
@@ -225,7 +219,7 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/tasks/{task}',
 		tag: 'Tasks',
-		summary: 'Get a task with its epic, phase and specs',
+		summary: 'Get a task with its epic and specs',
 		input: z.object({ task }),
 		run: (app, { task }) => app.tasks.detail(task)
 	}),
@@ -289,7 +283,9 @@ export const operations: Operation[] = [
 		path: '/epics/{epic}/specs',
 		tag: 'Specs',
 		summary: 'Attach a markdown spec to an epic',
+		description: BRIEF_GUIDANCE,
 		input: createSpecSchema.extend({ epic }),
+		mcp: { required: ['brief'], check: briefCheck },
 		successStatus: 201,
 		run: (app, input, { actor }) => app.specs.createForEpic(input.epic, pick(input, 'epic'), actor)
 	}),
@@ -308,7 +304,9 @@ export const operations: Operation[] = [
 		path: '/tasks/{task}/specs',
 		tag: 'Specs',
 		summary: 'Attach a markdown spec to a task',
+		description: BRIEF_GUIDANCE,
 		input: createSpecSchema.extend({ task }),
+		mcp: { required: ['brief'], check: briefCheck },
 		successStatus: 201,
 		run: (app, input, { actor }) => app.specs.createForTask(input.task, pick(input, 'task'), actor)
 	}),
@@ -326,8 +324,10 @@ export const operations: Operation[] = [
 		method: 'PATCH',
 		path: '/specs/{spec}',
 		tag: 'Specs',
-		summary: 'Edit a spec. Changing the content clears its human brief.',
+		summary: 'Edit a spec. Changing the content clears its human brief unless you send a new one.',
+		description: `Over MCP, brief is required whenever content is sent, so the human brief always matches the content. Title, kind and position edits do not need it. ${BRIEF_GUIDANCE}`,
 		input: updateSpecSchema.extend({ spec }),
+		mcp: { check: (input) => (input.content !== undefined ? briefCheck(input) : null) },
 		run: (app, input, { actor }) => app.specs.update(input.spec, pick(input, 'spec'), actor)
 	}),
 	defineOperation({
@@ -341,6 +341,16 @@ export const operations: Operation[] = [
 			app.specs.delete(spec, actor);
 			return { deleted: true };
 		}
+	}),
+	defineOperation({
+		name: 'set_spec_brief',
+		method: 'PUT',
+		path: '/specs/{spec}/brief',
+		tag: 'Specs',
+		summary: 'Write or replace the human brief of a spec, leaving its content untouched',
+		description: BRIEF_GUIDANCE,
+		input: setSpecBriefSchema.extend({ spec }),
+		run: (app, input, { actor }) => app.specs.setBrief(input.spec, pick(input, 'spec'), actor)
 	}),
 	defineOperation({
 		name: 'translate_spec',
@@ -366,6 +376,102 @@ export const operations: Operation[] = [
 		summary: 'List the external ticketing systems this server can update',
 		input: z.object({}),
 		run: (app) => app.ticketing.providers()
+	}),
+	defineOperation({
+		name: 'list_ticketing_connections',
+		method: 'GET',
+		path: '/ticketing/connections',
+		tag: 'Ticketing',
+		summary: 'List ticketing connections and the projects using each',
+		description:
+			'API keys are never returned: hasSecret tells whether one is stored, secretSource whether it comes from storage, the server environment or is missing.',
+		input: z.object({}),
+		run: (app) => app.connections.list()
+	}),
+	defineOperation({
+		name: 'get_ticketing_connection',
+		method: 'GET',
+		path: '/ticketing/connections/{connection}',
+		tag: 'Ticketing',
+		summary: 'Get a ticketing connection',
+		input: z.object({ connection }),
+		run: (app, { connection }) => app.connections.get(connection)
+	}),
+	defineOperation({
+		name: 'create_ticketing_connection',
+		method: 'POST',
+		path: '/ticketing/connections',
+		tag: 'Ticketing',
+		summary: 'Create a ticketing connection',
+		description:
+			'Holds the account-level settings and the API key of one external system. Projects select a connection. The secret is encrypted with BRIEFLINE_SECRET_KEY and write-only.',
+		input: createTicketingConnectionSchema,
+		successStatus: 201,
+		run: (app, input) => app.connections.create(input)
+	}),
+	defineOperation({
+		name: 'update_ticketing_connection',
+		method: 'PATCH',
+		path: '/ticketing/connections/{connection}',
+		tag: 'Ticketing',
+		summary: 'Update a ticketing connection',
+		description:
+			'Omit secret to keep the stored one. Send clearSecret: true to remove it, after which the provider environment variable is used if set.',
+		input: updateTicketingConnectionSchema.extend({ connection }),
+		run: (app, input) => app.connections.update(input.connection, pick(input, 'connection'))
+	}),
+	defineOperation({
+		name: 'delete_ticketing_connection',
+		method: 'DELETE',
+		path: '/ticketing/connections/{connection}',
+		tag: 'Ticketing',
+		summary: 'Delete a ticketing connection',
+		description: 'Refused while a project uses the connection.',
+		input: z.object({ connection }),
+		run: (app, { connection }) => {
+			app.connections.delete(connection);
+			return { deleted: true };
+		}
+	}),
+	defineOperation({
+		name: 'test_ticketing_connection',
+		method: 'POST',
+		path: '/ticketing/connections/{connection}/test',
+		tag: 'Ticketing',
+		summary: 'Check that the connection can authenticate',
+		description: 'Returns { ok, message }. A failing check is a result, not an error.',
+		input: z.object({ connection }),
+		readOnly: true,
+		run: (app, { connection }) => app.connections.test(connection)
+	}),
+	defineOperation({
+		name: 'list_ticketing_states',
+		method: 'POST',
+		path: '/projects/{project}/ticketing/states',
+		tag: 'Ticketing',
+		summary: 'List the states of the external project that statuses can be mapped to',
+		description:
+			"Uses the project's connection and target. Pass connectionId and target to preview a choice that is not saved yet. A POST only because of the body; it changes nothing.",
+		input: z.object({
+			project,
+			connectionId: connection.optional(),
+			target: setProjectTicketingSchema.shape.target
+		}),
+		readOnly: true,
+		run: (app, { project, connectionId, target }) =>
+			app.connections.listStates(project, { connectionId, target })
+	}),
+	defineOperation({
+		name: 'set_project_ticketing',
+		method: 'PUT',
+		path: '/projects/{project}/ticketing',
+		tag: 'Ticketing',
+		summary: 'Choose the project ticketing connection, target and status mapping',
+		description:
+			'connectionId null disconnects the project. target holds the project-level provider fields. statusMapping maps not_started, dev, test, deploy and done to { id, name } states from list_ticketing_states; unmapped keys use the provider default.',
+		input: setProjectTicketingSchema.extend({ project }),
+		run: (app, input, { actor }) =>
+			app.connections.setProjectTicketing(input.project, pick(input, 'project'), actor)
 	}),
 	defineOperation({
 		name: 'sync_epic_ticket',

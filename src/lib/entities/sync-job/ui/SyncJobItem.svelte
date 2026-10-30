@@ -30,6 +30,9 @@
 			/>
 			{#if job.attempts > 1}· {job.attempts} attempts{/if}
 		</p>
+		{#if job.message}
+			<p class="text-[11px] text-warning">{job.message}</p>
+		{/if}
 		{#if job.lastError}
 			<p class="truncate font-mono text-[11px] text-danger" title={job.lastError}>
 				{job.lastError}

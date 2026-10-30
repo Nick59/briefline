@@ -17,5 +17,5 @@ export function loadPage<T>(
 		page = pageCount;
 		result = fetchPage({ limit: size, offset: (page - 1) * size });
 	}
-	return { ...result, page, pageCount };
+	return { ...result, page, pageCount, pageSize: size };
 }

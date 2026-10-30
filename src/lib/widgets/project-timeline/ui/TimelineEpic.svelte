@@ -8,8 +8,8 @@
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { resolve } from '$app/paths';
-	import TimelineTaskRow from '../../epic-timeline/ui/TimelineTaskRow.svelte';
-	import { PhaseMarker } from '#lib/entities/phase/index.ts';
+	import TimelineTaskRow from './TimelineTaskRow.svelte';
+	import { EpicMarker } from '#lib/entities/epic/index.ts';
 	import { StageBadge, StatusBadge } from '#lib/entities/work-status/index.ts';
 
 	interface Props {
@@ -36,7 +36,7 @@
 			aria-hidden="true"
 		></span>
 	{/if}
-	<PhaseMarker {status} {index} {stage} />
+	<EpicMarker {status} {index} {stage} />
 	<div class="min-w-0 pb-8">
 		<div class="flex min-h-7 flex-wrap items-center gap-2">
 			<KeyChip value={displayKey(epic)} title={displayKeyTitle(epic)} />
@@ -52,7 +52,7 @@
 			{/if}
 		</div>
 		<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-			<span>{pluralize(epic.phaseCount, 'phase')} · {pluralize(epic.taskCount, 'task')}</span>
+			<span>{pluralize(epic.taskCount, 'task')}</span>
 			{#if epic.targetDate}
 				<span class="inline-flex items-center gap-1"
 					><CalendarIcon class="size-3" />{formatDate(epic.targetDate, true)}</span

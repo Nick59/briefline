@@ -10,7 +10,6 @@
 <TaskPage
 	project={data.project}
 	task={data.task}
-	phases={data.phases}
 	selectedSpec={data.selectedSpec}
 	activity={data.activity}
 	ticketUrl={data.ticketUrl}

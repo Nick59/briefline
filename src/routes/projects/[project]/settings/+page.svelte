@@ -6,4 +6,8 @@
 </script>
 
 <svelte:head><title>Settings · {data.project.name}</title></svelte:head>
-<ProjectSettingsPage project={data.project} providers={data.providers} />
+<ProjectSettingsPage
+	project={data.project}
+	providers={data.providers}
+	connections={data.connections}
+/>

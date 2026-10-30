@@ -10,7 +10,6 @@ import { transaction } from '../../db/connection.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
-import { withProgress, type PhaseService } from '../phases/service.ts';
 import { toSpecSummary } from '../specs/repository.ts';
 import type { SpecService } from '../specs/service.ts';
 import type { TaskService } from '../tasks/service.ts';
@@ -23,7 +22,6 @@ const normalizeRef = (
 export class EpicService {
 	constructor(
 		private readonly deps: ServiceDeps,
-		private readonly phases: PhaseService,
 		private readonly tasks: TaskService,
 		private readonly specs: SpecService
 	) {}
@@ -36,8 +34,7 @@ export class EpicService {
 			return {
 				...epic,
 				progress: computeProgress(tasks),
-				taskCount: tasks.length,
-				phaseCount: repos.phases.listByEpic(epic.id).length
+				taskCount: tasks.length
 			};
 		});
 	}
@@ -55,13 +52,12 @@ export class EpicService {
 			...epic,
 			project: { id: project.id, key: project.key, name: project.name },
 			progress: computeProgress(tasks),
-			phases: repos.phases.listByEpic(epic.id).map((phase) => withProgress(phase, tasks)),
 			tasks,
 			specs: repos.specs.listByEpic(epic.id).map(toSpecSummary)
 		};
 	}
 
-	/** Creates the epic with its whole plan (phases, tasks, specs) in one transaction. */
+	/** Creates the epic with its whole plan (tasks, specs) in one transaction. */
 	create(projectIdOrKey: string, input: CreateEpicInput, actor: string): EpicDetail {
 		const data = createEpicSchema.parse(input);
 		const { db, repos, events } = this.deps;
@@ -82,14 +78,11 @@ export class EpicService {
 			};
 			repos.epics.insert(epic);
 
-			for (const { tasks = [], ...phaseInput } of data.phases ?? []) {
-				const phase = this.phases.insert(epic.id, phaseInput);
-				for (const { specs = [], ...taskInput } of tasks) {
-					const task = this.tasks.insert(epic, taskInput, phase.id);
-					for (const spec of specs) this.specs.insert(epic.id, task.id, spec);
-				}
+			for (const { specs = [], ...taskInput } of data.tasks ?? []) {
+				const task = this.tasks.insert(epic, taskInput);
+				for (const spec of specs) this.specs.insert(epic.id, task.id, spec, actor);
 			}
-			for (const spec of data.specs ?? []) this.specs.insert(epic.id, null, spec);
+			for (const spec of data.specs ?? []) this.specs.insert(epic.id, null, spec, actor);
 			return epic;
 		});
 

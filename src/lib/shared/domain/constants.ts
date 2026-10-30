@@ -43,3 +43,12 @@ export const SPEC_KIND_LABELS: Record<SpecKind, string> = {
 	notes: 'Notes',
 	prompt: 'Prompt'
 };
+
+export const MAPPING_KEYS = ['not_started', ...STAGES, 'done'] as const;
+export type MappingKey = (typeof MAPPING_KEYS)[number];
+
+export const MAPPING_LABELS: Record<MappingKey, string> = {
+	not_started: 'Not started',
+	...STAGE_LABELS,
+	done: 'Done'
+};

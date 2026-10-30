@@ -19,13 +19,27 @@ export class TicketProviderRegistry {
 	}
 
 	list(): TicketProviderInfo[] {
-		return [...this.#providers.values()].map(({ id, label, description, settings, envVars }) => ({
-			id,
-			label,
-			description,
-			settings,
-			envVars
-		}));
+		return [...this.#providers.values()].map(
+			({
+				id,
+				label,
+				description,
+				settings,
+				envVars,
+				secretLabel,
+				secretEnvVar,
+				supportsStates
+			}) => ({
+				id,
+				label,
+				description,
+				settings,
+				envVars,
+				secretLabel,
+				secretEnvVar,
+				supportsStates
+			})
+		);
 	}
 }
 

@@ -23,10 +23,7 @@ export class TaskService {
 
 	list(epicIdOrKey: string, filter: TaskFilter = {}): Task[] {
 		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		const phaseId = filter.phaseId
-			? (this.resolvePhase(epic.id, filter.phaseId) ?? undefined)
-			: undefined;
-		return this.deps.repos.tasks.listByEpic(epic.id, { ...filter, phaseId });
+		return this.deps.repos.tasks.listByEpic(epic.id, filter);
 	}
 
 	get(idOrKey: string): Task {
@@ -38,7 +35,6 @@ export class TaskService {
 		const task = this.get(idOrKey);
 		const epic = requireEpic(repos, task.epicId);
 		const project = requireProject(repos, epic.projectId);
-		const phase = task.phaseId ? repos.phases.find(task.phaseId) : undefined;
 		return {
 			...task,
 			epic: {
@@ -49,23 +45,12 @@ export class TaskService {
 				externalRef: epic.externalRef
 			},
 			project: { id: project.id, key: project.key, name: project.name },
-			phase: phase ? { id: phase.id, name: phase.name } : null,
 			specs: repos.specs.listByEpic(epic.id, task.id).map(toSpecSummary)
 		};
 	}
 
-	/** Accepts a phase id or a phase name inside the epic. */
-	resolvePhase(epicId: string, ref: string | null | undefined): string | null {
-		if (!ref) return null;
-		const phases = this.deps.repos.phases;
-		const phase = phases.find(ref) ?? phases.findByName(epicId, ref);
-		if (!phase || phase.epicId !== epicId)
-			throw new InvalidInputError(`Phase '${ref}' does not exist in this epic`);
-		return phase.id;
-	}
-
 	/** Inserts without emitting an event; callers emit their own. */
-	insert(epic: Epic, input: CreateTaskInput, phaseId: string | null): Task {
+	insert(epic: Epic, input: CreateTaskInput): Task {
 		const data = createTaskSchema.parse(input);
 		const { repos } = this.deps;
 		const project = requireProject(repos, epic.projectId);
@@ -73,7 +58,6 @@ export class TaskService {
 		const task: Task = {
 			id: newId(),
 			epicId: epic.id,
-			phaseId,
 			key: `${project.key}-${repos.projects.nextSequence(project.id, 'task')}`,
 			title: data.title,
 			description: data.description,
@@ -94,7 +78,7 @@ export class TaskService {
 
 	create(epicIdOrKey: string, input: CreateTaskInput, actor: string): Task {
 		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		const task = this.insert(epic, input, this.resolvePhase(epic.id, input.phaseId));
+		const task = this.insert(epic, input);
 		this.#emit('task.created', epic, task, actor);
 		return task;
 	}
@@ -110,8 +94,6 @@ export class TaskService {
 			summary: data.summary ?? current.summary,
 			priority: data.priority ?? current.priority,
 			assignee: data.assignee === undefined ? current.assignee : data.assignee,
-			phaseId:
-				data.phaseId === undefined ? current.phaseId : this.resolvePhase(epic.id, data.phaseId),
 			stages: { ...current.stages, ...data.stages },
 			externalRef:
 				data.externalRef === undefined
@@ -199,7 +181,6 @@ export class TaskService {
 				repos.tasks.update({
 					...task,
 					epicId: target.id,
-					phaseId: null,
 					position: repos.tasks.nextPosition(target.id),
 					updatedAt: now()
 				});
@@ -219,7 +200,7 @@ export class TaskService {
 					if (t.position !== position) repos.tasks.setPosition(t.id, position);
 				});
 				this.#emit('task.updated', source, task, actor, ['epicId']);
-				this.#emit('task.updated', target, this.get(task.id), actor, ['epicId', 'phaseId']);
+				this.#emit('task.updated', target, this.get(task.id), actor, ['epicId']);
 			}
 			return this.get(task.id);
 		});

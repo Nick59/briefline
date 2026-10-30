@@ -3,6 +3,7 @@
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { resolve } from '$app/paths';
 	import type { EpicDetail, Project } from '#lib/shared/domain/types.ts';
 	import { statusTone } from '#lib/shared/config/tokens/index.ts';
@@ -14,6 +15,7 @@
 	import { StageBadge, StatusBadge } from '#lib/entities/work-status/index.ts';
 	import { ExternalTicketBadge, StageProgressList } from '#lib/entities/epic/index.ts';
 	import { EpicFormDialog } from '#lib/features/epic-form/index.ts';
+	import { TaskFormDialog } from '#lib/features/task-form/index.ts';
 	import { LinkTicketDialog } from '#lib/features/link-ticket/index.ts';
 	import { SyncNowButton } from '#lib/features/sync-ticket/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
@@ -39,6 +41,11 @@
 		{/snippet}
 		{#snippet description()}{epic.summary}{/snippet}
 		{#snippet actions()}
+			<TaskFormDialog epicId={epic.id}>
+				{#snippet trigger({ props })}
+					<Button {...props} size="sm"><PlusIcon />New task</Button>
+				{/snippet}
+			</TaskFormDialog>
 			<LinkTicketDialog
 				target={{ type: 'epic', id: epic.id }}
 				current={epic.externalRef}
@@ -60,7 +67,7 @@
 				operation="delete_epic"
 				input={{ epic: epic.id }}
 				what="epic {displayKey(epic)}"
-				consequence="Its phases, tasks and specs are deleted too. Linked tickets are not touched."
+				consequence="Its tasks and specs are deleted too. Linked tickets are not touched."
 				redirectTo={resolve('/projects/[project]', { project: project.key })}
 			/>
 		{/snippet}
@@ -79,7 +86,7 @@
 			<div class="text-sm">
 				<p class="font-medium">Overall progress</p>
 				<p class="text-muted-foreground">
-					{pluralize(epic.tasks.length, 'task')} · {pluralize(epic.phases.length, 'phase')}
+					{pluralize(epic.tasks.length, 'task')}
 				</p>
 			</div>
 		</div>

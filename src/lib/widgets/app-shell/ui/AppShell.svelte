@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import CableIcon from '@lucide/svelte/icons/cable';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -29,6 +30,12 @@
 			label: 'Overview',
 			icon: LayoutGridIcon,
 			match: (p: string) => p === '/'
+		},
+		{
+			href: resolve('/ticketing'),
+			label: 'Ticketing',
+			icon: CableIcon,
+			match: (p: string) => p.startsWith('/ticketing')
 		},
 		{
 			href: resolve('/docs'),

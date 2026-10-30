@@ -2,7 +2,7 @@
 
 A dev dashboard that tracks work planned and executed by AI agents, and translates their specs for humans.
 
-- **Project → Epic → Task.** Each epic has a **vertical timeline of phases**. Each task moves through three
+- **Project → Epic → Task.** Each task moves through three
   **stages — Dev, Tests, Deploy** — and each stage is **To do, In progress or Done**.
 - **Specs** (markdown, any number per epic or task) are shown in an extensible viewer, and translated into a
   **human brief**: what changes, why, how we know it is done, risks, open questions, and a glossary.
@@ -53,6 +53,10 @@ claude mcp add --transport http briefline http://localhost:5173/mcp --header "X-
 The MCP server is stateless JSON-RPC over HTTP (`POST /mcp`). Its `initialize` result carries instructions that
 explain the model and the expected workflow to the agent.
 
+Over MCP, agents must send a `brief` (the plain-language summary for non-engineers) whenever they create a spec or change its
+content (`add_epic_spec`, `add_task_spec`, `update_spec` with `content`, `create_epic` specs). `set_spec_brief` rewrites the
+brief alone. The REST API and the dashboard keep the brief optional.
+
 **REST:** `GET /api/v1` lists every operation, and `GET /api/v1/openapi.json` describes them in OpenAPI 3.1.
 The in-app page **API & MCP** (`/docs`) shows the same list with copy-paste examples.
 
@@ -60,7 +64,7 @@ The in-app page **API & MCP** (`/docs`) shows the same list with copy-paste exam
 # Plan a whole epic in one call
 curl -X POST localhost:5173/api/v1/projects/SHOP/epics -H 'content-type: application/json' -H 'x-actor: my-agent' -d '{
   "title": "Search v2",
-  "phases": [{ "name": "Build", "tasks": [{ "title": "Search endpoint", "specs": [{ "title": "API spec", "content": "# ..." }] }] }]
+  "tasks": [{ "title": "Search endpoint", "specs": [{ "title": "API spec", "content": "# ..." }] }]
 }'
 
 # Report progress (move_task also reorders: {"stage":"dev","status":"done","beforeTask":"SHOP-3"})
@@ -69,23 +73,53 @@ curl -X PUT localhost:5173/api/v1/tasks/SHOP-7/stages/dev -H 'content-type: appl
 
 Conventions: ids and keys are interchangeable (`SHOP`, `SHOP-E1`, `SHOP-12`); `X-Actor` names who made a change in
 the activity log and ticket comments; errors are `{ "error": { "code", "message", "issues" } }`.
+Activity (`get_project_activity`, `get_epic_activity`) is paginated, newest first: pass `limit` (default 10, max 100) and
+`offset`, and read `{ items, total, limit, offset, hasMore, nextOffset }` to fetch older entries.
 
 ## Ticketing
 
-Configure one provider per project in **Settings**, then link an epic (and optionally a task) to a ticket. With
-automatic sync on, every stage change pushes the overall status (and an optional comment) to the ticket. Each push
-is a **sync job**: visible in the sync log, with its error, and retryable.
+Set up ticketing in two steps.
 
-| Provider  | Status mapping                                             | Credentials (env)              |
-| --------- | ---------------------------------------------------------- | ------------------------------ |
-| `github`  | Done → issue closed, otherwise open                        | `GITHUB_TOKEN`                 |
-| `jira`    | To do / In progress / Done → status category transition    | `JIRA_EMAIL`, `JIRA_API_TOKEN` |
-| `linear`  | → first workflow state of type unstarted/started/completed | `LINEAR_API_KEY`               |
-| `plane`   | → first state of group unstarted/started/completed         | `PLANE_API_KEY`                |
-| `webhook` | POSTs JSON, signed with `x-pm-signature: sha256=…`         | `PM_WEBHOOK_SECRET` (optional) |
-| `dry-run` | Records the update without calling anything                | —                              |
+1. **Connections** (top-level **Ticketing** menu): one per account in an external system, with its settings (site URL,
+   workspace) and API key. Keys are encrypted with AES-256-GCM and never shown again; leave the field empty on edit to
+   keep the saved key, or use **Clear** to remove it.
+2. **Project settings**: select a connection, fill in the project-level field (Plane project id, Jira project key,
+   Linear team key, GitHub default repository) and **map statuses**: Not started, Dev, Test, Deploy and Done each to
+   one external state. **Suggest mapping** proposes backlog/unstarted, started and completed states; rows left on
+   Default keep the provider's own rule.
 
-Secrets are only read from the environment, never stored. Pushes to the same ticket run in order.
+Then link an epic (and optionally a task) to a ticket. With automatic sync on, every stage change moves the ticket to
+the mapped state (and posts an optional comment). A task is Not started until work begins, then follows its current
+stage (Dev, Test, Deploy), then Done; an epic follows its current stage the same way. If a mapped state no longer exists
+remotely the default is used and the sync job records it. Each push is a **sync job**: visible in the sync log, with
+its error, and retryable.
+
+Set `BRIEFLINE_SECRET_KEY` (32 bytes, base64 or hex) before saving API keys:
+
+```bash
+openssl rand -base64 32
+```
+
+Without it keys cannot be saved, and keys already stored cannot be read. Connections without a stored key fall back
+to the provider's environment variable, so setups from before connections existed keep working; the Ticketing menu
+shows "Using environment variable" for them. On upgrade, each project's old settings become a connection (projects with
+the same account share one) and the project-level fields move to the project.
+
+| Provider  | Connection fields                     | Project fields              | Default status rule (unmapped rows)                      | Key (env fallback)             |
+| --------- | ------------------------------------- | --------------------------- | -------------------------------------------------------- | ------------------------------ |
+| `github`  | —                                     | default repository          | Done → closed, otherwise open                            | `GITHUB_TOKEN`                 |
+| `jira`    | site URL, account email               | project key, preferred done | status category transition (To Do, In Progress, Done)    | `JIRA_EMAIL`, `JIRA_API_TOKEN` |
+| `linear`  | workspace slug                        | team key                    | first workflow state of type unstarted/started/completed | `LINEAR_API_KEY`               |
+| `plane`   | workspace slug, API URL (self-hosted) | project id                  | first state of group unstarted/started/completed         | `PLANE_API_KEY`                |
+| `webhook` | endpoint URL, ticket URL template     | —                           | POSTs JSON, signed with `x-pm-signature: sha256=…`       | `PM_WEBHOOK_SECRET` (optional) |
+| `dry-run` | ticket URL template                   | —                           | Records the update without calling anything              | —                              |
+
+Mappable states come from the system: Plane states, Linear team workflow states, Jira project statuses (a push picks
+the transition whose target is the mapped status; an issue already in it is left alone), GitHub `open`/`closed`. The
+webhook provider has no states. Operations: `list_ticketing_connections`, `get_ticketing_connection`,
+`create_ticketing_connection`, `update_ticketing_connection`, `delete_ticketing_connection` (refused while projects use
+it), `test_ticketing_connection`, `list_ticketing_states` and `set_project_ticketing`. Secrets are write-only: responses
+carry `hasSecret` and `secretSource` (`stored`, `env` or `none`). Pushes to the same ticket run in order.
 Add a provider by implementing `TicketProvider` (`src/lib/server/modules/ticketing/provider.ts`) and registering it
 in `registry.ts`.
 
@@ -104,9 +138,9 @@ Feature-Sliced Design in `src/lib`, layers importing only from layers below:
 routes/        SvelteKit routes: load data, export the shared `run` action, render a page
 lib/pages/     Page compositions (home, project, project-settings, epic, task, docs, login)
 lib/widgets/   app-shell (sidebar), epic-header, epic-timeline, stage-board, spec-panel, activity-feed, sync-log
-lib/features/  User actions: project/epic/task/phase forms, change-task-status, spec-editor, translate-spec,
+lib/features/  User actions: project/epic/task forms, change-task-status, spec-editor, translate-spec,
                link-ticket, sync-ticket, configure-ticketing, delete-entity, theme-toggle
-lib/entities/  Display of domain objects: work-status, task, epic, project, phase, spec, activity, sync-job
+lib/entities/  Display of domain objects: work-status, task, epic, project, spec, activity, sync-job
 lib/shared/    domain (types, zod schemas, progress math), config/tokens, ui (shadcn primitives + small
                design-system components + markdown viewer), lib (format, run-operation)
 lib/server/    Backend (server-only): db, modules/<domain>/{repository,service}, api, mcp, http
@@ -152,13 +186,14 @@ Pass it with `<MarkdownViewer source={md} extensions={[jiraKeys]} />` (or `exten
 
 ## Configuration
 
-| Variable            | Default                   | Purpose                                                               |
-| ------------------- | ------------------------- | --------------------------------------------------------------------- |
-| `PM_DATABASE_PATH`  | `data/project-manager.db` | SQLite file                                                           |
-| `PM_API_TOKEN`      | —                         | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in |
-| `PM_PUBLIC_URL`     | —                         | Dashboard URL used in ticket comments                                 |
-| `PM_SEED_DEMO`      | `true`                    | Create the demo project when the database is empty                    |
-| `ANTHROPIC_API_KEY` | —                         | Use Claude for human briefs                                           |
-| `PM_BRIEF_MODEL`    | `claude-opus-5-5`         | Claude model for briefs                                               |
+| Variable               | Default                   | Purpose                                                               |
+| ---------------------- | ------------------------- | --------------------------------------------------------------------- |
+| `PM_DATABASE_PATH`     | `data/project-manager.db` | SQLite file                                                           |
+| `PM_API_TOKEN`         | —                         | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in |
+| `PM_PUBLIC_URL`        | —                         | Dashboard URL used in ticket comments                                 |
+| `PM_SEED_DEMO`         | `true`                    | Create the demo project when the database is empty                    |
+| `BRIEFLINE_SECRET_KEY` | —                         | Encrypts API keys saved on ticketing connections                      |
+| `ANTHROPIC_API_KEY`    | —                         | Use Claude for human briefs                                           |
+| `PM_BRIEF_MODEL`       | `claude-opus-5-5`         | Claude model for briefs                                               |
 
 Requests with an `Origin` header from another site are refused on `/api` and `/mcp`.

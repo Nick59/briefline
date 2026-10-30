@@ -4,8 +4,17 @@ import {
 	requireSetting,
 	TicketProviderError,
 	TIMEOUT_MS,
+	type ProviderContext,
 	type TicketProvider
 } from '../provider.ts';
+
+function endpoint(ctx: ProviderContext): URL {
+	const url = new URL(requireSetting(ctx, 'url'));
+	if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+		throw new TicketProviderError('Webhook URL must use http or https');
+	}
+	return url;
+}
 
 export const webhookProvider: TicketProvider = {
 	id: 'webhook',
@@ -17,26 +26,34 @@ export const webhookProvider: TicketProvider = {
 			name: 'url',
 			label: 'Endpoint URL',
 			required: true,
+			scope: 'connection',
 			placeholder: 'https://example.com/hooks/tickets'
 		},
 		{
 			name: 'ticketUrlTemplate',
 			label: 'Ticket URL template',
 			required: false,
+			scope: 'connection',
 			placeholder: 'https://tracker/browse/{key}'
 		}
 	],
 	envVars: ['PM_WEBHOOK_SECRET'],
+	secretLabel: 'Signing secret (optional)',
+	secretEnvVar: 'PM_WEBHOOK_SECRET',
+	supportsStates: false,
 	ticketUrl(ref, settings) {
 		return settings.ticketUrlTemplate
 			? settings.ticketUrlTemplate.replace('{key}', encodeURIComponent(ref.key))
 			: null;
 	},
+	async testConnection(ctx) {
+		endpoint(ctx);
+	},
+	async listStates() {
+		return [];
+	},
 	async push(ctx, update) {
-		const url = new URL(requireSetting(ctx, 'url'));
-		if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-			throw new TicketProviderError('Webhook URL must use http or https');
-		}
+		const url = endpoint(ctx);
 		const body = JSON.stringify({
 			event: 'ticket.update',
 			ticket: ctx.ref,
@@ -44,7 +61,7 @@ export const webhookProvider: TicketProvider = {
 			sentAt: new Date().toISOString()
 		});
 		const headers: Record<string, string> = { 'content-type': 'application/json' };
-		const secret = ctx.env.PM_WEBHOOK_SECRET;
+		const secret = ctx.secret;
 		if (secret)
 			headers['x-pm-signature'] =
 				`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;

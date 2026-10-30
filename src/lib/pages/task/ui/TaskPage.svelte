@@ -6,14 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { STAGES } from '#lib/shared/domain/constants.ts';
 	import { taskOverallStatus } from '#lib/shared/domain/progress.ts';
-	import type {
-		Activity,
-		PageView,
-		Phase,
-		Project,
-		Spec,
-		TaskDetail
-	} from '#lib/shared/domain/types.ts';
+	import type { Activity, PageView, Project, Spec, TaskDetail } from '#lib/shared/domain/types.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
@@ -33,13 +26,12 @@
 	interface Props {
 		project: Project;
 		task: TaskDetail;
-		phases: Pick<Phase, 'id' | 'name'>[];
 		selectedSpec: Spec | null;
 		activity: PageView<Activity>;
 		ticketUrl: string | null;
 	}
 
-	let { project, task, phases, selectedSpec, activity, ticketUrl }: Props = $props();
+	let { project, task, selectedSpec, activity, ticketUrl }: Props = $props();
 	const epicHref = $derived(
 		resolve('/projects/[project]/epics/[epic]', { project: project.key, epic: task.epic.key })
 	);
@@ -62,7 +54,6 @@
 				{#if task.assignee}<span class="inline-flex items-center gap-1 text-xs"
 						><UserIcon class="size-3" />{task.assignee}</span
 					>{/if}
-				{#if task.phase}<span class="text-xs">Phase: {task.phase.name}</span>{/if}
 				{#if task.externalRef}<ExternalTicketBadge ref={task.externalRef} url={ticketUrl} />{/if}
 			{/snippet}
 			{#snippet description()}{task.summary}{/snippet}
@@ -76,7 +67,7 @@
 							><LinkIcon />Ticket</Button
 						>{/snippet}
 				</LinkTicketDialog>
-				<TaskFormDialog epicId={task.epicId} {phases} {task}>
+				<TaskFormDialog epicId={task.epicId} {task}>
 					{#snippet trigger({ props })}<Button {...props} variant="outline" size="sm"
 							><PencilIcon />Edit</Button
 						>{/snippet}
@@ -111,6 +102,12 @@
 			{/if}
 			<SpecPanel specs={task.specs} selected={selectedSpec} owner={{ type: 'task', id: task.id }} />
 		</div>
-		<ActivityFeed items={activity.items} page={activity.page} pageCount={activity.pageCount} />
+		<ActivityFeed
+			items={activity.items}
+			page={activity.page}
+			pageCount={activity.pageCount}
+			total={activity.total}
+			pageSize={activity.pageSize}
+		/>
 	</div>
 </div>

@@ -7,10 +7,8 @@
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
 	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
-	import { ChoiceSelect } from '#lib/shared/ui/choice-select/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import type { Epic, EpicDetail } from '#lib/shared/domain/types.ts';
-	import { PHASE_TEMPLATES } from '../model/templates.ts';
 
 	interface Props {
 		projectKey: string;
@@ -25,7 +23,6 @@
 	let title = $state('');
 	let summary = $state('');
 	let targetDate = $state('');
-	let template = $state('delivery');
 	let busy = $state(false);
 
 	$effect(() => {
@@ -48,11 +45,9 @@
 			);
 			if (outcome.ok) open = false;
 		} else {
-			const phases =
-				PHASE_TEMPLATES.find((t) => t.id === template)?.phases.map((name) => ({ name })) ?? [];
 			const outcome = await runOperation<EpicDetail>(
 				'create_epic',
-				{ project: projectKey, ...fields, phases },
+				{ project: projectKey, ...fields },
 				{ success: 'Epic created', refresh: false }
 			);
 			if (outcome.ok) {
@@ -82,7 +77,7 @@
 				<Dialog.Description>
 					{epic
 						? 'Update the outcome and the target date.'
-						: 'An epic is a deliverable with a timeline of phases. Agents can fill it with tasks and specs.'}
+						: 'An epic is a deliverable. Agents can fill it with tasks and specs.'}
 				</Dialog.Description>
 			</Dialog.Header>
 			<Field label="Title" for="epic-title">
@@ -97,20 +92,9 @@
 			<Field label="Summary" for="epic-summary" hint="The outcome in plain language.">
 				<Textarea id="epic-summary" bind:value={summary} rows={3} />
 			</Field>
-			<div class="grid gap-3 sm:grid-cols-2">
-				<Field label="Target date" for="epic-target">
-					<Input id="epic-target" type="date" bind:value={targetDate} />
-				</Field>
-				{#if !epic}
-					<Field label="Timeline" for="epic-template">
-						<ChoiceSelect
-							id="epic-template"
-							bind:value={template}
-							options={PHASE_TEMPLATES.map((t) => ({ value: t.id, label: t.label }))}
-						/>
-					</Field>
-				{/if}
-			</div>
+			<Field label="Target date" for="epic-target">
+				<Input id="epic-target" type="date" bind:value={targetDate} />
+			</Field>
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>
 				<Button type="submit" disabled={busy || !title}>{epic ? 'Save' : 'Create epic'}</Button>

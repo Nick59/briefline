@@ -1,13 +1,23 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { Project, TicketProviderInfo } from '#lib/shared/domain/types.ts';
+	import type {
+		Project,
+		TicketingConnection,
+		TicketProviderInfo
+	} from '#lib/shared/domain/types.ts';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
 	import { ProjectDetailsForm, TicketingForm } from '#lib/features/configure-ticketing/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
 	import { Crumbs } from '#lib/widgets/app-shell/index.ts';
 
-	let { project, providers }: { project: Project; providers: TicketProviderInfo[] } = $props();
+	interface Props {
+		project: Project;
+		providers: TicketProviderInfo[];
+		connections: TicketingConnection[];
+	}
+
+	let { project, providers, connections }: Props = $props();
 </script>
 
 <div class="max-w-3xl space-y-10">
@@ -27,7 +37,9 @@
 	</Section>
 
 	<Section title="Ticketing">
-		<div class="rounded-xl border bg-card p-5"><TicketingForm {project} {providers} /></div>
+		<div class="rounded-xl border bg-card p-5">
+			<TicketingForm {project} {providers} {connections} />
+		</div>
 	</Section>
 
 	<Section title="Danger zone">

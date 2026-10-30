@@ -1,10 +1,13 @@
 import type { WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	expectOk,
-	requireEnv,
+	requireSecret,
+	requireSetting,
+	resolveMapped,
 	TicketProviderError,
 	TIMEOUT_MS,
-	type TicketContext,
+	type ProviderContext,
+	type ProviderState,
 	type TicketProvider
 } from '../provider.ts';
 
@@ -15,15 +18,16 @@ const STATE_TYPE: Record<WorkStatus, string> = {
 };
 
 async function graphql<T>(
-	ctx: TicketContext,
+	ctx: ProviderContext,
 	query: string,
-	variables: Record<string, unknown>
+	variables: Record<string, unknown> = {}
 ): Promise<T> {
 	const response = await ctx.fetch('https://api.linear.app/graphql', {
 		method: 'POST',
 		headers: {
 			'content-type': 'application/json',
-			authorization: requireEnv(ctx, 'LINEAR_API_KEY')
+			// Personal API keys are sent as-is; the Bearer prefix is only for OAuth tokens.
+			authorization: requireSecret(ctx)
 		},
 		body: JSON.stringify({ query, variables }),
 		signal: AbortSignal.timeout(TIMEOUT_MS)
@@ -34,51 +38,88 @@ async function graphql<T>(
 	return result.data as T;
 }
 
+interface LinearState {
+	id: string;
+	name: string;
+	type: string;
+	position: number;
+}
+
+const toStates = (nodes: LinearState[]): ProviderState[] =>
+	[...nodes]
+		.sort((a, b) => a.position - b.position)
+		.map(({ id, name, type }) => ({ id, name, group: type }));
+
 interface IssueLookup {
-	issue: {
-		id: string;
-		team: { states: { nodes: { id: string; type: string; position: number }[] } };
-	};
+	issue: { id: string; team: { states: { nodes: LinearState[] } } };
 }
 
 export const linearProvider: TicketProvider = {
 	id: 'linear',
 	label: 'Linear',
 	description:
-		'Moves the issue to the first workflow state of the matching type and posts progress comments.',
-	settings: [{ name: 'workspace', label: 'Workspace slug', required: false, placeholder: 'acme' }],
+		'Moves the issue to the workflow state mapped to its progress, or the first state of the matching type, and posts progress comments.',
+	settings: [
+		{
+			name: 'workspace',
+			label: 'Workspace slug',
+			required: false,
+			scope: 'connection',
+			placeholder: 'acme'
+		},
+		{
+			name: 'teamKey',
+			label: 'Team key',
+			required: false,
+			scope: 'project',
+			placeholder: 'ENG',
+			help: 'Needed to load the workflow states for status mapping.'
+		}
+	],
 	envVars: ['LINEAR_API_KEY'],
+	secretLabel: 'API key',
+	secretEnvVar: 'LINEAR_API_KEY',
+	supportsStates: true,
 	ticketUrl(ref, settings) {
 		return settings.workspace ? `https://linear.app/${settings.workspace}/issue/${ref.key}` : null;
+	},
+	async testConnection(ctx) {
+		await graphql(ctx, 'query { viewer { id } }');
+	},
+	async listStates(ctx) {
+		const key = requireSetting(ctx, 'teamKey');
+		const { teams } = await graphql<{ teams: { nodes: { states: { nodes: LinearState[] } }[] } }>(
+			ctx,
+			'query($key: String!) { teams(filter: { key: { eq: $key } }) { nodes { states { nodes { id name type position } } } } }',
+			{ key }
+		);
+		const team = teams.nodes[0];
+		if (!team) throw new TicketProviderError(`Linear team '${key}' was not found`);
+		return toStates(team.states.nodes);
 	},
 	async push(ctx, update) {
 		const { issue } = await graphql<IssueLookup>(
 			ctx,
-			'query($id: String!) { issue(id: $id) { id team { states { nodes { id type position } } } } }',
+			'query($id: String!) { issue(id: $id) { id team { states { nodes { id name type position } } } } }',
 			{ id: ctx.ref.key }
 		);
-		const state = issue.team.states.nodes
-			.filter((s) => s.type === STATE_TYPE[update.status])
-			.sort((a, b) => a.position - b.position)[0];
+		const states = toStates(issue.team.states.nodes);
+		const mapped = resolveMapped(ctx, states);
+		const state = mapped.state ?? states.find((s) => s.group === STATE_TYPE[update.status]);
 		if (state) {
 			await graphql(
 				ctx,
 				'mutation($id: String!, $stateId: String!) { issueUpdate(id: $id, input: { stateId: $stateId }) { success } }',
-				{
-					id: issue.id,
-					stateId: state.id
-				}
+				{ id: issue.id, stateId: state.id }
 			);
 		}
 		if (update.comment) {
 			await graphql(
 				ctx,
 				'mutation($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success } }',
-				{
-					issueId: issue.id,
-					body: update.comment
-				}
+				{ issueId: issue.id, body: update.comment }
 			);
 		}
+		return { note: mapped.note };
 	}
 };

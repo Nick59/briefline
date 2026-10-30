@@ -24,6 +24,8 @@ export async function execute(
 ): Promise<unknown> {
 	try {
 		const input = op.input.parse(rawInput ?? {});
+		const refusal = ctx.transport === 'mcp' ? op.mcp?.check?.(input) : null;
+		if (refusal) throw new ApiFailure(400, { error: { code: 'invalid_input', message: refusal } });
 		return await op.run(app, input, ctx);
 	} catch (error) {
 		throw toFailure(error);

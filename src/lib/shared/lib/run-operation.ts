@@ -11,7 +11,7 @@ export type OperationResult<T = unknown> = { ok: true; result: T } | { ok: false
 export async function runOperation<T = unknown>(
 	op: string,
 	input: Record<string, unknown>,
-	options: { success?: string; refresh?: boolean } = {}
+	options: { success?: string; refresh?: boolean; silent?: boolean } = {}
 ): Promise<OperationResult<T>> {
 	const body = new FormData();
 	body.set('_op', op);
@@ -38,7 +38,7 @@ export async function runOperation<T = unknown>(
 	if (outcome.ok) {
 		if (options.success) toast.success(options.success);
 		if (options.refresh !== false) await refreshAll();
-	} else {
+	} else if (!options.silent) {
 		toast.error(outcome.message);
 	}
 	return outcome;

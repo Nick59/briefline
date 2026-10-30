@@ -10,16 +10,7 @@ function withEpic() {
 		'PMA',
 		{
 			title: 'Launch',
-			phases: [
-				{
-					name: 'Build',
-					tasks: [
-						{ title: 'API', specs: [{ title: 'API spec', content: '# API' }] },
-						{ title: 'UI' }
-					]
-				},
-				{ name: 'Release' }
-			],
+			tasks: [{ title: 'API', specs: [{ title: 'API spec', content: '# API' }] }, { title: 'UI' }],
 			specs: [{ title: 'Epic spec', content: 'Hello' }]
 		},
 		'agent'
@@ -67,9 +58,7 @@ describe('epics', () => {
 	it('creates the whole plan in one call with sequential keys', () => {
 		const { epic } = withEpic();
 		expect(epic.key).toBe('PMA-E1');
-		expect(epic.phases.map((p) => p.name)).toEqual(['Build', 'Release']);
 		expect(epic.tasks.map((t) => t.key)).toEqual(['PMA-1', 'PMA-2']);
-		expect(epic.tasks.every((t) => t.phaseId === epic.phases[0].id)).toBe(true);
 		expect(epic.specs.map((s) => [s.title, s.taskId === null])).toEqual([
 			['Epic spec', true],
 			['API spec', false]
@@ -82,19 +71,11 @@ describe('epics', () => {
 		expect(() =>
 			app.epics.create(
 				'PMA',
-				{ title: 'Bad', phases: [{ name: 'X', startDate: '2026-02-01', endDate: '2026-01-01' }] },
+				{ title: 'Bad', tasks: [{ title: 'Fine' }, { title: 'X', priority: 'nope' as never }] },
 				'test'
 			)
-		).toThrow(InvalidInputError);
+		).toThrow(ZodError);
 		expect(app.epics.list('PMA')).toHaveLength(0);
-	});
-
-	it('derives phase status from its tasks, and uses the stored one when empty', () => {
-		const { app, epic } = withEpic();
-		app.tasks.setStage('PMA-1', { stage: 'dev', status: 'in_progress' }, 'test');
-		app.phases.update(epic.phases[1].id, { status: 'done' }, 'test');
-		const detail = app.epics.detail(epic.key);
-		expect(detail.phases.map((p) => p.effectiveStatus)).toEqual(['in_progress', 'done']);
 	});
 });
 
@@ -112,20 +93,6 @@ describe('tasks', () => {
 			message: 'Moved PMA-1 to Tests · Done',
 			data: { note: 'All green' }
 		});
-	});
-
-	it('accepts a phase name and rejects phases from another epic', () => {
-		const { app, epic } = withEpic();
-		const task = app.tasks.create(epic.key, { title: 'Docs', phaseId: 'release' }, 'test');
-		expect(task.phaseId).toBe(epic.phases[1].id);
-		const other = app.epics.create(
-			'PMA',
-			{ title: 'Other', phases: [{ name: 'Elsewhere' }] },
-			'test'
-		);
-		expect(() => app.tasks.update(task.id, { phaseId: other.phases[0].id }, 'test')).toThrow(
-			InvalidInputError
-		);
 	});
 
 	it('filters a board column', () => {
@@ -146,8 +113,6 @@ describe('specs', () => {
 		expect(app.projects.update('PMA', { name: 'Renamed' }, 'test').description).toBe('Kept');
 		app.epics.update(epic.id, { summary: 'Kept' }, 'test');
 		expect(app.epics.update(epic.id, { title: 'T' }, 'test').summary).toBe('Kept');
-		app.phases.update(epic.phases[0].id, { description: 'Kept' }, 'test');
-		expect(app.phases.update(epic.phases[0].id, { name: 'N' }, 'test').description).toBe('Kept');
 	});
 
 	it('writes a human brief and clears it when the content changes', async () => {
@@ -221,11 +186,7 @@ describe('moving tasks on the board', () => {
 	it('rejects a half stage change and a task from another epic', () => {
 		const { app } = withEpic();
 		expect(() => app.tasks.move('PMA-1', { stage: 'dev' }, 'test')).toThrow(InvalidInputError);
-		const other = app.epics.create(
-			'PMA',
-			{ title: 'Other', phases: [{ name: 'X', tasks: [{ title: 'Y' }] }] },
-			'test'
-		);
+		const other = app.epics.create('PMA', { title: 'Other', tasks: [{ title: 'Y' }] }, 'test');
 		expect(() => app.tasks.move('PMA-1', { beforeTask: other.tasks[0].key }, 'test')).toThrow(
 			InvalidInputError
 		);
@@ -233,14 +194,13 @@ describe('moving tasks on the board', () => {
 });
 
 describe('moving tasks between epics', () => {
-	it('preserves completed stages and specs, clears the phase and recomputes both epics', () => {
+	it('preserves completed stages and specs, recomputes both epics', () => {
 		const { app, epic } = withEpic();
 		app.tasks.update('PMA-1', { stages: { dev: 'done', test: 'done', deploy: 'done' } }, 'test');
 		const target = app.epics.create('PMA', { title: 'Destination' }, 'test');
 		const moved = app.tasks.move('PMA-1', { epic: target.id, beforeTask: null }, 'test');
 		expect(moved).toMatchObject({
 			epicId: target.id,
-			phaseId: null,
 			key: 'PMA-1',
 			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		});
@@ -282,6 +242,6 @@ describe('moving tasks between epics', () => {
 		expect(() => app.tasks.move('PMA-1', { epic: target.id, beforeTask: 'PMA-2' }, 'test')).toThrow(
 			InvalidInputError
 		);
-		expect(app.tasks.get('PMA-1')).toMatchObject({ epicId: epic.id, phaseId: epic.phases[0].id });
+		expect(app.tasks.get('PMA-1')).toMatchObject({ epicId: epic.id });
 	});
 });

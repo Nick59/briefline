@@ -25,3 +25,38 @@ export function testApp(
 	});
 	return { app, calls };
 }
+
+type TestApp = ReturnType<typeof testApp>['app'];
+
+/** Creates a connection and selects it for the project. Flat settings are split by field scope. */
+export function connectProject(
+	app: TestApp,
+	projectKey: string,
+	provider: string,
+	settings: Record<string, string> = {},
+	extra: {
+		secret?: string;
+		statusMapping?: Record<string, { id: string; name: string }>;
+		name?: string;
+	} = {}
+) {
+	const fields = app.ticketing.providers().find((p) => p.id === provider)!.settings;
+	const pick = (scope: 'connection' | 'project') =>
+		Object.fromEntries(
+			Object.entries(settings).filter(([name]) =>
+				fields.some((f) => f.name === name && f.scope === scope)
+			)
+		);
+	const connection = app.connections.create({
+		name: extra.name ?? `${provider} test`,
+		provider,
+		settings: pick('connection'),
+		secret: extra.secret
+	});
+	app.connections.setProjectTicketing(
+		projectKey,
+		{ connectionId: connection.id, target: pick('project'), statusMapping: extra.statusMapping },
+		'test'
+	);
+	return connection;
+}

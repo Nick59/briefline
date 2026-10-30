@@ -13,13 +13,12 @@
 		stage: Stage;
 		status: WorkStatus;
 		tasks: Task[];
-		phaseNames: Map<string, string>;
 		projectKey: string;
 		epicKey: string;
 		sortable: Sortable;
 	}
 
-	let { stage, status, tasks, phaseNames, projectKey, epicKey, sortable }: Props = $props();
+	let { stage, status, tasks, projectKey, epicKey, sortable }: Props = $props();
 
 	const zone = $derived(`${stage}:${status}`);
 	const isTarget = $derived(sortable.active !== null && sortable.over?.zone === zone);
@@ -52,7 +51,6 @@
 				epic: epicKey,
 				task: task.key
 			})}
-			phaseName={task.phaseId ? phaseNames.get(task.phaseId) : null}
 			class={cn(
 				'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none]',
 				sortable.active?.id === task.id && 'opacity-40'

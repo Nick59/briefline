@@ -1,18 +1,20 @@
 import type { Container } from '../container.ts';
 import { execute, toFailure } from '../api/execute.ts';
 import { inputJsonSchema } from '../api/openapi.ts';
+import type { Operation } from '../api/operation.ts';
 import { operations, operationsByName } from '../api/operations.ts';
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
 
 export const MCP_INSTRUCTIONS = `Briefline tracks software work for humans.
-Model: Project > Epic > Task. Each epic has a vertical timeline of phases; each task belongs to at most one phase.
+Model: Project > Epic > Task.
 Every task moves through three stages: dev, test, deploy. Each stage is todo, in_progress or done.
 Typical flow for an agent:
 1. list_projects, then get_epic to read the plan and the current board.
-2. When you plan new work, call create_epic with phases, tasks and specs in one call.
+2. When you plan new work, call create_epic with tasks and specs in one call.
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
-4. Attach your specs/plans as markdown with add_epic_spec or add_task_spec, then translate_spec so humans get a plain-language brief.
+4. Attach your specs/plans as markdown with add_epic_spec or add_task_spec, always including the \`brief\` argument:
+   the plain-language summary for non-engineers is written by you, in the same call (set_spec_brief rewrites it alone).
    Add diagrams as \`\`\`mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
 Linked tickets in Jira, GitHub, Linear, Plane or a webhook are updated automatically when ticket sync is on.
 Ids and keys are interchangeable: PMA, PMA-E1 and PMA-12 work wherever an id is expected.`;
@@ -28,6 +30,12 @@ type JsonRpcResponse = { jsonrpc: '2.0'; id: string | number | null } & (
 	{ result: unknown } | { error: { code: number; message: string } }
 );
 
+function toolInputSchema(op: Operation) {
+	const schema = inputJsonSchema(op.input);
+	const required = [...new Set([...(schema.required ?? []), ...(op.mcp?.required ?? [])])];
+	return required.length ? { ...schema, required } : schema;
+}
+
 function tools() {
 	return operations.map((op) => ({
 		name: op.name,
@@ -35,7 +43,7 @@ function tools() {
 		description: [op.summary, op.description, `REST: ${op.method} /api/v1${op.path}`]
 			.filter(Boolean)
 			.join('\n'),
-		inputSchema: inputJsonSchema(op.input),
+		inputSchema: toolInputSchema(op),
 		annotations: {
 			readOnlyHint: op.readOnly,
 			destructiveHint: op.method === 'DELETE',
@@ -48,7 +56,7 @@ async function callTool(app: Container, params: Record<string, unknown>, actor: 
 	const op = operationsByName.get(String(params.name));
 	if (!op) return { error: { code: -32602, message: `Unknown tool '${String(params.name)}'` } };
 	try {
-		const value = await execute(app, op, params.arguments ?? {}, { actor });
+		const value = await execute(app, op, params.arguments ?? {}, { actor, transport: 'mcp' });
 		const structured =
 			value !== null && typeof value === 'object' && !Array.isArray(value)
 				? value

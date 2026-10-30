@@ -81,7 +81,7 @@ export function buildOpenApi(origin: string) {
 			title: 'AI Project Manager API',
 			version: '1.0.0',
 			description:
-				'Projects contain epics; epics contain timeline phases and tasks; tasks move through dev, test and deploy stages. The same operations are exposed as MCP tools at /mcp.'
+				'Projects contain epics; epics contain tasks; tasks move through dev, test and deploy stages. The same operations are exposed as MCP tools at /mcp.'
 		},
 		servers: [{ url: origin }],
 		security: [{ bearer: [] }],

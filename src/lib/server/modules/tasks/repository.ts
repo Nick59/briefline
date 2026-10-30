@@ -5,7 +5,6 @@ import { all, fromJson, one, run, toJson, type Db, type Params } from '../../db/
 interface TaskRow {
 	id: string;
 	epic_id: string;
-	phase_id: string | null;
 	key: string;
 	title: string;
 	description: string;
@@ -24,7 +23,6 @@ interface TaskRow {
 const toTask = (row: TaskRow): Task => ({
 	id: row.id,
 	epicId: row.epic_id,
-	phaseId: row.phase_id,
 	key: row.key,
 	title: row.title,
 	description: row.description,
@@ -45,7 +43,6 @@ const toTask = (row: TaskRow): Task => ({
 export interface TaskFilter {
 	stage?: Stage;
 	status?: WorkStatus;
-	phaseId?: string;
 }
 
 const STAGE_COLUMN: Record<Stage, string> = {
@@ -60,10 +57,6 @@ export class TaskRepository {
 	listByEpic(epicId: string, filter: TaskFilter = {}): Task[] {
 		const where = ['epic_id = :epicId'];
 		const params: Params = { epicId };
-		if (filter.phaseId) {
-			where.push('phase_id = :phaseId');
-			params.phaseId = filter.phaseId;
-		}
 		if (filter.status) {
 			where.push(`${STAGE_COLUMN[filter.stage ?? 'dev']} = :status`);
 			params.status = filter.status;
@@ -104,9 +97,9 @@ export class TaskRepository {
 	insert(task: Task) {
 		run(
 			this.db,
-			`INSERT INTO tasks (id, epic_id, phase_id, key, title, description, summary, priority, assignee, dev_status,
+			`INSERT INTO tasks (id, epic_id, key, title, description, summary, priority, assignee, dev_status,
 			 test_status, deploy_status, external_ref, position, created_at, updated_at)
-			 VALUES (:id, :epicId, :phaseId, :key, :title, :description, :summary, :priority, :assignee, :dev, :test,
+			 VALUES (:id, :epicId, :key, :title, :description, :summary, :priority, :assignee, :dev, :test,
 			 :deploy, :externalRef, :position, :createdAt, :updatedAt)`,
 			{ ...this.#params(task), epicId: task.epicId, key: task.key, createdAt: task.createdAt }
 		);
@@ -115,7 +108,7 @@ export class TaskRepository {
 	update(task: Task) {
 		run(
 			this.db,
-			`UPDATE tasks SET epic_id = :epicId, phase_id = :phaseId, title = :title, description = :description, summary = :summary,
+			`UPDATE tasks SET epic_id = :epicId, title = :title, description = :description, summary = :summary,
 			 priority = :priority, assignee = :assignee, dev_status = :dev, test_status = :test, deploy_status = :deploy,
 			 external_ref = :externalRef, position = :position, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(task)
@@ -134,7 +127,6 @@ export class TaskRepository {
 		return {
 			id: task.id,
 			epicId: task.epicId,
-			phaseId: task.phaseId,
 			title: task.title,
 			description: task.description,
 			summary: task.summary,

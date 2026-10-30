@@ -13,6 +13,7 @@ interface SyncJobRow {
 	status: string;
 	attempts: number;
 	last_error: string | null;
+	message: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -28,6 +29,7 @@ const toJob = (row: SyncJobRow): SyncJob => ({
 	status: row.status as SyncJobStatus,
 	attempts: row.attempts,
 	lastError: row.last_error,
+	message: row.message,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -45,9 +47,9 @@ export class SyncJobRepository {
 	insert(job: SyncJob) {
 		run(
 			this.db,
-			`INSERT INTO sync_jobs (id, project_id, epic_id, task_id, provider, operation, payload, status, attempts, last_error,
+			`INSERT INTO sync_jobs (id, project_id, epic_id, task_id, provider, operation, payload, status, attempts, last_error, message,
 			 created_at, updated_at) VALUES (:id, :projectId, :epicId, :taskId, :provider, :operation, :payload, :status,
-			 :attempts, :lastError, :createdAt, :updatedAt)`,
+			 :attempts, :lastError, :message, :createdAt, :updatedAt)`,
 			{
 				id: job.id,
 				projectId: job.projectId,
@@ -59,6 +61,7 @@ export class SyncJobRepository {
 				status: job.status,
 				attempts: job.attempts,
 				lastError: job.lastError,
+				message: job.message,
 				createdAt: job.createdAt,
 				updatedAt: job.updatedAt
 			}
@@ -68,13 +71,14 @@ export class SyncJobRepository {
 	update(job: SyncJob) {
 		run(
 			this.db,
-			`UPDATE sync_jobs SET status = :status, attempts = :attempts, last_error = :lastError, updated_at = :updatedAt
+			`UPDATE sync_jobs SET status = :status, attempts = :attempts, last_error = :lastError, message = :message, updated_at = :updatedAt
 			 WHERE id = :id`,
 			{
 				id: job.id,
 				status: job.status,
 				attempts: job.attempts,
 				lastError: job.lastError,
+				message: job.message,
 				updatedAt: job.updatedAt
 			}
 		);

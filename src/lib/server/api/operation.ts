@@ -5,6 +5,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export interface OperationContext {
 	actor: string;
+	/** Set when the call arrives as an MCP tool call. */
+	transport?: 'mcp';
 }
 
 export interface Operation<S extends z.ZodObject = z.ZodObject> {
@@ -17,6 +19,13 @@ export interface Operation<S extends z.ZodObject = z.ZodObject> {
 	summary: string;
 	description?: string;
 	input: S;
+	/** Rules that only apply to MCP tool calls; the REST API and dashboard are unaffected. */
+	mcp?: {
+		/** Fields marked required in the tool's input schema. */
+		required?: string[];
+		/** Returns an error message when the call must be refused. */
+		check?(input: z.output<S>): string | null;
+	};
 	readOnly: boolean;
 	successStatus?: number;
 	run(app: Container, input: z.output<S>, ctx: OperationContext): unknown;

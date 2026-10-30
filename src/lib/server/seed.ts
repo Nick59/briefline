@@ -35,78 +35,54 @@ Start with 10% of shoppers and compare search-to-product click-through before ex
 `
 		}
 	],
-	phases: [
+	tasks: [
 		{
-			name: 'Research',
-			description: 'Understand search behavior and define the product taxonomy.',
-			startDate: '2026-10-05',
-			endDate: '2026-10-16',
-			tasks: [
-				{
-					title: 'Review search queries and empty results',
-					summary: 'Identify common queries that fail to lead shoppers to a product.',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				},
-				{
-					title: 'Define catalog categories and filter attributes',
-					summary: 'Agree on consistent categories, price ranges and stock availability filters.',
-					priority: 'medium',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				}
-			]
+			title: 'Review search queries and empty results',
+			summary: 'Identify common queries that fail to lead shoppers to a product.',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		},
 		{
-			name: 'Build',
-			description: 'Implement searchable product data and the discovery experience.',
-			startDate: '2026-10-19',
-			endDate: '2026-11-20',
-			tasks: [
-				{
-					title: 'Build product search index and API',
-					summary: 'Index product names and descriptions, with typo tolerance and stock updates.',
-					priority: 'high',
-					assignee: 'claude-code',
-					stages: { dev: 'done', test: 'in_progress' }
-				},
-				{
-					title: 'Add category, price and availability filters',
-					summary: 'Keep selected filters in the URL so shoppers can share their results.',
-					priority: 'high',
-					assignee: 'claude-code',
-					stages: { dev: 'in_progress' }
-				},
-				{
-					title: 'Design helpful empty search results',
-					summary: 'Suggest alternative queries and let shoppers reset restrictive filters.',
-					priority: 'medium'
-				},
-				{
-					title: 'Show related products on detail pages',
-					summary:
-						'Recommend in-stock products from the same category without repeating the current item.',
-					priority: 'medium'
-				}
-			]
+			title: 'Define catalog categories and filter attributes',
+			summary: 'Agree on consistent categories, price ranges and stock availability filters.',
+			priority: 'medium',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		},
 		{
-			name: 'Rollout',
-			description: 'Validate accessibility and performance before expanding the feature flag.',
-			startDate: '2026-11-23',
-			endDate: '2026-12-04',
-			tasks: [
-				{
-					title: 'Verify keyboard navigation and search performance',
-					summary: 'Check screen reader announcements, filter focus and p95 search latency.',
-					priority: 'high'
-				},
-				{
-					title: 'Roll out discovery and track search conversions',
-					summary:
-						'Enable the feature for 10% of shoppers and review click-through before full rollout.',
-					priority: 'low'
-				}
-			]
+			title: 'Build product search index and API',
+			summary: 'Index product names and descriptions, with typo tolerance and stock updates.',
+			priority: 'high',
+			assignee: 'claude-code',
+			stages: { dev: 'done', test: 'in_progress' }
+		},
+		{
+			title: 'Add category, price and availability filters',
+			summary: 'Keep selected filters in the URL so shoppers can share their results.',
+			priority: 'high',
+			assignee: 'claude-code',
+			stages: { dev: 'in_progress' }
+		},
+		{
+			title: 'Design helpful empty search results',
+			summary: 'Suggest alternative queries and let shoppers reset restrictive filters.',
+			priority: 'medium'
+		},
+		{
+			title: 'Show related products on detail pages',
+			summary:
+				'Recommend in-stock products from the same category without repeating the current item.',
+			priority: 'medium'
+		},
+		{
+			title: 'Verify keyboard navigation and search performance',
+			summary: 'Check screen reader announcements, filter focus and p95 search latency.',
+			priority: 'high'
+		},
+		{
+			title: 'Roll out discovery and track search conversions',
+			summary:
+				'Enable the feature for 10% of shoppers and review click-through before full rollout.',
+			priority: 'low'
 		}
 	]
 };
@@ -115,35 +91,14 @@ export const ORDER_TRACKING_DEMO: CreateEpicInput = {
 	title: 'Order tracking',
 	summary: 'Let customers follow their delivery and receive shipping updates.',
 	targetDate: '2027-01-29',
-	phases: [
-		{
-			name: 'Discovery',
-			startDate: '2027-01-04',
-			endDate: '2027-01-08',
-			tasks: [
-				{ title: 'Map delivery statuses and carrier events', priority: 'high' },
-				{ title: 'Design the order tracking experience', priority: 'medium' }
-			]
-		},
-		{
-			name: 'Build',
-			startDate: '2027-01-11',
-			endDate: '2027-01-22',
-			tasks: [
-				{ title: 'Integrate carrier tracking webhooks', priority: 'high' },
-				{ title: 'Build the customer order tracking page', priority: 'high' },
-				{ title: 'Send shipment and delivery notifications', priority: 'medium' }
-			]
-		},
-		{
-			name: 'Rollout',
-			startDate: '2027-01-25',
-			endDate: '2027-01-29',
-			tasks: [
-				{ title: 'Test delayed, delivered and lost shipments', priority: 'high' },
-				{ title: 'Enable tracking for all customers', priority: 'low' }
-			]
-		}
+	tasks: [
+		{ title: 'Map delivery statuses and carrier events', priority: 'high' },
+		{ title: 'Design the order tracking experience', priority: 'medium' },
+		{ title: 'Integrate carrier tracking webhooks', priority: 'high' },
+		{ title: 'Build the customer order tracking page', priority: 'high' },
+		{ title: 'Send shipment and delivery notifications', priority: 'medium' },
+		{ title: 'Test delayed, delivered and lost shipments', priority: 'high' },
+		{ title: 'Enable tracking for all customers', priority: 'low' }
 	]
 };
 
@@ -151,60 +106,36 @@ export const STOREFRONT_FOUNDATION_DEMO: CreateEpicInput = {
 	title: 'Storefront foundation',
 	summary: 'The catalog, product pages and shopping cart that launched the store.',
 	targetDate: '2026-09-30',
-	phases: [
+	tasks: [
 		{
-			name: 'Catalog',
-			status: 'done',
-			startDate: '2026-09-01',
-			endDate: '2026-09-11',
-			tasks: [
-				{
-					title: 'Import the product catalog',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				},
-				{
-					title: 'Launch product detail pages',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				}
-			]
+			title: 'Import the product catalog',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		},
 		{
-			name: 'Shopping cart',
-			status: 'done',
-			startDate: '2026-09-14',
-			endDate: '2026-09-25',
-			tasks: [
-				{
-					title: 'Build persistent shopping carts',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				},
-				{
-					title: 'Validate pricing and stock at checkout',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				}
-			]
+			title: 'Launch product detail pages',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		},
 		{
-			name: 'Launch',
-			status: 'done',
-			startDate: '2026-09-28',
-			endDate: '2026-09-30',
-			tasks: [
-				{
-					title: 'Complete accessibility and mobile checks',
-					priority: 'medium',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				},
-				{
-					title: 'Deploy the storefront to production',
-					priority: 'high',
-					stages: { dev: 'done', test: 'done', deploy: 'done' }
-				}
-			]
+			title: 'Build persistent shopping carts',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
+		},
+		{
+			title: 'Validate pricing and stock at checkout',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
+		},
+		{
+			title: 'Complete accessibility and mobile checks',
+			priority: 'medium',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
+		},
+		{
+			title: 'Deploy the storefront to production',
+			priority: 'high',
+			stages: { dev: 'done', test: 'done', deploy: 'done' }
 		}
 	]
 };
@@ -277,16 +208,16 @@ export function seedDemo(app: Container) {
 		{
 			key: 'SHOP',
 			name: 'Storefront',
-			description: 'Customer-facing web shop. Demo data — delete it whenever you like.',
-			ticketing: {
-				provider: 'dry-run',
-				settings: { ticketUrlTemplate: 'https://tracker.example.com/browse/{key}' },
-				autoSync: true,
-				postComments: true
-			}
+			description: 'Customer-facing web shop. Demo data — delete it whenever you like.'
 		},
 		actor
 	);
+	const connection = app.connections.create({
+		name: 'Demo tracker (dry run)',
+		provider: 'dry-run',
+		settings: { ticketUrlTemplate: 'https://tracker.example.com/browse/{key}' }
+	});
+	app.connections.setProjectTicketing(project.key, { connectionId: connection.id }, actor);
 
 	app.epics.create(project.key, STOREFRONT_FOUNDATION_DEMO, actor);
 
@@ -298,59 +229,35 @@ export function seedDemo(app: Container) {
 			targetDate: '2026-12-15',
 			externalRef: { provider: 'dry-run', key: 'SHOP-482' },
 			specs: [{ title: 'Checkout v2 technical spec', kind: 'spec', content: CHECKOUT_SPEC }],
-			phases: [
+			tasks: [
 				{
-					name: 'Discovery',
-					description: 'Understand where customers drop off.',
-					startDate: '2026-10-01',
-					endDate: '2026-10-10',
-					tasks: [
-						{
-							title: 'Funnel analysis of current checkout',
-							summary: 'Find the step where most customers give up.',
-							priority: 'high',
-							stages: { dev: 'done', test: 'done', deploy: 'done' }
-						}
-					]
+					title: 'Funnel analysis of current checkout',
+					summary: 'Find the step where most customers give up.',
+					priority: 'high',
+					stages: { dev: 'done', test: 'done', deploy: 'done' }
 				},
 				{
-					name: 'Build',
-					description: 'Single-page checkout and payment backend.',
-					startDate: '2026-10-11',
-					endDate: '2026-11-20',
-					tasks: [
-						{
-							title: 'Idempotent payment intent endpoint',
-							summary: 'Paying twice by accident becomes impossible.',
-							priority: 'urgent',
-							assignee: 'claude-code',
-							stages: { dev: 'done', test: 'in_progress' },
-							specs: [{ title: 'Payment intent design', kind: 'design', content: TASK_SPEC }]
-						},
-						{
-							title: 'One-page checkout UI',
-							summary: 'Customers see shipping, payment and review on one screen.',
-							priority: 'high',
-							assignee: 'claude-code',
-							stages: { dev: 'in_progress' }
-						},
-						{
-							title: 'Saved address book',
-							summary: 'Returning customers skip typing their address.',
-							priority: 'medium'
-						}
-					]
+					title: 'Idempotent payment intent endpoint',
+					summary: 'Paying twice by accident becomes impossible.',
+					priority: 'urgent',
+					assignee: 'claude-code',
+					stages: { dev: 'done', test: 'in_progress' },
+					specs: [{ title: 'Payment intent design', kind: 'design', content: TASK_SPEC }]
 				},
 				{
-					name: 'Rollout',
-					description: 'Feature flag ramp-up from 10% to 100%.',
-					startDate: '2026-11-21',
-					endDate: '2026-12-15',
-					tasks: [
-						{ title: 'Wallet payments (Apple Pay, Google Pay)', priority: 'medium' },
-						{ title: 'Ramp checkout_v2 flag to 100%', priority: 'low' }
-					]
-				}
+					title: 'One-page checkout UI',
+					summary: 'Customers see shipping, payment and review on one screen.',
+					priority: 'high',
+					assignee: 'claude-code',
+					stages: { dev: 'in_progress' }
+				},
+				{
+					title: 'Saved address book',
+					summary: 'Returning customers skip typing their address.',
+					priority: 'medium'
+				},
+				{ title: 'Wallet payments (Apple Pay, Google Pay)', priority: 'medium' },
+				{ title: 'Ramp checkout_v2 flag to 100%', priority: 'low' }
 			]
 		},
 		actor

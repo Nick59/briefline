@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PRIORITIES, SPEC_KINDS, STAGES, WORK_STATUSES } from './constants.ts';
+import { EFFORTS, PRIORITIES, SPEC_KINDS, STAGES, WORK_STATUSES } from './constants.ts';
 
 const text = (max: number) => z.string().trim().max(max);
 const isoDate = z.iso.date().describe('Date as YYYY-MM-DD');
@@ -22,11 +22,54 @@ export const externalRefSchema = z
 	})
 	.describe('Link to a ticket in an external system');
 
-export const ticketingConfigSchema = z.object({
-	provider: text(40).min(1),
-	settings: z.record(z.string(), z.string().max(500)).default({}),
-	autoSync: z.boolean().default(true),
-	postComments: z.boolean().default(true)
+const settingsRecord = z
+	.record(z.string(), text(500))
+	.describe('Provider fields as name/value strings; see list_ticket_providers for the names');
+
+export const mappedStateSchema = z.object({
+	id: text(200).min(1).describe('State id in the external system'),
+	name: text(200).describe('State name, kept for display')
+});
+
+export const statusMappingSchema = z
+	.object({
+		not_started: mappedStateSchema,
+		dev: mappedStateSchema,
+		test: mappedStateSchema,
+		deploy: mappedStateSchema,
+		done: mappedStateSchema
+	})
+	.partial()
+	.describe('External state per Briefline status. Omitted keys use the provider default.');
+
+const connectionFields = {
+	name: text(120).min(1),
+	settings: settingsRecord,
+	secret: text(2000).describe(
+		'API key or token. Write-only: it is stored encrypted, never returned.'
+	)
+};
+
+export const createTicketingConnectionSchema = z.object({
+	name: connectionFields.name,
+	provider: text(40).min(1).describe('Provider id from list_ticket_providers'),
+	settings: connectionFields.settings.default({}),
+	secret: connectionFields.secret.optional()
+});
+
+export const updateTicketingConnectionSchema = z
+	.object({
+		...connectionFields,
+		clearSecret: z.literal(true).describe('Removes the stored secret')
+	})
+	.partial();
+
+export const setProjectTicketingSchema = z.object({
+	connectionId: z.string().min(1).nullable().describe('Connection id, or null to disconnect'),
+	target: settingsRecord.optional().describe('Project-level provider fields'),
+	statusMapping: statusMappingSchema.optional(),
+	autoSync: z.boolean().optional(),
+	postComments: z.boolean().optional()
 });
 
 const projectKey = z
@@ -40,15 +83,13 @@ const projectKey = z
 // fills an omitted optional field, which would overwrite stored values on a partial update.
 const projectFields = {
 	name: text(120).min(1),
-	description: text(5000),
-	ticketing: ticketingConfigSchema.nullable()
+	description: text(5000)
 };
 
 export const createProjectSchema = z.object({
 	key: projectKey,
 	...projectFields,
-	description: projectFields.description.default(''),
-	ticketing: projectFields.ticketing.optional()
+	description: projectFields.description.default('')
 });
 
 export const updateProjectSchema = z.object(projectFields).partial();
@@ -57,7 +98,6 @@ const taskFields = {
 	title: text(200).min(1),
 	description: text(50_000).describe('Markdown description, usually written by an AI agent'),
 	summary: text(500).describe('One-line, plain-language summary for humans'),
-	phaseId: z.string().nullable().describe('Phase id or name inside the same epic'),
 	priority: prioritySchema,
 	assignee: text(120).nullable(),
 	stages: z.partialRecord(stageSchema, workStatusSchema),
@@ -68,7 +108,6 @@ export const createTaskSchema = z.object({
 	...taskFields,
 	description: taskFields.description.default(''),
 	summary: taskFields.summary.default(''),
-	phaseId: taskFields.phaseId.optional(),
 	priority: taskFields.priority.default('medium'),
 	assignee: taskFields.assignee.optional(),
 	stages: taskFields.stages.optional(),
@@ -86,6 +125,30 @@ export const setStageStatusSchema = z.object({
 		.optional()
 		.describe('Optional note recorded in the activity log and ticket comment')
 });
+
+export const briefSchema = z.object({
+	summary: z.string().describe('Two sentences a product manager understands, no jargon'),
+	whyItMatters: z.string().describe('The user or business reason for this work'),
+	whatChanges: z
+		.array(z.string())
+		.describe('What will be different once this ships, from the user point of view'),
+	acceptance: z.array(z.string()).describe('How a human can check that it is done'),
+	risks: z.array(z.string()),
+	openQuestions: z.array(z.string()).describe('Decisions a human still needs to make'),
+	glossary: z
+		.array(z.object({ term: z.string(), meaning: z.string() }))
+		.describe('Technical terms used, explained simply'),
+	effort: z.enum(EFFORTS).describe('T-shirt size of the work: S, M, L or XL'),
+	readingMinutes: z
+		.number()
+		.int()
+		.min(0)
+		.describe('Minutes to read the spec, about its word count divided by 200')
+});
+
+const optionalBrief = briefSchema
+	.optional()
+	.describe('Plain-language brief of the spec content, written for non-engineers');
 
 const specFields = {
 	title: text(200).min(1),
@@ -110,34 +173,17 @@ export const moveTaskSchema = z.object({
 export const createSpecSchema = z.object({
 	...specFields,
 	kind: specFields.kind.default('spec'),
-	content: specFields.content.default('')
+	content: specFields.content.default(''),
+	brief: optionalBrief
 });
 
 export const updateSpecSchema = z
-	.object({ ...specFields, position: z.number().int().min(0) })
+	.object({ ...specFields, position: z.number().int().min(0), brief: optionalBrief })
 	.partial();
 
-const phaseFields = {
-	name: text(120).min(1),
-	description: text(5000),
-	startDate: isoDate.nullable(),
-	endDate: isoDate.nullable(),
-	status: workStatusSchema,
-	position: z.number().int().min(0)
-};
+export const setSpecBriefSchema = z.object({ brief: briefSchema });
 
-export const createPhaseSchema = z.object({
-	...phaseFields,
-	description: phaseFields.description.default(''),
-	startDate: nullableDate,
-	endDate: nullableDate,
-	status: phaseFields.status.optional(),
-	position: phaseFields.position.optional()
-});
-
-export const updatePhaseSchema = z.object(phaseFields).partial();
-
-const planTaskSchema = createTaskSchema.omit({ phaseId: true }).extend({
+const planTaskSchema = createTaskSchema.extend({
 	specs: z.array(createSpecSchema).max(20).optional()
 });
 
@@ -153,15 +199,11 @@ export const createEpicSchema = z.object({
 	summary: epicFields.summary.default(''),
 	targetDate: nullableDate,
 	externalRef: epicFields.externalRef.optional(),
-	phases: z
-		.array(
-			createPhaseSchema
-				.omit({ position: true })
-				.extend({ tasks: z.array(planTaskSchema).max(200).optional() })
-		)
-		.max(30)
+	tasks: z
+		.array(planTaskSchema)
+		.max(200)
 		.optional()
-		.describe('Ordered timeline phases, each with optional tasks'),
+		.describe('Ordered tasks, each with optional specs'),
 	specs: z.array(createSpecSchema).max(20).optional().describe('Specs attached to the epic')
 });
 
@@ -169,20 +211,21 @@ export const updateEpicSchema = z.object(epicFields).partial();
 
 export const listTasksQuerySchema = z.object({
 	stage: stageSchema.optional(),
-	status: workStatusSchema.optional(),
-	phaseId: z.string().optional()
+	status: workStatusSchema.optional()
 });
 
 export type CreateProjectInput = z.input<typeof createProjectSchema>;
 export type UpdateProjectInput = z.input<typeof updateProjectSchema>;
 export type CreateEpicInput = z.input<typeof createEpicSchema>;
 export type UpdateEpicInput = z.input<typeof updateEpicSchema>;
-export type CreatePhaseInput = z.input<typeof createPhaseSchema>;
-export type UpdatePhaseInput = z.input<typeof updatePhaseSchema>;
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type SetStageStatusInput = z.input<typeof setStageStatusSchema>;
 export type MoveTaskInput = z.input<typeof moveTaskSchema>;
+export type BriefInput = z.infer<typeof briefSchema>;
+export type SetSpecBriefInput = z.input<typeof setSpecBriefSchema>;
 export type CreateSpecInput = z.input<typeof createSpecSchema>;
 export type UpdateSpecInput = z.input<typeof updateSpecSchema>;
-export type TicketingConfigInput = z.input<typeof ticketingConfigSchema>;
+export type CreateTicketingConnectionInput = z.input<typeof createTicketingConnectionSchema>;
+export type UpdateTicketingConnectionInput = z.input<typeof updateTicketingConnectionSchema>;
+export type SetProjectTicketingInput = z.input<typeof setProjectTicketingSchema>;
