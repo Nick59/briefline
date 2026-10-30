@@ -28,14 +28,18 @@ This also exposes it on your local network.
 
 Requires Node 22.17 or later. Copy `.env.example` to `.env` to configure the server.
 
-| Command      | What it does                                  |
-| ------------ | --------------------------------------------- |
-| `pnpm dev`   | Development server                            |
-| `pnpm test`  | Unit and integration tests (Vitest)           |
-| `pnpm check` | Type check (svelte-check)                     |
-| `pnpm lint`  | Prettier and ESLint                           |
-| `pnpm build` | Production build (adapter-node) into `build/` |
-| `pnpm start` | Run the production build                      |
+| Command      | What it does                                       |
+| ------------ | -------------------------------------------------- |
+| `pnpm dev`   | Development server                                 |
+| `pnpm test`  | Unit and integration tests (Vitest)                |
+| `pnpm check` | Type check (svelte-check)                          |
+| `pnpm lint`  | Prettier and ESLint                                |
+| `pnpm build` | Production build (adapter-node) into `build/`      |
+| `pnpm start` | Run the production build (reads `.env` if present) |
+
+> **Production settings.** The built server does not load `.env` by itself. `pnpm start` runs
+> `node --env-file-if-exists=.env build`, which reads `.env` from the current directory. Otherwise provide real
+> environment variables (systemd, Docker `-e`, your host's settings). Restart the server after any change.
 
 > **Production over plain HTTP.** adapter-node assumes `https` unless told otherwise, and SvelteKit then rejects
 > dashboard form posts as cross-site. Serve over HTTPS, or behind a proxy with `PROTOCOL_HEADER=x-forwarded-proto`

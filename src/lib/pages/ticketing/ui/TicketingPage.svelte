@@ -48,8 +48,9 @@
 	{#if !secretsAvailable}
 		<p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm" role="status">
 			<code class="font-mono text-xs">BRIEFLINE_SECRET_KEY</code> is not set, so API keys cannot be
-			saved. Generate one with <code class="font-mono text-xs">openssl rand -base64 32</code>, or
-			keep using the provider environment variables.
+			saved. Generate one with <code class="font-mono text-xs">openssl rand -base64 32</code>, put
+			it in <code class="font-mono text-xs">.env</code> at the project root (or in the environment), and
+			restart the server. Or keep using the provider environment variables.
 		</p>
 	{/if}
 
