@@ -33,16 +33,20 @@ export class LiveActivity {
 	#source: EventSource | null = null;
 	#tick: ReturnType<typeof setInterval> | null = null;
 	#refresh: ReturnType<typeof setTimeout> | null = null;
+	#hadOpen = false;
 
 	connect(projectKey: string) {
 		this.disconnect();
 		this.connected = 'connecting';
 		const source = new EventSource(`/projects/${encodeURIComponent(projectKey)}/events`);
 		this.#source = source;
+		this.#hadOpen = false;
 		source.onopen = () => {
 			this.connected = 'open';
 			this.#startTick();
-			this.#scheduleRefresh();
+			// EventSource auto-reconnects after an error, so events may have been missed.
+			if (this.#hadOpen) this.#scheduleRefresh();
+			this.#hadOpen = true;
 		};
 		source.onerror = () => {
 			this.connected = source.readyState === EventSource.CLOSED ? 'closed' : 'connecting';

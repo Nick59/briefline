@@ -1,5 +1,6 @@
 <script lang="ts">
 	import './layout.css';
+	import { untrack } from 'svelte';
 	import { ModeWatcher } from 'mode-watcher';
 	import { page } from '$app/state';
 	import favicon from '#lib/assets/favicon.svg';
@@ -14,10 +15,11 @@
 	const live = new LiveActivity();
 	provideLiveActivity(live);
 
+	const projectKey = $derived(data.activeProjectKey);
+
 	$effect(() => {
-		const projectKey = data.activeProjectKey;
 		if (!projectKey) return;
-		live.connect(projectKey);
+		untrack(() => live.connect(projectKey));
 		return () => live.disconnect();
 	});
 </script>
