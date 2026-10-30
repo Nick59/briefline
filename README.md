@@ -46,7 +46,7 @@ Requires Node 22.17 or later. Copy `.env.example` to `.env` to configure the ser
 **MCP (Claude Code):**
 
 ```bash
-claude mcp add --transport http project-manager http://localhost:5173/mcp --header "X-Actor: claude-code"
+claude mcp add --transport http briefline http://localhost:5173/mcp --header "X-Actor: claude-code"
 # with PM_API_TOKEN set, add: --header "Authorization: Bearer <token>"
 ```
 

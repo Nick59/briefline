@@ -5,7 +5,7 @@ import { operations, operationsByName } from '../api/operations.ts';
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
 
-export const MCP_INSTRUCTIONS = `AI Project Manager tracks software work for humans.
+export const MCP_INSTRUCTIONS = `Briefline tracks software work for humans.
 Model: Project > Epic > Task. Each epic has a vertical timeline of phases; each task belongs to at most one phase.
 Every task moves through three stages: dev, test, deploy. Each stage is todo, in_progress or done.
 Typical flow for an agent:
@@ -86,7 +86,7 @@ async function dispatch(
 						? requested
 						: SUPPORTED_VERSIONS[0],
 					capabilities: { tools: { listChanged: false } },
-					serverInfo: { name: 'ai-project-manager', title: 'AI Project Manager', version: '1.0.0' },
+					serverInfo: { name: 'briefline', title: 'Briefline', version: '1.0.0' },
 					instructions: MCP_INSTRUCTIONS
 				}
 			});

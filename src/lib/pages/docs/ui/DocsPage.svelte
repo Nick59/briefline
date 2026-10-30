@@ -32,7 +32,7 @@
 	const setup = $derived(`## Connect an agent over MCP
 
 \`\`\`bash
-claude mcp add --transport http project-manager ${origin}/mcp${auth} --header "X-Actor: claude-code"
+claude mcp add --transport http briefline ${origin}/mcp${auth} --header "X-Actor: claude-code"
 \`\`\`
 
 The server speaks stateless MCP over HTTP (JSON-RPC on \`POST /mcp\`). Every REST operation below is also an MCP tool with the same name and input.
