@@ -2,6 +2,7 @@
 	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import type { Sortable } from '#lib/shared/lib/dnd/index.ts';
 	import CalendarIcon from '@lucide/svelte/icons/calendar';
+	import { epicDisplayStage } from '#lib/shared/domain/progress.ts';
 	import type { EpicSummary, Task } from '#lib/shared/domain/types.ts';
 	import { formatDate, pluralize } from '#lib/shared/lib/format.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
@@ -22,11 +23,7 @@
 
 	let { epic, index, isLast, href, projectKey, taskSortable }: Props = $props();
 	const status = $derived(epic.progress.status);
-	const stage = $derived(
-		status === 'in_progress' && epic.progress.currentStage && epic.progress.currentStage !== 'dev'
-			? epic.progress.currentStage
-			: null
-	);
+	const stage = $derived(epicDisplayStage(epic.progress));
 </script>
 
 <li class="group/epic relative grid grid-cols-[1.75rem_1fr] gap-x-3">
@@ -65,7 +62,7 @@
 		{#if epic.summary}
 			<p class="mt-1 line-clamp-2 text-sm text-muted-foreground">{epic.summary}</p>
 		{/if}
-		<ul class="-mx-2 mt-2 min-h-10" {@attach taskSortable.zone(epic.id)}>
+		<ul class="-mx-2 mt-2 flex min-h-10 flex-col gap-1" {@attach taskSortable.zone(epic.id)}>
 			{#if !epic.tasks.length}<li class="px-2 py-2 text-xs text-muted-foreground">
 					Drop tasks here
 				</li>{/if}

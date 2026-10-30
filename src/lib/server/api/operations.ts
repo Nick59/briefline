@@ -26,6 +26,14 @@ const task = ref('Task (e.g. PMA-12)');
 const phase = z.string().min(1).describe('Phase id');
 const spec = z.string().min(1).describe('Spec id');
 const limit = z.coerce.number().int().min(1).max(500).optional();
+const pageLimit = z.coerce
+	.number()
+	.int()
+	.min(1)
+	.max(100)
+	.optional()
+	.describe('Entries per page (default 10, max 100)');
+const offset = z.coerce.number().int().min(0).optional().describe('Entries to skip (default 0)');
 const pick = <T extends Record<string, unknown>, K extends keyof T>(input: T, ...keys: K[]) =>
 	Object.fromEntries(Object.entries(input).filter(([k]) => !keys.includes(k as K))) as Omit<T, K>;
 
@@ -88,8 +96,9 @@ export const operations: Operation[] = [
 		path: '/projects/{project}/activity',
 		tag: 'Activity',
 		summary: 'Recent activity in a project, newest first',
-		input: z.object({ project, limit }),
-		run: (app, { project, limit }) => app.activity.forProject(project, limit)
+		input: z.object({ project, limit: pageLimit, offset }),
+		run: (app, { project, limit, offset }) =>
+			app.activity.forProject(project, { limit, offset }).items
 	}),
 
 	// Epics
@@ -150,8 +159,8 @@ export const operations: Operation[] = [
 		path: '/epics/{epic}/activity',
 		tag: 'Activity',
 		summary: 'Recent activity in an epic, newest first',
-		input: z.object({ epic, limit }),
-		run: (app, { epic, limit }) => app.activity.forEpic(epic, limit)
+		input: z.object({ epic, limit: pageLimit, offset }),
+		run: (app, { epic, limit, offset }) => app.activity.forEpic(epic, { limit, offset }).items
 	}),
 
 	// Phases

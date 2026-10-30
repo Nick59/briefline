@@ -1,8 +1,13 @@
-import type { Activity } from '#lib/shared/domain/types.ts';
+import type { Activity, Page } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject, requireTask } from '../../core/lookup.ts';
 import { describeEvent } from './describe.ts';
+
+export interface Paging {
+	limit?: number;
+	offset?: number;
+}
 
 export class ActivityService {
 	constructor(private readonly deps: ServiceDeps) {
@@ -23,24 +28,28 @@ export class ActivityService {
 		});
 	}
 
-	forProject(idOrKey: string, limit?: number): Activity[] {
+	recent(paging?: Paging): Page<Activity> {
+		return this.deps.repos.activity.list({ ...paging });
+	}
+
+	forProject(idOrKey: string, paging?: Paging): Page<Activity> {
 		return this.deps.repos.activity.list({
 			projectId: requireProject(this.deps.repos, idOrKey).id,
-			limit
+			...paging
 		});
 	}
 
-	forEpic(idOrKey: string, limit?: number): Activity[] {
+	forEpic(idOrKey: string, paging?: Paging): Page<Activity> {
 		return this.deps.repos.activity.list({
 			epicId: requireEpic(this.deps.repos, idOrKey).id,
-			limit
+			...paging
 		});
 	}
 
-	forTask(idOrKey: string, limit?: number): Activity[] {
+	forTask(idOrKey: string, paging?: Paging): Page<Activity> {
 		return this.deps.repos.activity.list({
 			taskId: requireTask(this.deps.repos, idOrKey).id,
-			limit
+			...paging
 		});
 	}
 }

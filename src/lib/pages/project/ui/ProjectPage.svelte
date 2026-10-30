@@ -3,7 +3,14 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import { resolve } from '$app/paths';
-	import type { Activity, EpicSummary, Project, SyncJob, Task } from '#lib/shared/domain/types.ts';
+	import type {
+		Activity,
+		PageView,
+		EpicSummary,
+		Project,
+		SyncJob,
+		Task
+	} from '#lib/shared/domain/types.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
@@ -18,7 +25,7 @@
 	interface Props {
 		project: Project;
 		epics: (EpicSummary & { tasks: Task[] })[];
-		activity: Activity[];
+		activity: PageView<Activity>;
 		syncJobs: SyncJob[];
 	}
 
@@ -64,7 +71,7 @@
 			{/if}
 		</Section>
 		<div class="space-y-8">
-			<ActivityFeed items={activity} />
+			<ActivityFeed items={activity.items} page={activity.page} pageCount={activity.pageCount} />
 			{#if project.ticketing}<SyncLog jobs={syncJobs} />{/if}
 		</div>
 	</div>

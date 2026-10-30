@@ -2,9 +2,10 @@ import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 import { orHttpError } from '#lib/server/http/load.ts';
+import { loadPage } from '#lib/server/http/pagination.ts';
 import { operationActions } from '#lib/server/http/operation-actions.ts';
 
-export const load: PageServerLoad = ({ params }) => {
+export const load: PageServerLoad = ({ params, url }) => {
 	const services = app();
 	const project = orHttpError(() => services.projects.get(params.project));
 	if (params.project !== project.key) redirect(308, `/projects/${project.key}`);
@@ -13,7 +14,9 @@ export const load: PageServerLoad = ({ params }) => {
 		epics: services.epics
 			.list(project.id)
 			.map((epic) => ({ ...epic, tasks: services.epics.detail(epic.id).tasks })),
-		activity: services.activity.forProject(project.id, 20),
+		activity: loadPage(url, 'activity', (paging) =>
+			services.activity.forProject(project.id, paging)
+		),
 		syncJobs: services.ticketing.jobs({ projectId: project.id, limit: 8 })
 	};
 };

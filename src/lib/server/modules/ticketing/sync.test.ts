@@ -101,7 +101,9 @@ describe('ticket sync', () => {
 			lastError: 'Missing environment variable GITHUB_TOKEN'
 		});
 		expect((await app.ticketing.retry(job.id)).attempts).toBe(2);
-		expect(app.activity.forEpic(epic.id).some((a) => a.action === 'ticket.sync_failed')).toBe(true);
+		expect(app.activity.forEpic(epic.id).items.some((a) => a.action === 'ticket.sync_failed')).toBe(
+			true
+		);
 	});
 
 	it('does nothing when the ticket belongs to another provider or sync is off', async () => {

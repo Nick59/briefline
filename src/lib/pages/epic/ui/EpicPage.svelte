@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import type {
 		Activity,
+		PageView,
 		EpicDetail,
 		Project,
 		Spec,
@@ -25,7 +26,7 @@
 		project: Project;
 		epic: EpicDetail;
 		selectedSpec: Spec | null;
-		activity: Activity[];
+		activity: PageView<Activity>;
 		syncJobs: SyncJob[];
 		ticketUrl: string | null;
 	}
@@ -66,7 +67,7 @@
 				{ownerLabel}
 			/>
 			<div class="grid gap-10 lg:grid-cols-2">
-				<ActivityFeed items={activity} />
+				<ActivityFeed items={activity.items} page={activity.page} pageCount={activity.pageCount} />
 				{#if epic.externalRef}<SyncLog jobs={syncJobs} />{/if}
 			</div>
 		</div>

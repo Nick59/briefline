@@ -27,6 +27,24 @@ function withEpic() {
 	return { ...ctx, epic };
 }
 
+describe('activity paging', () => {
+	it('pages newest first with a stable order and a total', () => {
+		const { app } = withEpic();
+		for (let i = 0; i < 12; i++) app.tasks.create('PMA-E1', { title: `T${i}` }, 'test');
+		const first = app.activity.forEpic('PMA-E1');
+		expect(first.items).toHaveLength(10);
+		const second = app.activity.forEpic('PMA-E1', { limit: 10, offset: 10 });
+		expect(second.total).toBe(first.total);
+		expect(second.items.length).toBe(first.total - 10);
+		const ids = [...first.items, ...second.items].map((a) => a.id);
+		expect(new Set(ids).size).toBe(first.total);
+		const times = [...first.items, ...second.items].map((a) => a.createdAt);
+		expect(times).toEqual([...times].sort().reverse());
+		expect(app.activity.forEpic('PMA-E1', { limit: 500 }).items.length).toBe(first.total);
+		expect(app.activity.forEpic('PMA-E1', { offset: 1000 }).items).toEqual([]);
+	});
+});
+
 describe('projects', () => {
 	it('normalizes keys and rejects duplicates', () => {
 		const { app } = testApp();
@@ -85,7 +103,9 @@ describe('tasks', () => {
 		const { app } = withEpic();
 		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done', note: 'All green' }, 'ci-bot');
 		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done' }, 'ci-bot');
-		const moves = app.activity.forTask('PMA-1').filter((a) => a.action === 'task.stage_changed');
+		const moves = app.activity
+			.forTask('PMA-1')
+			.items.filter((a) => a.action === 'task.stage_changed');
 		expect(moves).toHaveLength(1);
 		expect(moves[0]).toMatchObject({
 			actor: 'ci-bot',
@@ -152,7 +172,9 @@ describe('moving tasks on the board', () => {
 		expect(order(app, epic.key)).toEqual(['PMA-3', 'PMA-1', 'PMA-2']);
 		app.tasks.move('PMA-3', { beforeTask: null }, 'test');
 		expect(order(app, epic.key)).toEqual(['PMA-1', 'PMA-2', 'PMA-3']);
-		expect(app.activity.forEpic(epic.key).some((a) => a.action === 'task.updated')).toBe(false);
+		expect(app.activity.forEpic(epic.key).items.some((a) => a.action === 'task.updated')).toBe(
+			false
+		);
 	});
 
 	const positions = (app: ReturnType<typeof testApp>['app'], epicKey: string) =>
@@ -191,7 +213,9 @@ describe('moving tasks on the board', () => {
 		);
 		expect(moved.stages.test).toBe('in_progress');
 		expect(order(app, epic.key)).toEqual(['PMA-2', 'PMA-1']);
-		expect(app.activity.forTask('PMA-2')[0].message).toBe('Moved PMA-2 to Tests · In progress');
+		expect(app.activity.forTask('PMA-2').items[0].message).toBe(
+			'Moved PMA-2 to Tests · In progress'
+		);
 	});
 
 	it('rejects a half stage change and a task from another epic', () => {

@@ -6,7 +6,8 @@
 	import { page } from '$app/state';
 	import type { EpicSummary, ProjectSummary } from '#lib/shared/domain/types.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
-	import { statusTone } from '#lib/shared/config/tokens/index.ts';
+	import { epicDisplayStage } from '#lib/shared/domain/progress.ts';
+	import { stageTone, statusTone } from '#lib/shared/config/tokens/index.ts';
 	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
 	import { StatusIcon } from '#lib/entities/work-status/index.ts';
 	import { CreateProjectDialog } from '#lib/features/project-form/index.ts';
@@ -73,6 +74,7 @@
 			{#if active}
 				<ul class="my-1 ml-[1.15rem] space-y-0.5 border-l pl-2">
 					{#each orderedEpics as epic (epic.id)}
+						{@const stage = epicDisplayStage(epic.progress)}
 						{@const epicHref = resolve('/projects/[project]/epics/[epic]', {
 							project: project.key,
 							epic: epic.key
@@ -89,7 +91,7 @@
 							>
 								<StatusIcon
 									status={epic.progress.status}
-									tone={statusTone[epic.progress.status]}
+									tone={stage ? stageTone[stage] : statusTone[epic.progress.status]}
 									size={12}
 								/>
 								<span class="truncate">{epic.title}</span>

@@ -33,6 +33,17 @@ export function taskCurrentStage(stages: StageStatuses): Stage | null {
 	return STAGES.find((s) => stages[s] !== 'done') ?? null;
 }
 
+/** The stage that colors an in-progress epic; dev keeps the plain in-progress color. */
+export function epicDisplayStage(
+	progress: Pick<Progress, 'status' | 'currentStage'>
+): Stage | null {
+	return progress.status === 'in_progress' &&
+		progress.currentStage &&
+		progress.currentStage !== 'dev'
+		? progress.currentStage
+		: null;
+}
+
 export function computeProgress(items: { stages: StageStatuses }[]): Progress {
 	const stages = Object.fromEntries(STAGES.map((s) => [s, emptyCounts()])) as Record<
 		Stage,

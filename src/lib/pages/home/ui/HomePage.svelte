@@ -1,7 +1,7 @@
 <script lang="ts">
 	import FolderKanbanIcon from '@lucide/svelte/icons/folder-kanban';
 	import { resolve } from '$app/paths';
-	import type { Activity, ProjectSummary } from '#lib/shared/domain/types.ts';
+	import type { Activity, PageView, ProjectSummary } from '#lib/shared/domain/types.ts';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
@@ -9,7 +9,8 @@
 	import { CreateProjectDialog } from '#lib/features/project-form/index.ts';
 	import { ActivityFeed } from '#lib/widgets/activity-feed/index.ts';
 
-	let { projects, activity }: { projects: ProjectSummary[]; activity: Activity[] } = $props();
+	let { projects, activity }: { projects: ProjectSummary[]; activity: PageView<Activity> } =
+		$props();
 </script>
 
 <div class="space-y-8">
@@ -42,6 +43,11 @@
 				</div>
 			{/if}
 		</Section>
-		<ActivityFeed items={activity} title="Recent activity" />
+		<ActivityFeed
+			items={activity.items}
+			page={activity.page}
+			pageCount={activity.pageCount}
+			title="Recent activity"
+		/>
 	</div>
 </div>

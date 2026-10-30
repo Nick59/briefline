@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 import { orHttpError } from '#lib/server/http/load.ts';
+import { loadPage } from '#lib/server/http/pagination.ts';
 import { operationActions } from '#lib/server/http/operation-actions.ts';
 
 export const load: PageServerLoad = ({ params, url }) => {
@@ -21,7 +22,7 @@ export const load: PageServerLoad = ({ params, url }) => {
 		project,
 		epic,
 		selectedSpec: specId ? services.specs.get(specId) : null,
-		activity: services.activity.forEpic(epic.id, 25),
+		activity: loadPage(url, 'activity', (paging) => services.activity.forEpic(epic.id, paging)),
 		syncJobs: services.ticketing.jobs({ epicId: epic.id, limit: 8 }),
 		ticketUrl: epic.externalRef ? services.ticketing.ticketUrl(project, epic.externalRef) : null
 	};

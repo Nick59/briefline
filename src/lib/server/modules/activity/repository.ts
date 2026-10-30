@@ -1,4 +1,4 @@
-import type { Activity } from '#lib/shared/domain/types.ts';
+import type { Activity, Page } from '#lib/shared/domain/types.ts';
 import { all, fromJson, run, toJson, type Db, type Params } from '../../db/connection.ts';
 
 interface ActivityRow {
@@ -25,11 +25,15 @@ const toActivity = (row: ActivityRow): Activity => ({
 	createdAt: row.created_at
 });
 
+export const DEFAULT_PAGE_SIZE = 10;
+export const MAX_PAGE_SIZE = 100;
+
 export interface ActivityFilter {
 	projectId?: string;
 	epicId?: string;
 	taskId?: string;
 	limit?: number;
+	offset?: number;
 }
 
 export class ActivityRepository {
@@ -54,9 +58,9 @@ export class ActivityRepository {
 		);
 	}
 
-	list(filter: ActivityFilter): Activity[] {
+	list(filter: ActivityFilter): Page<Activity> {
 		const where: string[] = [];
-		const params: Params = { limit: Math.min(filter.limit ?? 50, 500) };
+		const params: Params = {};
 		for (const [column, key] of [
 			['project_id', 'projectId'],
 			['epic_id', 'epicId'],
@@ -69,10 +73,20 @@ export class ActivityRepository {
 			}
 		}
 		const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-		return all<ActivityRow>(
+		const total = all<{ n: number }>(
 			this.db,
-			`SELECT * FROM activity ${clause} ORDER BY created_at DESC, rowid DESC LIMIT :limit`,
+			`SELECT COUNT(*) AS n FROM activity ${clause}`,
 			params
+		)[0].n;
+		const items = all<ActivityRow>(
+			this.db,
+			`SELECT * FROM activity ${clause} ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset`,
+			{
+				...params,
+				limit: Math.min(filter.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
+				offset: Math.max(filter.offset ?? 0, 0)
+			}
 		).map(toActivity);
+		return { items, total };
 	}
 }

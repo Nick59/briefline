@@ -6,7 +6,14 @@
 	import { resolve } from '$app/paths';
 	import { STAGES } from '#lib/shared/domain/constants.ts';
 	import { taskOverallStatus } from '#lib/shared/domain/progress.ts';
-	import type { Activity, Phase, Project, Spec, TaskDetail } from '#lib/shared/domain/types.ts';
+	import type {
+		Activity,
+		PageView,
+		Phase,
+		Project,
+		Spec,
+		TaskDetail
+	} from '#lib/shared/domain/types.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
@@ -28,7 +35,7 @@
 		task: TaskDetail;
 		phases: Pick<Phase, 'id' | 'name'>[];
 		selectedSpec: Spec | null;
-		activity: Activity[];
+		activity: PageView<Activity>;
 		ticketUrl: string | null;
 	}
 
@@ -104,6 +111,6 @@
 			{/if}
 			<SpecPanel specs={task.specs} selected={selectedSpec} owner={{ type: 'task', id: task.id }} />
 		</div>
-		<ActivityFeed items={activity} />
+		<ActivityFeed items={activity.items} page={activity.page} pageCount={activity.pageCount} />
 	</div>
 </div>

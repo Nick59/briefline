@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeProgress, taskCurrentStage, taskOverallStatus } from './progress.ts';
+import {
+	computeProgress,
+	epicDisplayStage,
+	taskCurrentStage,
+	taskOverallStatus
+} from './progress.ts';
 import type { StageStatuses } from './types.ts';
 
 const task = (dev: string, test: string, deploy: string) => ({
@@ -42,5 +47,15 @@ describe('task status', () => {
 		expect(taskOverallStatus({ dev: 'done', test: 'todo', deploy: 'todo' })).toBe('in_progress');
 		expect(taskCurrentStage({ dev: 'done', test: 'in_progress', deploy: 'todo' })).toBe('test');
 		expect(taskCurrentStage({ dev: 'done', test: 'done', deploy: 'done' })).toBeNull();
+	});
+});
+
+describe('epicDisplayStage', () => {
+	it('returns the stage only for in-progress epics past dev', () => {
+		expect(epicDisplayStage({ status: 'in_progress', currentStage: 'test' })).toBe('test');
+		expect(epicDisplayStage({ status: 'in_progress', currentStage: 'deploy' })).toBe('deploy');
+		expect(epicDisplayStage({ status: 'in_progress', currentStage: 'dev' })).toBeNull();
+		expect(epicDisplayStage({ status: 'todo', currentStage: 'test' })).toBeNull();
+		expect(epicDisplayStage({ status: 'done', currentStage: null })).toBeNull();
 	});
 });

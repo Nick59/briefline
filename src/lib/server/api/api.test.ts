@@ -59,7 +59,7 @@ describe('mcp', () => {
 			arguments: { key: 'AI', name: 'Agents' }
 		});
 		expect(created.result.structuredContent.key).toBe('AI');
-		expect(app.activity.forProject('AI')[0].actor).toBe('claude');
+		expect(app.activity.forProject('AI').items[0].actor).toBe('claude');
 
 		const missing = await call(app, 'tools/call', {
 			name: 'get_epic',
@@ -72,6 +72,24 @@ describe('mcp', () => {
 
 		const unknown = await call(app, 'tools/call', { name: 'nope' });
 		expect(unknown.error.code).toBe(-32602);
+	});
+
+	it('pages activity with limit and offset', async () => {
+		const { app } = testApp();
+		app.projects.create({ key: 'PG', name: 'Paging' }, 'test');
+		for (let i = 0; i < 4; i++) app.epics.create('PG', { title: `E${i}` }, 'test');
+		const page = async (args: object) =>
+			(
+				await call(app, 'tools/call', {
+					name: 'get_project_activity',
+					arguments: { project: 'PG', ...args }
+				})
+			).result.structuredContent.items;
+		expect(await page({})).toHaveLength(5);
+		const second = await page({ limit: 2, offset: 2 });
+		expect(second.map((a: { id: string }) => a.id)).toEqual(
+			(await page({})).slice(2, 4).map((a: { id: string }) => a.id)
+		);
 	});
 
 	it('answers notifications with nothing and supports batches', async () => {

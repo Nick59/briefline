@@ -47,7 +47,7 @@
 	{#if unphased.length}
 		<div class="rounded-lg border border-dashed p-3">
 			<p class="mb-1 text-xs font-medium text-muted-foreground">Not in a phase</p>
-			<ul class="-mx-2">
+			<ul class="-mx-2 flex flex-col gap-1">
 				{#each unphased as task (task.id)}
 					<TimelineTaskRow
 						{task}

@@ -99,6 +99,16 @@ export interface Spec {
 
 export type SpecSummary = Omit<Spec, 'content' | 'brief'> & { hasBrief: boolean };
 
+export interface Page<T> {
+	items: T[];
+	total: number;
+}
+
+export interface PageView<T> extends Page<T> {
+	page: number;
+	pageCount: number;
+}
+
 export interface Activity {
 	id: string;
 	projectId: string;

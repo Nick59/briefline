@@ -2,6 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 import { orHttpError } from '#lib/server/http/load.ts';
+import { loadPage } from '#lib/server/http/pagination.ts';
 import { operationActions } from '#lib/server/http/operation-actions.ts';
 
 export const load: PageServerLoad = ({ params, url }) => {
@@ -32,7 +33,7 @@ export const load: PageServerLoad = ({ params, url }) => {
 		task,
 		phases: services.epics.detail(task.epicId).phases.map(({ id, name }) => ({ id, name })),
 		selectedSpec: specId ? services.specs.get(specId) : null,
-		activity: services.activity.forTask(task.id, 25),
+		activity: loadPage(url, 'activity', (paging) => services.activity.forTask(task.id, paging)),
 		ticketUrl: task.externalRef ? services.ticketing.ticketUrl(project, task.externalRef) : null
 	};
 };
