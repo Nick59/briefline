@@ -10,6 +10,7 @@
 	import * as Sheet from '#lib/shared/ui/primitives/sheet/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { cn } from '#lib/shared/lib/utils.ts';
+	import { QuickJumpTrigger } from '#lib/features/quick-jump/index.ts';
 	import { ThemeToggle } from '#lib/features/theme-toggle/index.ts';
 	import LiveActivityPanel from './LiveActivityPanel.svelte';
 	import ProjectNav from './ProjectNav.svelte';
@@ -56,6 +57,7 @@
 		>
 			<Brand />
 		</a>
+		<QuickJumpTrigger onclick={onnavigate} />
 		<nav class="space-y-0.5" aria-label="Main">
 			{#each links as link (link.href)}
 				{@const active = link.match(page.url.pathname)}

@@ -123,7 +123,7 @@ export class TicketingConnectionService {
 		else if (data.secret) secretCiphertext = this.#encrypt(data.secret);
 
 		const headersCiphertext = data.headers
-			? this.#encryptHeaders(provider, data.headers, this.#headersOrEmpty(current))
+			? this.#encryptHeaders(provider, data.headers, this.#readHeaders(current))
 			: current.headersCiphertext;
 
 		this.deps.repos.connections.update({
@@ -299,8 +299,12 @@ export class TicketingConnectionService {
 			provider: connection.provider,
 			settings: connection.settings,
 			hasSecret: Boolean(connection.secretCiphertext),
+			secretUnreadable: this.#unreadable(connection.secretCiphertext, (c) =>
+				this.secrets.decrypt(c)
+			),
+			headersUnreadable: this.#readHeaders(connection) === null,
 			secretSource: stored ? 'stored' : env ? 'env' : 'none',
-			headers: this.#headerNames(connection),
+			headers: (this.#readHeaders(connection) ?? []).map(({ name }) => ({ name, hasValue: true })),
 			usedBy,
 			createdAt: connection.createdAt,
 			updatedAt: connection.updatedAt
@@ -316,30 +320,41 @@ export class TicketingConnectionService {
 		}
 	}
 
-	#headersOrEmpty(connection: StoredConnection): HeaderEntry[] {
+	/** True when a stored ciphertext is present but cannot be decrypted, for lack of a key or with a different one. */
+	#unreadable(ciphertext: string | null, decrypt: (ciphertext: string) => string): boolean {
+		if (!ciphertext) return false;
+		if (!this.secrets.available) return true;
 		try {
-			return this.#storedHeaders(connection);
+			decrypt(ciphertext);
+			return false;
 		} catch {
-			return [];
+			return true;
 		}
 	}
 
-	/** Names only; a list that cannot be decrypted shows as empty rather than failing the page. */
-	#headerNames(connection: StoredConnection): TicketingConnection['headers'] {
-		return this.#headersOrEmpty(connection).map(({ name }) => ({ name, hasValue: true }));
+	/** The stored headers, or null when they exist but cannot be read. */
+	#readHeaders(connection: StoredConnection): HeaderEntry[] | null {
+		if (!connection.headersCiphertext) return [];
+		try {
+			return this.#storedHeaders(connection);
+		} catch {
+			return null;
+		}
 	}
 
-	/** An entry without a value keeps the stored value of the header with the same name. */
+	/** An entry without a value keeps the stored value of the header with the same name; null means the stored list is unreadable. */
 	#encryptHeaders(
 		provider: TicketProvider,
 		input: { name: string; value?: string }[],
-		stored: HeaderEntry[]
+		stored: HeaderEntry[] | null
 	): string | null {
 		const entries = validateHeaders(
 			input.map(({ name, value }) => ({ name, value: value ?? '' })),
 			provider.reservedHeaders
 		).map((entry) => {
 			if (entry.value) return entry;
+			if (!stored)
+				throw new InvalidInputError(`${entry.name} needs a value, the saved one can't be read`);
 			const kept = stored.find((s) => s.name.toLowerCase() === entry.name.toLowerCase());
 			if (!kept) throw new InvalidInputError(`Header '${entry.name}' needs a value`);
 			return { name: entry.name, value: kept.value };

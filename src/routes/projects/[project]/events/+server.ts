@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
 import { app } from '#lib/server/runtime.ts';
+import { liveState } from '#lib/server/live.ts';
 import { orHttpError } from '#lib/server/http/load.ts';
 import { formatSse, toLiveEvent } from '#lib/server/modules/activity/live.ts';
 
@@ -21,7 +22,7 @@ export const GET: RequestHandler = ({ params, request }) => {
 					cleanup();
 				}
 			};
-			const unsubscribe = services.events.subscribe((event) => {
+			const unsubscribe = liveState().bus.subscribe((event) => {
 				const live = toLiveEvent(event, project.id);
 				if (live) send(formatSse(live));
 			});

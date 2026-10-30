@@ -51,6 +51,10 @@ export interface TicketingConnection {
 	/** True when an encrypted API key is stored for this connection. */
 	hasSecret: boolean;
 	secretSource: SecretSource;
+	/** An API key is stored but cannot be decrypted: the server secret key changed or is missing. */
+	secretUnreadable: boolean;
+	/** Custom headers are stored but cannot be decrypted. `headers` is empty in that case. */
+	headersUnreadable: boolean;
 	headers: TicketingConnectionHeader[];
 	usedBy: { key: string; name: string }[];
 	createdAt: ISODate;

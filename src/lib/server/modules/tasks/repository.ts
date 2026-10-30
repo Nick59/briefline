@@ -83,6 +83,29 @@ export class TaskRepository {
 		return row && toTask(row);
 	}
 
+	findByExternalKey(keys: string[]): Task[] {
+		if (keys.length === 0) return [];
+		const marks = keys.map((_, i) => `:k${i}`).join(', ');
+		const params = Object.fromEntries(keys.map((key, i) => [`k${i}`, key]));
+		return all<TaskRow>(
+			this.db,
+			`SELECT * FROM tasks WHERE json_extract(external_ref, '$.key') COLLATE NOCASE IN (${marks}) ORDER BY key`,
+			params
+		).map(toTask);
+	}
+
+	/** Key prefix matches rank before title matches. `text` must already have LIKE wildcards escaped. */
+	searchByText(text: string, limit: number): Task[] {
+		return all<TaskRow>(
+			this.db,
+			`SELECT * FROM tasks
+			 WHERE key LIKE :prefix ESCAPE '\\' OR title LIKE :contains ESCAPE '\\'
+			 ORDER BY CASE WHEN key LIKE :prefix ESCAPE '\\' THEN 0 ELSE 1 END, updated_at DESC, key
+			 LIMIT :limit`,
+			{ prefix: `${text}%`, contains: `%${text}%`, limit }
+		).map(toTask);
+	}
+
 	nextPosition(epicId: string): number {
 		const row = one<{ next: number }>(
 			this.db,

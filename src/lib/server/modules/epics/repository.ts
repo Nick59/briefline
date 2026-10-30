@@ -45,6 +45,17 @@ export class EpicRepository {
 		return row && toEpic(row);
 	}
 
+	findByExternalKey(keys: string[]): Epic[] {
+		if (keys.length === 0) return [];
+		const marks = keys.map((_, i) => `:k${i}`).join(', ');
+		const params = Object.fromEntries(keys.map((key, i) => [`k${i}`, key]));
+		return all<EpicRow>(
+			this.db,
+			`SELECT * FROM epics WHERE json_extract(external_ref, '$.key') COLLATE NOCASE IN (${marks}) ORDER BY key`,
+			params
+		).map(toEpic);
+	}
+
 	insert(epic: Epic) {
 		run(
 			this.db,

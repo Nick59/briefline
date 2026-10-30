@@ -6,6 +6,7 @@
 	import favicon from '#lib/assets/favicon.svg';
 	import { Toaster } from '#lib/shared/ui/primitives/sonner/index.js';
 	import { TooltipProvider } from '#lib/shared/ui/primitives/tooltip/index.js';
+	import { QuickJump } from '#lib/features/quick-jump/index.ts';
 	import { AppShell } from '#lib/widgets/app-shell/index.ts';
 	import { LiveActivity, provideLiveActivity } from '#lib/shared/lib/live-activity/index.ts';
 	import type { LayoutProps } from './$types';
@@ -47,5 +48,6 @@
 		>
 			{@render children()}
 		</AppShell>
+		<QuickJump />
 	{/if}
 </TooltipProvider>

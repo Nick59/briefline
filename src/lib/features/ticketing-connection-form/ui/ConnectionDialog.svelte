@@ -179,6 +179,15 @@
 						{/if}
 					</div>
 				</Field>
+				{#if connection?.secretUnreadable}
+					<p
+						class="-mt-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm"
+						role="alert"
+					>
+						The saved API key can't be read, the server secret key (BRIEFLINE_SECRET_KEY) changed or
+						is missing. Enter it again and save to replace it.
+					</p>
+				{/if}
 				{#if !secretsAvailable}
 					<p class="-mt-2 text-xs text-warning" role="status">
 						Saving API keys needs BRIEFLINE_SECRET_KEY on the server (<code class="font-mono"
@@ -188,9 +197,18 @@
 				{/if}
 			{/if}
 
-			<details class="rounded-md border px-3 py-2" open={headers.length > 0}>
+			<details
+				class="rounded-md border px-3 py-2"
+				open={headers.length > 0 || Boolean(connection?.headersUnreadable)}
+			>
 				<summary class="cursor-pointer text-sm font-medium">Custom headers</summary>
 				<div class="mt-3 grid gap-3">
+					{#if connection?.headersUnreadable}
+						<p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm" role="alert">
+							Saved headers can't be read, the server secret key (BRIEFLINE_SECRET_KEY) changed or
+							is missing. Enter them again and save to replace them.
+						</p>
+					{/if}
 					<p class="text-sm text-muted-foreground">
 						Sent with every request to this provider, e.g. Cloudflare Access service token headers.
 					</p>

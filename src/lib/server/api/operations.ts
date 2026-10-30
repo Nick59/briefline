@@ -57,6 +57,21 @@ const pick = <T extends Record<string, unknown>, K extends keyof T>(input: T, ..
 	Object.fromEntries(Object.entries(input).filter(([k]) => !keys.includes(k as K))) as Omit<T, K>;
 
 export const operations: Operation[] = [
+	defineOperation({
+		name: 'find_tickets',
+		method: 'GET',
+		path: '/tickets/search',
+		tag: 'Search',
+		summary: 'Find tasks, epics and projects by key, linked ticket number or title',
+		description:
+			'The query is matched case-insensitively, in this order: a project key (SHOP), an epic key (SHOP-E3), a task key (SHOP-15), the key of a linked external ticket (e.g. SOFT1-693 or #123), then task titles and key prefixes. Exact key matches come first. Each hit carries the dashboard path.',
+		input: z.object({
+			query: z.string().trim().min(1).max(100).describe('Key, linked ticket number or title text'),
+			limit: z.coerce.number().int().min(1).max(20).default(8).describe('Max hits (default 8)')
+		}),
+		run: (app, { query, limit }) => app.search.find(query, limit)
+	}),
+
 	// Projects
 	defineOperation({
 		name: 'list_projects',

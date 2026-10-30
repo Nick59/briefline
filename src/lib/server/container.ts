@@ -10,6 +10,7 @@ import { EpicRepository } from './modules/epics/repository.ts';
 import { EpicService } from './modules/epics/service.ts';
 import { ProjectRepository } from './modules/projects/repository.ts';
 import { ProjectService } from './modules/projects/service.ts';
+import { TicketSearchService } from './modules/search/service.ts';
 import { SpecRepository } from './modules/specs/repository.ts';
 import { SpecService } from './modules/specs/service.ts';
 import { TaskRepository } from './modules/tasks/repository.ts';
@@ -66,10 +67,12 @@ export function createContainer(
 	);
 
 	return {
+		db,
 		events: deps.events,
 		projects: new ProjectService(deps),
 		epics: new EpicService(deps, tasks, specs),
 		tasks,
+		search: new TicketSearchService(deps),
 		specs,
 		briefs,
 		activity: new ActivityService(deps),

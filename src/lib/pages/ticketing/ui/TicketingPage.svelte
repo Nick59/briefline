@@ -76,6 +76,15 @@
 								{#if provider?.secretLabel}
 									<ToneBadge tone={badge.tone}>{badge.label(provider)}</ToneBadge>
 								{/if}
+								{#if connection.secretUnreadable || connection.headersUnreadable}
+									<ToneBadge tone="warning">
+										{connection.secretUnreadable && connection.headersUnreadable
+											? "API key and headers can't be read"
+											: connection.secretUnreadable
+												? "API key can't be read"
+												: "Headers can't be read"}
+									</ToneBadge>
+								{/if}
 							</div>
 						</div>
 						<div class="flex items-center gap-1.5">

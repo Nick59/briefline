@@ -434,3 +434,52 @@ describe('custom headers', () => {
 		warn.mockRestore();
 	});
 });
+
+describe('unreadable stored secrets', () => {
+	function withOtherKey(env: Record<string, string | undefined>) {
+		const first = setup();
+		const connection = first.app.connections.create({
+			name: 'GH',
+			provider: 'github',
+			secret: SECRET,
+			headers: [{ name: 'CF-Access-Client-Id', value: 'id' }]
+		});
+		const db = first.app.db;
+		const app = createContainer(db, { config: readConfig({}), env });
+		return { app, id: connection.id };
+	}
+	const otherKey = { BRIEFLINE_SECRET_KEY: randomBytes(32).toString('base64') };
+
+	it('flags a key that changed or is missing and still lists the connection', () => {
+		for (const env of [otherKey, {}]) {
+			const { app, id } = withOtherKey(env);
+			expect(app.connections.get(id)).toMatchObject({
+				secretUnreadable: true,
+				headersUnreadable: true,
+				headers: []
+			});
+		}
+		const { app, id } = withOtherKey({ BRIEFLINE_SECRET_KEY: KEY });
+		expect(app.connections.get(id)).toMatchObject({
+			secretUnreadable: false,
+			headersUnreadable: false
+		});
+	});
+
+	it('replaces unreadable headers when every entry has a value', () => {
+		const { app, id } = withOtherKey(otherKey);
+		const updated = app.connections.update(id, {
+			headers: [{ name: 'CF-Access-Client-Id', value: 'new' }]
+		});
+		expect(updated).toMatchObject({ headersUnreadable: false, secretUnreadable: true });
+		expect(updated.headers.map((h) => h.name)).toEqual(['CF-Access-Client-Id']);
+	});
+
+	it('refuses a valueless entry when the saved value cannot be read', () => {
+		const { app, id } = withOtherKey(otherKey);
+		expect(() =>
+			app.connections.update(id, { headers: [{ name: 'CF-Access-Client-Id' }] })
+		).toThrow("CF-Access-Client-Id needs a value, the saved one can't be read");
+		expect(app.connections.get(id).headersUnreadable).toBe(true);
+	});
+});
