@@ -23,7 +23,7 @@ export const GET: RequestHandler = ({ params, request }) => {
 				}
 			};
 			const unsubscribe = liveState().bus.subscribe((event) => {
-				const live = toLiveEvent(event, project.id);
+				const live = toLiveEvent(event, project.id, (e) => app().activity.externalKeyOf(e));
 				if (live) send(formatSse(live));
 			});
 			const ping = setInterval(() => send(': ping\n\n'), PING_MS);

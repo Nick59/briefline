@@ -39,7 +39,6 @@
 				/>{/if}
 			{#if epic.externalRef}<ExternalTicketBadge ref={epic.externalRef} url={ticketUrl} />{/if}
 		{/snippet}
-		{#snippet description()}{epic.summary}{/snippet}
 		{#snippet actions()}
 			<TaskFormDialog epicId={epic.id}>
 				{#snippet trigger({ props })}

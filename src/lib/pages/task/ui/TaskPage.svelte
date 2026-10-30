@@ -56,7 +56,6 @@
 					>{/if}
 				{#if task.externalRef}<ExternalTicketBadge ref={task.externalRef} url={ticketUrl} />{/if}
 			{/snippet}
-			{#snippet description()}{task.summary}{/snippet}
 			{#snippet actions()}
 				<LinkTicketDialog
 					target={{ type: 'task', id: task.id }}
@@ -91,15 +90,16 @@
 		</div>
 	</Section>
 
+	{#if task.description || task.summary}
+		<Section title="Description">
+			<div class="rounded-xl border bg-card p-5">
+				<MarkdownViewer source={task.description || task.summary} />
+			</div>
+		</Section>
+	{/if}
+
 	<div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="min-w-0 space-y-10">
-			{#if task.description}
-				<Section title="Description">
-					<div class="rounded-xl border bg-card p-5">
-						<MarkdownViewer source={task.description} />
-					</div>
-				</Section>
-			{/if}
 			<SpecPanel specs={task.specs} selected={selectedSpec} owner={{ type: 'task', id: task.id }} />
 		</div>
 		<ActivityFeed

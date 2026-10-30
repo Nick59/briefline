@@ -148,7 +148,10 @@ export class SpecService {
 			epicId: epic.id,
 			taskId: spec.taskId,
 			actor,
-			data: { title: spec.title }
+			data: {
+				key: spec.taskId ? this.deps.repos.tasks.find(spec.taskId)?.key : epic.key,
+				title: spec.title
+			}
 		});
 	}
 }

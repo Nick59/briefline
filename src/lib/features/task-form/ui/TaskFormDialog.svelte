@@ -71,11 +71,11 @@
 				<Input id="task-title" bind:value={title} required maxlength={200} />
 			</Field>
 			<Field
-				label="Plain-language summary"
+				label="Summary"
 				for="task-summary"
-				hint="One line a non-engineer understands."
+				hint="One or two plain sentences, shown on board cards."
 			>
-				<Input id="task-summary" bind:value={summary} maxlength={500} />
+				<Textarea id="task-summary" bind:value={summary} maxlength={500} rows={2} />
 			</Field>
 			<div class="grid gap-3 sm:grid-cols-2">
 				<Field label="Priority" for="task-priority">
@@ -93,8 +93,8 @@
 				<Textarea
 					id="task-description"
 					bind:value={description}
-					rows={6}
-					class="font-mono text-xs"
+					rows={10}
+					class="font-mono text-xs leading-relaxed"
 				/>
 			</Field>
 			<Dialog.Footer>

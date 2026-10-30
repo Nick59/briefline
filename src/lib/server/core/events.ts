@@ -36,7 +36,8 @@ export type DomainEvent = Scope &
 		  }
 		| {
 				type: 'spec.created' | 'spec.updated' | 'spec.deleted' | 'spec.translated';
-				data: { title: string };
+				/** key is the task key for a task spec, else the epic key. */
+				data: { key?: string; title: string };
 		  }
 		| {
 				type: 'ticket.synced' | 'ticket.sync_failed';

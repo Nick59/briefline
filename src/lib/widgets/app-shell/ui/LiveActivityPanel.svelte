@@ -1,12 +1,10 @@
 <script lang="ts">
 	import BellIcon from '@lucide/svelte/icons/bell';
 	import BellOffIcon from '@lucide/svelte/icons/bell-off';
-	import { resolve } from '$app/paths';
 	import { useLiveActivity } from '#lib/shared/lib/live-activity/index.ts';
+	import { liveLabel } from '#lib/shared/lib/live-activity/label.ts';
 	import { relativeTime } from '#lib/shared/lib/format.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
-
-	let { projectKey, onnavigate }: { projectKey: string; onnavigate?: () => void } = $props();
 
 	const live = useLiveActivity();
 	const labels = { active: 'working', recent: 'recent', idle: 'idle', offline: 'offline' } as const;
@@ -51,33 +49,14 @@
 	</div>
 
 	{#if live.status !== 'idle' && live.status !== 'offline' && latest}
-		{#if live.focus}
-			<div class="mt-2 min-w-0">
-				<p class="text-[10px] tracking-wider text-muted-foreground uppercase">Working on</p>
-				<a
-					href={live.focus.epicId && live.focus.taskId
-						? resolve('/projects/[project]/epics/[epic]/tasks/[task]', {
-								project: projectKey,
-								epic: live.focus.epicId,
-								task: live.focus.key ?? live.focus.taskId
-							})
-						: resolve('/projects/[project]', { project: projectKey })}
-					onclick={onnavigate}
-					class="block truncate font-medium hover:underline"
-				>
-					<span class="font-mono">{live.focus.key}</span>
-					{live.focus.title}
-				</a>
-			</div>
-		{/if}
 		<p class="mt-1 text-muted-foreground">
-			<span class="line-clamp-2">{latest.message}</span>
+			<span class="line-clamp-2">{liveLabel(latest)}</span>
 			<span class="tabular-nums">{ago(latest.at)}</span>
 		</p>
 		{#if previous.length}
 			<ul class="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground/80">
 				{#each previous as event (event.at + event.type + event.key)}
-					<li class="truncate" title={event.message}>{event.message}</li>
+					<li class="truncate">{liveLabel(event)}</li>
 				{/each}
 			</ul>
 		{/if}

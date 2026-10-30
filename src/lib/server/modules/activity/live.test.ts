@@ -11,11 +11,12 @@ const event: DomainEvent = {
 	transport: 'mcp',
 	data: { key: 'PRJ-12', title: 'Fix login', stage: 'test', from: 'todo', to: 'in_progress' }
 };
+const none = () => null;
 const at = new Date('2026-01-01T00:00:00Z');
 
 describe('toLiveEvent', () => {
 	it('serializes an event of the project', () => {
-		expect(toLiveEvent(event, 'p1', at)).toMatchObject({
+		expect(toLiveEvent(event, 'p1', none, at)).toMatchObject({
 			type: 'task.stage_changed',
 			transport: 'mcp',
 			actor: 'claude-code',
@@ -27,8 +28,21 @@ describe('toLiveEvent', () => {
 		});
 	});
 
+	it('shows the external key and keeps the internal one', () => {
+		const live = toLiveEvent(event, 'p1', () => 'SOFT1-693', at)!;
+		expect(live).toMatchObject({
+			key: 'SOFT1-693',
+			internalKey: 'PRJ-12',
+			message: 'Moved SOFT1-693 to Tests · In progress'
+		});
+		expect(toLiveEvent(event, 'p1', none, at)).toMatchObject({
+			key: 'PRJ-12',
+			internalKey: 'PRJ-12'
+		});
+	});
+
 	it('drops events of other projects', () => {
-		expect(toLiveEvent(event, 'p2', at)).toBeNull();
+		expect(toLiveEvent(event, 'p2', none, at)).toBeNull();
 	});
 
 	it('reports a missing transport as null and a spec without key', () => {
@@ -40,7 +54,7 @@ describe('toLiveEvent', () => {
 			actor: 'dashboard',
 			data: { title: 'Plan' }
 		};
-		expect(toLiveEvent(spec, 'p1', at)).toMatchObject({
+		expect(toLiveEvent(spec, 'p1', none, at)).toMatchObject({
 			transport: null,
 			key: null,
 			title: 'Plan'
@@ -48,7 +62,7 @@ describe('toLiveEvent', () => {
 	});
 
 	it('frames an event for server-sent events', () => {
-		const out = formatSse(toLiveEvent(event, 'p1', at)!);
+		const out = formatSse(toLiveEvent(event, 'p1', none, at)!);
 		expect(out.startsWith('data: {')).toBe(true);
 		expect(out.endsWith('\n\n')).toBe(true);
 	});

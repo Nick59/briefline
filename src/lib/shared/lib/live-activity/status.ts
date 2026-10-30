@@ -3,7 +3,6 @@ export type Connection = 'connecting' | 'open' | 'closed';
 
 export const ACTIVE_MS = 10_000;
 export const RECENT_MS = 5 * 60_000;
-export const FOCUS_MS = 60_000;
 export const HIGHLIGHT_MS = 2_000;
 
 export function liveStatus(
@@ -18,9 +17,6 @@ export function liveStatus(
 	if (age < RECENT_MS) return 'recent';
 	return 'idle';
 }
-
-export const hasFocus = (lastAgentAt: number | null, now: number) =>
-	lastAgentAt !== null && now - lastAgentAt < FOCUS_MS;
 
 export const isRecentlyChanged = (changedAt: number | undefined, now: number) =>
 	changedAt !== undefined && now - changedAt < HIGHLIGHT_MS;

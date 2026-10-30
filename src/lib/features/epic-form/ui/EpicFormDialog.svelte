@@ -70,7 +70,7 @@
 			{@render trigger({ props })}
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="sm:max-w-lg">
+	<Dialog.Content class="sm:max-w-2xl">
 		<form class="grid gap-4" onsubmit={submit}>
 			<Dialog.Header>
 				<Dialog.Title>{epic ? 'Edit epic' : 'New epic'}</Dialog.Title>
@@ -89,8 +89,18 @@
 					placeholder="Checkout v2"
 				/>
 			</Field>
-			<Field label="Summary" for="epic-summary" hint="The outcome in plain language.">
-				<Textarea id="epic-summary" bind:value={summary} rows={3} />
+			<Field
+				label="Description (markdown)"
+				for="epic-summary"
+				hint="The outcome in plain language."
+			>
+				<Textarea
+					id="epic-summary"
+					bind:value={summary}
+					maxlength={5000}
+					rows={10}
+					class="font-mono text-xs leading-relaxed"
+				/>
 			</Field>
 			<Field label="Target date" for="epic-target">
 				<Input id="epic-target" type="date" bind:value={targetDate} />

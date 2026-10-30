@@ -1,4 +1,5 @@
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
+import { withTicketKey } from '#lib/shared/lib/ticket-key.ts';
 import type { DomainEvent } from '../../core/events.ts';
 import { describeEvent } from './describe.ts';
 
@@ -8,20 +9,24 @@ const text = (value: unknown) => (typeof value === 'string' ? value : null);
 export function toLiveEvent(
 	event: DomainEvent,
 	projectId: string,
+	externalKeyOf: (event: DomainEvent) => string | null,
 	at: Date = new Date()
 ): LiveEvent | null {
 	if (event.projectId !== projectId) return null;
 	const data = event.data as Record<string, unknown>;
+	const internalKey = text(data.key);
+	const externalKey = event.type.startsWith('ticket.') ? null : externalKeyOf(event);
 	return {
 		type: event.type,
 		transport: event.transport ?? null,
 		actor: event.actor,
 		taskId: event.taskId,
 		epicId: event.epicId,
-		key: text(data.key),
+		key: externalKey && internalKey ? externalKey : internalKey,
+		internalKey,
 		title: text(data.title),
 		data,
-		message: describeEvent(event),
+		message: withTicketKey(describeEvent(event), internalKey, externalKey),
 		at: at.toISOString()
 	};
 }

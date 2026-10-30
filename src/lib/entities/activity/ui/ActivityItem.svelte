@@ -5,6 +5,7 @@
 	import type { Activity } from '#lib/shared/domain/types.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
+	import { splitOnKey } from '#lib/shared/lib/ticket-key.ts';
 
 	let { activity }: { activity: Activity } = $props();
 
@@ -15,6 +16,12 @@
 			: HUMAN_ACTORS.has(activity.actor)
 				? UserIcon
 				: BotIcon
+	);
+	const ticketUrl = $derived(
+		activity.ticket?.url && /^https?:\/\//i.test(activity.ticket.url) ? activity.ticket.url : null
+	);
+	const parts = $derived(
+		ticketUrl && activity.ticket ? splitOnKey(activity.message, activity.ticket.key) : null
 	);
 	const failed = $derived(activity.action === 'ticket.sync_failed');
 </script>
@@ -29,7 +36,22 @@
 		<Icon class="size-3" />
 	</span>
 	<div class="min-w-0 text-sm">
-		<p class={cn('text-pretty', failed && 'text-danger')}>{activity.message}</p>
+		<p class={cn('text-pretty', failed && 'text-danger')}>
+			{#if parts && ticketUrl}
+				{#each parts as part, i (i)}
+					{#if part.isKey}
+						<a
+							href={ticketUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="font-mono underline-offset-2 hover:underline">{part.text}</a
+						>
+					{:else}{part.text}{/if}
+				{/each}
+			{:else}
+				{activity.message}
+			{/if}
+		</p>
 		{#if failed && typeof activity.data.error === 'string'}
 			<p class="truncate font-mono text-[11px] text-muted-foreground" title={activity.data.error}>
 				{activity.data.error}

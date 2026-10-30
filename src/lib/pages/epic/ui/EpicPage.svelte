@@ -11,6 +11,7 @@
 		SyncJob
 	} from '#lib/shared/domain/types.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
+	import { MarkdownViewer } from '#lib/shared/ui/markdown/index.ts';
 	import { Crumbs } from '#lib/widgets/app-shell/index.ts';
 	import { EpicHeader } from '#lib/widgets/epic-header/index.ts';
 	import { StageBoard } from '#lib/widgets/stage-board/index.ts';
@@ -43,6 +44,14 @@
 		/>
 		<EpicHeader {epic} {project} {ticketUrl} />
 	</div>
+
+	{#if epic.summary}
+		<Section title="Description">
+			<div class="rounded-xl border bg-card p-5">
+				<MarkdownViewer source={epic.summary} />
+			</div>
+		</Section>
+	{/if}
 
 	<Section title="Board">
 		{#key epic.id}

@@ -8,7 +8,7 @@
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
 	import type { Spec } from '#lib/shared/domain/types.ts';
-	import { HumanBrief, SpecKindBadge } from '#lib/entities/spec/index.ts';
+	import { SpecBrief, SpecKindBadge } from '#lib/entities/spec/index.ts';
 	import { SpecEditorDialog } from '#lib/features/spec-editor/index.ts';
 	import { SpecReadModeButton } from '#lib/features/spec-read-mode/index.ts';
 	import { TranslateSpecButton } from '#lib/features/translate-spec/index.ts';
@@ -22,13 +22,6 @@
 
 	let { spec, owner, extensions = [] }: Props = $props();
 	let view = $state<'brief' | 'source'>('brief');
-
-	/** Diagrams from the spec, shown with the brief because they are often the clearest part for humans. */
-	const diagrams = $derived(
-		[...spec.content.matchAll(/^```mermaid[^\n]*\n[\s\S]*?^```/gm)]
-			.map((match) => match[0])
-			.join('\n\n')
-	);
 </script>
 
 <article class="min-w-0 space-y-4">
@@ -42,7 +35,7 @@
 			<h3 class="text-lg font-semibold tracking-tight">{spec.title}</h3>
 		</div>
 		<div class="flex items-center gap-1">
-			<SpecReadModeButton {spec} {extensions} />
+			<SpecReadModeButton {spec} {extensions} bind:view />
 			<TranslateSpecButton specId={spec.id} hasBrief={spec.brief !== null} />
 			<SpecEditorDialog {owner} {spec}>
 				{#snippet trigger({ props })}
@@ -66,24 +59,16 @@
 			<Tabs.Trigger value="source"><FileCodeIcon />AI source</Tabs.Trigger>
 		</Tabs.List>
 		<Tabs.Content value="brief" class="pt-3">
-			{#if spec.brief}
-				<HumanBrief brief={spec.brief} />
-			{:else}
-				<EmptyState
-					title="No human brief yet"
-					description="Translate this spec into a short, plain-language brief: what changes, why, how we know it is done, and the risks."
-				>
-					{#snippet action()}<TranslateSpecButton specId={spec.id} hasBrief={false} />{/snippet}
-				</EmptyState>
-			{/if}
-			{#if diagrams}
-				<section class="mt-6 space-y-2">
-					<h4 class="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-						Diagrams
-					</h4>
-					<MarkdownViewer source={diagrams} {extensions} />
-				</section>
-			{/if}
+			<SpecBrief {spec} {extensions}>
+				{#snippet empty()}
+					<EmptyState
+						title="No human brief yet"
+						description="Translate this spec into a short, plain-language brief: what changes, why, how we know it is done, and the risks."
+					>
+						{#snippet action()}<TranslateSpecButton specId={spec.id} hasBrief={false} />{/snippet}
+					</EmptyState>
+				{/snippet}
+			</SpecBrief>
 		</Tabs.Content>
 		<Tabs.Content value="source" class="pt-3">
 			<MarkdownViewer source={spec.content} {extensions} />

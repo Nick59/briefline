@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasFocus, isRecentlyChanged, liveStatus } from './status.ts';
+import { isRecentlyChanged, liveStatus } from './status.ts';
 
 describe('liveStatus', () => {
 	it('is offline when the stream is closed', () => {
@@ -13,14 +13,6 @@ describe('liveStatus', () => {
 		expect(liveStatus('open', 0, 10_000)).toBe('recent');
 		expect(liveStatus('open', 0, 299_999)).toBe('recent');
 		expect(liveStatus('open', 0, 300_000)).toBe('idle');
-	});
-});
-
-describe('hasFocus', () => {
-	it('holds for 60 seconds', () => {
-		expect(hasFocus(0, 59_999)).toBe(true);
-		expect(hasFocus(0, 60_000)).toBe(false);
-		expect(hasFocus(null, 0)).toBe(false);
 	});
 });
 

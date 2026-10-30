@@ -2,13 +2,8 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { invalidateAll } from '$app/navigation';
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
-import {
-	hasFocus,
-	isRecentlyChanged,
-	liveStatus,
-	type Connection,
-	type LiveStatus
-} from './status.ts';
+import { isRecentlyChanged, liveStatus, type Connection, type LiveStatus } from './status.ts';
+import { isBriefOfPrevious } from './label.ts';
 import { notifyAgentEvent } from './toasts.ts';
 
 const RECENT_LIMIT = 5;
@@ -24,9 +19,6 @@ export class LiveActivity {
 	muted = $state(readMuted());
 
 	status = $derived<LiveStatus>(liveStatus(this.connected, this.lastAgentAt, this.now));
-	focus = $derived(
-		hasFocus(this.lastAgentAt, this.now) && this.recent[0]?.key ? this.recent[0] : null
-	);
 
 	#source: EventSource | null = null;
 	#tick: ReturnType<typeof setInterval> | null = null;
@@ -82,10 +74,12 @@ export class LiveActivity {
 	#handle(event: LiveEvent) {
 		const at = Date.now();
 		this.now = at;
-		if (event.key) this.recentlyChanged.set(event.key, at);
+		if (event.internalKey) this.recentlyChanged.set(event.internalKey, at);
 		if (event.transport === 'mcp') {
 			this.lastAgentAt = at;
-			this.recent = [event, ...this.recent].slice(0, RECENT_LIMIT);
+			if (!isBriefOfPrevious(event, this.recent[0])) {
+				this.recent = [event, ...this.recent].slice(0, RECENT_LIMIT);
+			}
 			if (!this.muted) notifyAgentEvent(event);
 		}
 		this.#scheduleRefresh();

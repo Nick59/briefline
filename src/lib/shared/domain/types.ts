@@ -156,6 +156,8 @@ export interface Activity {
 	action: string;
 	message: string;
 	data: Record<string, unknown>;
+	/** The external ticket of the task, or of the epic for epic events, when one is linked. */
+	ticket?: ExternalRef;
 	createdAt: ISODate;
 }
 

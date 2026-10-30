@@ -1,4 +1,4 @@
-import type { Activity, Page } from '#lib/shared/domain/types.ts';
+import type { Activity, ExternalRef, Page } from '#lib/shared/domain/types.ts';
 import { all, fromJson, run, toJson, type Db, type Params } from '../../db/connection.ts';
 
 interface ActivityRow {
@@ -11,7 +11,18 @@ interface ActivityRow {
 	message: string;
 	data: string;
 	created_at: string;
+	task_ref: string | null;
+	epic_ref: string | null;
 }
+
+// A deleted task leaves task_id null, so the epic ref must not stand in for it on task events.
+const ticketOf = (row: ActivityRow): ExternalRef | undefined => {
+	const raw = row.task_id ? row.task_ref : row.action.startsWith('epic.') ? row.epic_ref : null;
+	const ref = fromJson<Partial<ExternalRef> | null>(raw, null);
+	return ref?.key
+		? { provider: ref.provider ?? '', key: ref.key, url: ref.url ?? null }
+		: undefined;
+};
 
 const toActivity = (row: ActivityRow): Activity => ({
 	id: row.id,
@@ -22,6 +33,7 @@ const toActivity = (row: ActivityRow): Activity => ({
 	action: row.action,
 	message: row.message,
 	data: fromJson<Record<string, unknown>>(row.data, {}),
+	ticket: ticketOf(row),
 	createdAt: row.created_at
 });
 
@@ -68,19 +80,23 @@ export class ActivityRepository {
 		] as const) {
 			const value = filter[key];
 			if (value) {
-				where.push(`${column} = :${key}`);
+				where.push(`a.${column} = :${key}`);
 				params[key] = value;
 			}
 		}
 		const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 		const total = all<{ n: number }>(
 			this.db,
-			`SELECT COUNT(*) AS n FROM activity ${clause}`,
+			`SELECT COUNT(*) AS n FROM activity a ${clause}`,
 			params
 		)[0].n;
 		const items = all<ActivityRow>(
 			this.db,
-			`SELECT * FROM activity ${clause} ORDER BY created_at DESC, id DESC LIMIT :limit OFFSET :offset`,
+			`SELECT a.*, t.external_ref AS task_ref, e.external_ref AS epic_ref
+			 FROM activity a
+			 LEFT JOIN tasks t ON t.id = a.task_id
+			 LEFT JOIN epics e ON e.id = a.epic_id
+			 ${clause} ORDER BY a.created_at DESC, a.id DESC LIMIT :limit OFFSET :offset`,
 			{
 				...params,
 				limit: Math.min(filter.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE),
