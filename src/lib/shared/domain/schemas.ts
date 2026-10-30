@@ -42,19 +42,37 @@ export const statusMappingSchema = z
 	.partial()
 	.describe('External state per Briefline status. Omitted keys use the provider default.');
 
+const headersInput = z
+	.array(
+		z.object({
+			name: text(200).min(1).describe('Header name, e.g. CF-Access-Client-Id'),
+			value: text(4096)
+				.optional()
+				.describe(
+					'Header value. Omit or leave empty to keep the stored value of an existing header.'
+				)
+		})
+	)
+	.max(20)
+	.describe(
+		'Custom HTTP headers sent with every request to the provider, stored encrypted. The full list: headers left out are removed. Values are never returned.'
+	);
+
 const connectionFields = {
 	name: text(120).min(1),
 	settings: settingsRecord,
 	secret: text(2000).describe(
 		'API key or token. Write-only: it is stored encrypted, never returned.'
-	)
+	),
+	headers: headersInput
 };
 
 export const createTicketingConnectionSchema = z.object({
 	name: connectionFields.name,
 	provider: text(40).min(1).describe('Provider id from list_ticket_providers'),
 	settings: connectionFields.settings.default({}),
-	secret: connectionFields.secret.optional()
+	secret: connectionFields.secret.optional(),
+	headers: connectionFields.headers.optional()
 });
 
 export const updateTicketingConnectionSchema = z

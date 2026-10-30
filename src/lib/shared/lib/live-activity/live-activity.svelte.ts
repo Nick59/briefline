@@ -25,9 +25,7 @@ export class LiveActivity {
 
 	status = $derived<LiveStatus>(liveStatus(this.connected, this.lastAgentAt, this.now));
 	focus = $derived(
-		hasFocus(this.lastAgentAt, this.now) && this.recent[0]?.key
-			? this.recent[0]
-			: null
+		hasFocus(this.lastAgentAt, this.now) && this.recent[0]?.key ? this.recent[0] : null
 	);
 
 	#source: EventSource | null = null;

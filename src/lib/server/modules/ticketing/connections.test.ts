@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DatabaseSync } from 'node:sqlite';
 import { execute } from '../../api/execute.ts';
 import { operations } from '../../api/operations.ts';
@@ -229,12 +229,14 @@ describe('migration to ticketing connections', () => {
 			provider: string;
 			settings: string;
 			secret_ciphertext: string | null;
+			headers_ciphertext: string | null;
 		}[];
 		expect(connections.map((c) => [c.name, c.provider])).toEqual([
 			['Jira (acme.atlassian.net)', 'jira'],
 			['Plane (acme)', 'plane']
 		]);
 		expect(connections.every((c) => c.secret_ciphertext === null)).toBe(true);
+		expect(connections.every((c) => c.headers_ciphertext === null)).toBe(true);
 		const plane = connections.find((c) => c.provider === 'plane')!;
 		expect(JSON.parse(plane.settings)).toEqual({ workspaceSlug: 'acme' });
 
@@ -255,7 +257,7 @@ describe('migration to ticketing connections', () => {
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
 		expect(byKey.THR.ticketing_post_comments).toBe(0);
 		expect(byKey.FOU.ticketing_connection_id).toBeNull();
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 3 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 });
 	});
 
 	it('keeps migrated projects working: connection resolves and falls back to the environment', async () => {
@@ -287,5 +289,148 @@ describe('migration to ticketing connections', () => {
 		expect(calls[0]).toBe(
 			'https://api.plane.so/api/v1/workspaces/acme/projects/aaaaaaaa-1111-4222-8333-444455556666/states/'
 		);
+	});
+});
+
+describe('custom headers', () => {
+	const CF = [
+		{ name: 'CF-Access-Client-Id', value: 'abc.access' },
+		{ name: 'CF-Access-Client-Secret', value: 'cf-secret-value-xyz' }
+	];
+	const connect = (
+		app: ReturnType<typeof withHeaders>['app'],
+		headers: { name: string; value?: string }[] = CF
+	) =>
+		app.connections.create({
+			name: 'Plane',
+			provider: 'plane',
+			settings: { workspaceSlug: 'acme' },
+			secret: SECRET,
+			headers
+		});
+	const withHeaders = () =>
+		testApp({ BRIEFLINE_SECRET_KEY: KEY }, () => Response.json({ results: [] }));
+	const sent = (init: RequestInit) => Object.fromEntries(new Headers(init.headers));
+
+	it('sends them with every provider request, and the provider headers win', async () => {
+		const { app, calls } = withHeaders();
+		const connection = connect(app, [...CF, { name: 'X-Trace', value: 't' }]);
+		await app.connections.listProjects(connection.id);
+		expect(sent(calls[0].init)).toMatchObject({
+			'cf-access-client-id': 'abc.access',
+			'cf-access-client-secret': 'cf-secret-value-xyz',
+			'x-trace': 't',
+			'x-api-key': SECRET
+		});
+	});
+
+	it('sends none without headers and never leaks one connection headers to another', async () => {
+		const { app, calls } = withHeaders();
+		const withCf = connect(app);
+		const plain = app.connections.create({
+			name: 'Plain',
+			provider: 'plane',
+			settings: { workspaceSlug: 'acme' },
+			secret: SECRET
+		});
+		await app.connections.listProjects(plain.id);
+		await app.connections.listProjects(withCf.id);
+		await app.connections.listProjects(plain.id);
+		const [first, second, third] = calls.map((c) => sent(c.init));
+		expect(first).not.toHaveProperty('cf-access-client-id');
+		expect(second).toHaveProperty('cf-access-client-id');
+		expect(third).not.toHaveProperty('cf-access-client-id');
+		expect(third).not.toHaveProperty('cf-access-client-secret');
+	});
+
+	it('rejects the provider auth header and other invalid headers', () => {
+		const { app } = setup();
+		expect(() => connect(app, [{ name: 'X-Api-Key', value: 'x' }])).toThrow(/cannot be overridden/);
+		expect(() => connect(app, [{ name: 'Bad Name', value: 'x' }])).toThrow(/valid HTTP header/);
+		expect(() => connect(app, [{ name: 'X-A' }])).toThrow(/needs a value/);
+	});
+
+	it('exposes names only', async () => {
+		const { app } = setup();
+		const connection = connect(app);
+		expect(connection.headers).toEqual([
+			{ name: 'CF-Access-Client-Id', hasValue: true },
+			{ name: 'CF-Access-Client-Secret', hasValue: true }
+		]);
+		const actor = { actor: 'test' };
+		const run = async (name: string, input: object) =>
+			JSON.stringify(
+				await execute(
+					app,
+					operations.find((o) => o.name === name)!,
+					input,
+					actor
+				)
+			);
+		const outputs = [
+			await run('list_ticketing_connections', {}),
+			await run('get_ticketing_connection', { connection: connection.id }),
+			await run('update_ticketing_connection', { connection: connection.id, headers: CF })
+		];
+		for (const output of outputs) {
+			expect(output).not.toContain('cf-secret-value-xyz');
+			expect(output).not.toContain('abc.access');
+		}
+	});
+
+	it('keeps a stored value when the update omits it, and removes dropped headers', async () => {
+		const { app, calls } = withHeaders();
+		const { id } = connect(app);
+		app.connections.update(id, {
+			headers: [{ name: 'cf-access-client-id' }, { name: 'X-New', value: 'n' }]
+		});
+		expect(app.connections.get(id).headers.map((h) => h.name)).toEqual([
+			'cf-access-client-id',
+			'X-New'
+		]);
+		await app.connections.listProjects(id);
+		expect(sent(calls[0].init)).toMatchObject({
+			'cf-access-client-id': 'abc.access',
+			'x-new': 'n'
+		});
+		expect(sent(calls[0].init)).not.toHaveProperty('cf-access-client-secret');
+		expect(() => app.connections.update(id, { headers: [{ name: 'Other' }] })).toThrow(
+			/needs a value/
+		);
+		app.connections.update(id, { name: 'Renamed' });
+		expect(app.connections.get(id).headers).toHaveLength(2);
+		expect(app.connections.update(id, { headers: [] }).headers).toEqual([]);
+	});
+
+	it('needs BRIEFLINE_SECRET_KEY to store headers', () => {
+		const { app } = setup({});
+		expect(() =>
+			app.connections.create({
+				name: 'x',
+				provider: 'github',
+				headers: [{ name: 'X-A', value: 'v' }]
+			})
+		).toThrow(/BRIEFLINE_SECRET_KEY/);
+	});
+
+	it('masks header values in provider errors', async () => {
+		const failing = testApp(
+			{ BRIEFLINE_SECRET_KEY: KEY },
+			() => new Response('denied for cf-secret-value-xyz', { status: 403 })
+		);
+		const { id } = failing.app.connections.create({
+			name: 'Plane',
+			provider: 'plane',
+			settings: { workspaceSlug: 'acme' },
+			secret: SECRET,
+			headers: CF
+		});
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const result = await failing.app.connections.test(id);
+		expect(result.ok).toBe(false);
+		expect(result.message).not.toContain('cf-secret-value-xyz');
+		expect(result.message).toContain('***');
+		expect(warn.mock.calls.flat().join(' ')).not.toContain('cf-secret-value-xyz');
+		warn.mockRestore();
 	});
 });

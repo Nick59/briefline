@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import TrashIcon from '@lucide/svelte/icons/trash-2';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
@@ -25,6 +26,7 @@
 	let name = $state('');
 	let settings = $state<Record<string, string>>({});
 	let secret = $state('');
+	let headers = $state<{ name: string; value: string; saved: boolean }[]>([]);
 	let busy = $state(false);
 
 	const provider = $derived(providers.find((p) => p.id === providerId));
@@ -36,6 +38,13 @@
 		name = connection?.name ?? '';
 		settings = { ...connection?.settings };
 		secret = '';
+		headers = (connection?.headers ?? []).map((h) => ({ name: h.name, value: '', saved: true }));
+	}
+
+	function cleanHeaders() {
+		return headers
+			.filter((h) => h.name.trim())
+			.map((h) => ({ name: h.name.trim(), ...(h.value ? { value: h.value } : {}) }));
 	}
 
 	function clean() {
@@ -53,13 +62,20 @@
 						connection: connection.id,
 						name,
 						settings: clean(),
+						headers: cleanHeaders(),
 						...(secret ? { secret } : {})
 					},
 					{ success: 'Connection saved' }
 				)
 			: await runOperation(
 					'create_ticketing_connection',
-					{ name, provider: providerId, settings: clean(), ...(secret ? { secret } : {}) },
+					{
+						name,
+						provider: providerId,
+						settings: clean(),
+						headers: cleanHeaders(),
+						...(secret ? { secret } : {})
+					},
 					{ success: 'Connection created' }
 				);
 		busy = false;
@@ -171,6 +187,57 @@
 					</p>
 				{/if}
 			{/if}
+
+			<details class="rounded-md border px-3 py-2" open={headers.length > 0}>
+				<summary class="cursor-pointer text-sm font-medium">Custom headers</summary>
+				<div class="mt-3 grid gap-3">
+					<p class="text-sm text-muted-foreground">
+						Sent with every request to this provider, e.g. Cloudflare Access service token headers.
+					</p>
+					{#each headers as header, index (index)}
+						<div class="flex items-center gap-2">
+							<Input
+								bind:value={header.name}
+								aria-label="Header {index + 1} name"
+								placeholder="CF-Access-Client-Id"
+								maxlength={200}
+								autocomplete="off"
+							/>
+							<Input
+								type="password"
+								bind:value={header.value}
+								aria-label="Header {index + 1} value"
+								autocomplete="new-password"
+								disabled={!secretsAvailable}
+								placeholder={header.saved ? '•••••• (unchanged)' : 'Value'}
+							/>
+							<Button
+								type="button"
+								variant="outline"
+								size="icon"
+								aria-label="Remove header {header.name || index + 1}"
+								onclick={() => (headers = headers.filter((_, i) => i !== index))}
+								><TrashIcon /></Button
+							>
+						</div>
+					{/each}
+					<div>
+						<Button
+							type="button"
+							variant="outline"
+							size="sm"
+							disabled={!secretsAvailable || headers.length >= 20}
+							onclick={() => (headers = [...headers, { name: '', value: '', saved: false }])}
+							><PlusIcon />Add header</Button
+						>
+					</div>
+					{#if !secretsAvailable}
+						<p class="text-xs text-warning" role="status">
+							Saving headers needs BRIEFLINE_SECRET_KEY on the server.
+						</p>
+					{/if}
+				</div>
+			</details>
 
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>

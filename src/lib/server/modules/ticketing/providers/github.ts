@@ -49,10 +49,11 @@ async function call(ctx: ProviderContext, path: string, method: string, body?: u
 		},
 		{ json: false }
 	);
-	await expectOk(response, `GitHub ${method} ${path}`);
+	await expectOk(response, `GitHub ${method} ${path}`, ctx);
 }
 
 export const githubProvider: TicketProvider = {
+	reservedHeaders: ['authorization'],
 	id: 'github',
 	label: 'GitHub Issues',
 	description:

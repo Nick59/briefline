@@ -1,6 +1,8 @@
 import type { MappingKey, Stage, WorkStatus } from '#lib/shared/domain/constants.ts';
 import type { ExternalRef, MappedState, TicketProviderInfo } from '#lib/shared/domain/types.ts';
 
+import { mergeHeaders, type HeaderEntry } from './headers.ts';
+
 export type { ProviderSetting, TicketProviderInfo } from '#lib/shared/domain/types.ts';
 
 export interface TicketUpdate {
@@ -19,6 +21,8 @@ export interface ProviderContext {
 	/** Decrypted API key, or the provider's environment variable when none is stored. */
 	secret: string | null;
 	secretEnvVar: string | null;
+	/** Custom headers sent with every request. Provider-set headers win on conflict. */
+	headers: HeaderEntry[];
 	env: Record<string, string | undefined>;
 	fetch: typeof fetch;
 }
@@ -41,6 +45,8 @@ export interface PushResult {
 }
 
 export interface TicketProvider extends Omit<TicketProviderInfo, 'supportsProjects'> {
+	/** Lower-case names of the authentication headers this provider sets itself. */
+	reservedHeaders: string[];
 	ticketUrl(ref: ExternalRef, settings: Record<string, string>): string | null;
 	push(ctx: TicketContext, update: TicketUpdate): Promise<PushResult | void>;
 	/** States an issue can be moved to. Group values: backlog, unstarted, started, completed. */
@@ -88,16 +94,19 @@ export function resolveMapped(
 	};
 }
 
-export async function expectOk(response: Response, what: string) {
+export async function expectOk(response: Response, what: string, ctx: ProviderContext) {
 	if (response.ok) return;
 	const body = await response.text().catch(() => '');
-	throw new TicketProviderError(`${what} failed: HTTP ${response.status} ${body.slice(0, 300)}`);
+	throw new TicketProviderError(
+		`${what} failed: HTTP ${response.status} ${redact(body.slice(0, 300), ctx)}`
+	);
 }
 
 export const TIMEOUT_MS = 10_000;
 
 function redact(text: string, ctx: ProviderContext) {
-	return ctx.secret ? text.split(ctx.secret).join('***') : text;
+	const hidden = [ctx.secret, ...ctx.headers.map((h) => h.value)].filter(Boolean) as string[];
+	return hidden.reduce((result, value) => result.split(value).join('***'), text);
 }
 
 function safeUrl(url: string) {
@@ -134,9 +143,9 @@ export async function providerFetch(
 	const started = Date.now();
 	let response: Response;
 	try {
-		response = await ctx.fetch(url, init);
+		response = await ctx.fetch(url, { ...init, headers: mergeHeaders(ctx.headers, init.headers) });
 	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
+		const reason = redact(error instanceof Error ? error.message : String(error), ctx);
 		console.warn(`[ticketing] ${provider} ${method} ${shown} -> network error ${reason}`);
 		throw new TicketProviderError(`${provider} ${method} ${shown} failed: ${reason}`);
 	}

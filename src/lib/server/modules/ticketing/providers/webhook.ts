@@ -18,6 +18,7 @@ function endpoint(ctx: ProviderContext): URL {
 }
 
 export const webhookProvider: TicketProvider = {
+	reservedHeaders: ['x-pm-signature'],
 	id: 'webhook',
 	label: 'Generic webhook',
 	description:
@@ -73,6 +74,6 @@ export const webhookProvider: TicketProvider = {
 			{ method: 'POST', headers, body, signal: AbortSignal.timeout(TIMEOUT_MS) },
 			{ json: false }
 		);
-		await expectOk(response, 'Webhook');
+		await expectOk(response, 'Webhook', ctx);
 	}
 };

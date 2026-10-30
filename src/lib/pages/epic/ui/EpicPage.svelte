@@ -45,7 +45,9 @@
 	</div>
 
 	<Section title="Board">
-		<StageBoard {epic} />
+		{#key epic.id}
+			<StageBoard {epic} />
+		{/key}
 	</Section>
 
 	<div class="space-y-10">

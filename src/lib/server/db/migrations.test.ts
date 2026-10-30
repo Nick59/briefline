@@ -49,7 +49,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 3 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -68,5 +68,20 @@ describe('migration that removes phases', () => {
 		expect(app.activity.forEpic('PMA-E1').items).toMatchObject([
 			{ action: 'phase.created', message: 'Added phase "Build"' }
 		]);
+	});
+});
+
+describe('headers column migration', () => {
+	it('adds a nullable headers_ciphertext column and keeps existing connections', () => {
+		const db = new DatabaseSync(':memory:');
+		migrate(db, 3);
+		db.exec(
+			"INSERT INTO ticketing_connections (id, name, provider, created_at, updated_at) VALUES ('c1', 'GH', 'github', 't', 't')"
+		);
+		migrate(db);
+		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
+			{ id: 'c1', headers_ciphertext: null }
+		]);
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 });
 	});
 });

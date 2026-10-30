@@ -40,7 +40,11 @@ describe('toLiveEvent', () => {
 			actor: 'dashboard',
 			data: { title: 'Plan' }
 		};
-		expect(toLiveEvent(spec, 'p1', at)).toMatchObject({ transport: null, key: null, title: 'Plan' });
+		expect(toLiveEvent(spec, 'p1', at)).toMatchObject({
+			transport: null,
+			key: null,
+			title: 'Plan'
+		});
 	});
 
 	it('frames an event for server-sent events', () => {

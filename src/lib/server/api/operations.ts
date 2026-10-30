@@ -404,7 +404,7 @@ export const operations: Operation[] = [
 		tag: 'Ticketing',
 		summary: 'Create a ticketing connection',
 		description:
-			'Holds the account-level settings and the API key of one external system. Projects select a connection. The secret is encrypted with BRIEFLINE_SECRET_KEY and write-only.',
+			'Holds the account-level settings and the API key of one external system. Projects select a connection. The secret and any custom headers (for example Cloudflare Access service token headers) are encrypted with BRIEFLINE_SECRET_KEY and write-only.',
 		input: createTicketingConnectionSchema,
 		successStatus: 201,
 		run: (app, input) => app.connections.create(input)
@@ -416,7 +416,7 @@ export const operations: Operation[] = [
 		tag: 'Ticketing',
 		summary: 'Update a ticketing connection',
 		description:
-			'Omit secret to keep the stored one. Send clearSecret: true to remove it, after which the provider environment variable is used if set.',
+			'Omit secret to keep the stored one. Send clearSecret: true to remove it, after which the provider environment variable is used if set. headers replaces the whole custom header list; an existing header sent without a value keeps its stored value.',
 		input: updateTicketingConnectionSchema.extend({ connection }),
 		run: (app, input) => app.connections.update(input.connection, pick(input, 'connection'))
 	}),

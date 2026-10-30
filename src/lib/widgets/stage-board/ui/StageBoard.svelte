@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
 	import {
 		STAGES,
@@ -15,9 +16,13 @@
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { StageIcon } from '#lib/entities/work-status/index.ts';
 	import { applyDrop, byPosition, planDrop, type DropPlan } from '../model/drop.ts';
+	import { initialStage } from '../model/initial-stage.ts';
 	import BoardColumn from './BoardColumn.svelte';
 
-	let { epic, stage = $bindable('dev') }: { epic: EpicDetail; stage?: Stage } = $props();
+	let {
+		epic,
+		stage = $bindable(untrack(() => initialStage(epic.progress)))
+	}: { epic: EpicDetail; stage?: Stage } = $props();
 
 	/** The last drop, shown right away and replaced by server data once it is saved. */
 	let pending = $state<{ taskId: string; stage: Stage; plan: DropPlan } | null>(null);

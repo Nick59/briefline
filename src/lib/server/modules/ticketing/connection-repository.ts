@@ -6,6 +6,8 @@ export interface StoredConnection {
 	provider: string;
 	settings: Record<string, string>;
 	secretCiphertext: string | null;
+	/** Encrypted JSON list of custom headers. */
+	headersCiphertext: string | null;
 	createdAt: string;
 	updatedAt: string;
 }
@@ -16,6 +18,7 @@ interface ConnectionRow {
 	provider: string;
 	settings: string;
 	secret_ciphertext: string | null;
+	headers_ciphertext: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -26,6 +29,7 @@ const toConnection = (row: ConnectionRow): StoredConnection => ({
 	provider: row.provider,
 	settings: fromJson<Record<string, string>>(row.settings, {}),
 	secretCiphertext: row.secret_ciphertext,
+	headersCiphertext: row.headers_ciphertext,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -50,8 +54,8 @@ export class ConnectionRepository {
 	insert(connection: StoredConnection) {
 		run(
 			this.db,
-			`INSERT INTO ticketing_connections (id, name, provider, settings, secret_ciphertext, created_at, updated_at)
-			 VALUES (:id, :name, :provider, :settings, :secret, :createdAt, :updatedAt)`,
+			`INSERT INTO ticketing_connections (id, name, provider, settings, secret_ciphertext, headers_ciphertext, created_at, updated_at)
+			 VALUES (:id, :name, :provider, :settings, :secret, :headers, :createdAt, :updatedAt)`,
 			{ ...this.#params(connection), createdAt: connection.createdAt }
 		);
 	}
@@ -60,7 +64,7 @@ export class ConnectionRepository {
 		run(
 			this.db,
 			`UPDATE ticketing_connections SET name = :name, provider = :provider, settings = :settings,
-			 secret_ciphertext = :secret, updated_at = :updatedAt WHERE id = :id`,
+			 secret_ciphertext = :secret, headers_ciphertext = :headers, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(connection)
 		);
 	}
@@ -90,6 +94,7 @@ export class ConnectionRepository {
 			provider: connection.provider,
 			settings: toJson(connection.settings) ?? '{}',
 			secret: connection.secretCiphertext,
+			headers: connection.headersCiphertext,
 			updatedAt: connection.updatedAt
 		};
 	}

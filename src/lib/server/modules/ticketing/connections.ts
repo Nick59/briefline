@@ -20,6 +20,7 @@ import { ConflictError, DomainError, InvalidInputError, NotFoundError } from '..
 import { newId, now } from '../../core/ids.ts';
 import { requireProject } from '../../core/lookup.ts';
 import type { StoredConnection } from './connection-repository.ts';
+import { validateHeaders, type HeaderEntry } from './headers.ts';
 import { TicketProviderError, type ProviderContext, type TicketProvider } from './provider.ts';
 import type { TicketProviderRegistry } from './registry.ts';
 
@@ -103,6 +104,7 @@ export class TicketingConnectionService {
 			provider: provider.id,
 			settings: validateFields(provider, 'connection', data.settings),
 			secretCiphertext: data.secret ? this.#encrypt(data.secret) : null,
+			headersCiphertext: this.#encryptHeaders(provider, data.headers ?? [], []),
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -120,6 +122,10 @@ export class TicketingConnectionService {
 		if (data.clearSecret) secretCiphertext = null;
 		else if (data.secret) secretCiphertext = this.#encrypt(data.secret);
 
+		const headersCiphertext = data.headers
+			? this.#encryptHeaders(provider, data.headers, this.#headersOrEmpty(current))
+			: current.headersCiphertext;
+
 		this.deps.repos.connections.update({
 			...current,
 			name: data.name ?? current.name,
@@ -127,6 +133,7 @@ export class TicketingConnectionService {
 				? validateFields(provider, 'connection', data.settings)
 				: current.settings,
 			secretCiphertext,
+			headersCiphertext,
 			updatedAt: now()
 		});
 		return this.get(id);
@@ -257,6 +264,7 @@ export class TicketingConnectionService {
 				settings: { ...connection.settings, ...target },
 				secret,
 				secretEnvVar: provider.secretEnvVar,
+				headers: this.#storedHeaders(connection),
 				env: this.options.env,
 				fetch: this.options.fetch
 			}
@@ -292,10 +300,51 @@ export class TicketingConnectionService {
 			settings: connection.settings,
 			hasSecret: Boolean(connection.secretCiphertext),
 			secretSource: stored ? 'stored' : env ? 'env' : 'none',
+			headers: this.#headerNames(connection),
 			usedBy,
 			createdAt: connection.createdAt,
 			updatedAt: connection.updatedAt
 		};
+	}
+
+	#storedHeaders(connection: StoredConnection): HeaderEntry[] {
+		if (!connection.headersCiphertext) return [];
+		try {
+			return JSON.parse(this.secrets.decrypt(connection.headersCiphertext)) as HeaderEntry[];
+		} catch (error) {
+			throw new TicketProviderError(error instanceof Error ? error.message : String(error));
+		}
+	}
+
+	#headersOrEmpty(connection: StoredConnection): HeaderEntry[] {
+		try {
+			return this.#storedHeaders(connection);
+		} catch {
+			return [];
+		}
+	}
+
+	/** Names only; a list that cannot be decrypted shows as empty rather than failing the page. */
+	#headerNames(connection: StoredConnection): TicketingConnection['headers'] {
+		return this.#headersOrEmpty(connection).map(({ name }) => ({ name, hasValue: true }));
+	}
+
+	/** An entry without a value keeps the stored value of the header with the same name. */
+	#encryptHeaders(
+		provider: TicketProvider,
+		input: { name: string; value?: string }[],
+		stored: HeaderEntry[]
+	): string | null {
+		const entries = validateHeaders(
+			input.map(({ name, value }) => ({ name, value: value ?? '' })),
+			provider.reservedHeaders
+		).map((entry) => {
+			if (entry.value) return entry;
+			const kept = stored.find((s) => s.name.toLowerCase() === entry.name.toLowerCase());
+			if (!kept) throw new InvalidInputError(`Header '${entry.name}' needs a value`);
+			return { name: entry.name, value: kept.value };
+		});
+		return entries.length ? this.#encrypt(JSON.stringify(entries)) : null;
 	}
 
 	#encrypt(secret: string): string {

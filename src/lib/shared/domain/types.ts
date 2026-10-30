@@ -36,6 +36,12 @@ export interface ProjectTicketing {
 
 export type SecretSource = 'stored' | 'env' | 'none';
 
+/** A custom header of a connection. Only the name is exposed; the value is stored encrypted. */
+export interface TicketingConnectionHeader {
+	name: string;
+	hasValue: boolean;
+}
+
 /** A configured account in an external ticketing system. The secret itself is never exposed. */
 export interface TicketingConnection {
 	id: string;
@@ -45,6 +51,7 @@ export interface TicketingConnection {
 	/** True when an encrypted API key is stored for this connection. */
 	hasSecret: boolean;
 	secretSource: SecretSource;
+	headers: TicketingConnectionHeader[];
 	usedBy: { key: string; name: string }[];
 	createdAt: ISODate;
 	updatedAt: ISODate;

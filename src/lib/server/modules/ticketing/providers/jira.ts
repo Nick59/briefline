@@ -49,12 +49,13 @@ function request(ctx: ProviderContext, path: string, init: RequestInit = {}) {
 
 async function currentStatusId(ctx: TicketContext, key: string): Promise<string | undefined> {
 	const response = await request(ctx, `/rest/api/2/issue/${key}?fields=status`);
-	await expectOk(response, 'Jira get issue');
+	await expectOk(response, 'Jira get issue', ctx);
 	const body = (await response.json()) as { fields?: { status?: { id: string } } };
 	return body.fields?.status?.id;
 }
 
 export const jiraProvider: TicketProvider = {
+	reservedHeaders: ['authorization'],
 	id: 'jira',
 	label: 'Jira',
 	description:
@@ -101,12 +102,12 @@ export const jiraProvider: TicketProvider = {
 	},
 	async testConnection(ctx) {
 		const response = await request(ctx, '/rest/api/2/myself');
-		await expectOk(response, 'Jira check');
+		await expectOk(response, 'Jira check', ctx);
 	},
 	async listStates(ctx) {
 		const key = encodeURIComponent(requireSetting(ctx, 'projectKey'));
 		const response = await request(ctx, `/rest/api/2/project/${key}/statuses`);
-		await expectOk(response, 'Jira list statuses');
+		await expectOk(response, 'Jira list statuses', ctx);
 		const types = (await response.json()) as {
 			statuses: { id: string; name: string; statusCategory?: { key: string } }[];
 		}[];
@@ -126,7 +127,7 @@ export const jiraProvider: TicketProvider = {
 		let note: string | undefined;
 		let skipMove = false;
 		const response = await request(ctx, `/rest/api/2/issue/${key}/transitions`);
-		await expectOk(response, 'Jira list transitions');
+		await expectOk(response, 'Jira list transitions', ctx);
 		const { transitions } = (await response.json()) as { transitions: Transition[] };
 
 		let transition: Transition | undefined;
@@ -150,14 +151,14 @@ export const jiraProvider: TicketProvider = {
 				method: 'POST',
 				body: JSON.stringify({ transition: { id: transition.id } })
 			});
-			await expectOk(moved, 'Jira transition');
+			await expectOk(moved, 'Jira transition', ctx);
 		}
 		if (update.comment) {
 			const commented = await request(ctx, `/rest/api/2/issue/${key}/comment`, {
 				method: 'POST',
 				body: JSON.stringify({ body: update.comment })
 			});
-			await expectOk(commented, 'Jira comment');
+			await expectOk(commented, 'Jira comment', ctx);
 		}
 		return { note };
 	}

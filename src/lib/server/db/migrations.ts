@@ -109,7 +109,8 @@ export const MIGRATIONS: Migration[] = [
 	CREATE INDEX sync_jobs_epic ON sync_jobs(epic_id, created_at);
 	`,
 	migrateToTicketingConnections,
-	removePhases
+	removePhases,
+	`ALTER TABLE ticketing_connections ADD COLUMN headers_ciphertext TEXT;`
 ];
 
 const LEGACY_PROJECT_FIELDS: Record<string, string[]> = {

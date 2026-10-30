@@ -2,6 +2,7 @@ import type { TicketProvider } from '../provider.ts';
 
 /** Records what would be sent without calling anything. Useful for demos and for testing a workflow. */
 export const dryRunProvider: TicketProvider = {
+	reservedHeaders: [],
 	id: 'dry-run',
 	label: 'Dry run',
 	description: 'Logs every ticket update in the sync log without calling an external system.',

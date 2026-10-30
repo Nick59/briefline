@@ -65,7 +65,7 @@ function pageResults<T>(body: T[] | { results: T[] }): T[] {
 
 async function fetchProjects(ctx: ProviderContext): Promise<ProviderProject[]> {
 	const response = await request(ctx, '/projects/');
-	await expectOk(response, 'Plane list projects');
+	await expectOk(response, 'Plane list projects', ctx);
 	const body = (await response.json()) as ProviderProject[] | { results: ProviderProject[] };
 	return pageResults(body).map(({ id, name, identifier }) => ({ id, name, identifier }));
 }
@@ -87,12 +87,13 @@ async function resolveProjectId(ctx: ProviderContext): Promise<string> {
 async function fetchStates(ctx: ProviderContext): Promise<ProviderState[]> {
 	const projectId = await resolveProjectId(ctx);
 	const response = await request(ctx, `/projects/${projectId}/states/`);
-	await expectOk(response, 'Plane list states');
+	await expectOk(response, 'Plane list states', ctx);
 	const body = (await response.json()) as ProviderState[] | { results: ProviderState[] };
 	return pageResults(body).map(({ id, name, group }) => ({ id, name, group }));
 }
 
 export const planeProvider: TicketProvider = {
+	reservedHeaders: ['x-api-key'],
 	id: 'plane',
 	label: 'Plane',
 	description:
@@ -133,14 +134,14 @@ export const planeProvider: TicketProvider = {
 	},
 	async testConnection(ctx) {
 		const response = await request(ctx, '/projects/');
-		await expectOk(response, 'Plane check');
+		await expectOk(response, 'Plane check', ctx);
 	},
 	listStates: fetchStates,
 	listProjects: fetchProjects,
 	async push(ctx, update) {
 		const projectId = await resolveProjectId(ctx);
 		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);
-		await expectOk(lookup, 'Plane find work item');
+		await expectOk(lookup, 'Plane find work item', ctx);
 		const { id } = (await lookup.json()) as { id: string };
 
 		const states = await fetchStates(ctx);
@@ -155,14 +156,14 @@ export const planeProvider: TicketProvider = {
 				method: 'PATCH',
 				body: JSON.stringify({ state: state.id })
 			});
-			await expectOk(moved, 'Plane update work item');
+			await expectOk(moved, 'Plane update work item', ctx);
 		}
 		if (update.comment) {
 			const commented = await request(ctx, `/projects/${projectId}/issues/${id}/comments/`, {
 				method: 'POST',
 				body: JSON.stringify({ comment_html: `<p>${escapeHtml(update.comment)}</p>` })
 			});
-			await expectOk(commented, 'Plane comment');
+			await expectOk(commented, 'Plane comment', ctx);
 		}
 		return { note: mapped.note };
 	}

@@ -33,7 +33,7 @@ async function graphql<T>(
 		body: JSON.stringify({ query, variables }),
 		signal: AbortSignal.timeout(TIMEOUT_MS)
 	});
-	await expectOk(response, 'Linear request');
+	await expectOk(response, 'Linear request', ctx);
 	const result = (await response.json()) as { data?: T; errors?: { message: string }[] };
 	if (result.errors?.length) throw new TicketProviderError(`Linear: ${result.errors[0].message}`);
 	return result.data as T;
@@ -56,6 +56,7 @@ interface IssueLookup {
 }
 
 export const linearProvider: TicketProvider = {
+	reservedHeaders: ['authorization'],
 	id: 'linear',
 	label: 'Linear',
 	description:
