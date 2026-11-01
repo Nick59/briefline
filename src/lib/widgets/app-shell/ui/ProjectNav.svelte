@@ -10,7 +10,9 @@
 	import { stageTone, statusTone } from '#lib/shared/config/tokens/index.ts';
 	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
 	import { StatusIcon } from '#lib/entities/work-status/index.ts';
+	import { ReadinessBadge } from '#lib/entities/epic/index.ts';
 	import { CreateProjectDialog } from '#lib/features/project-form/index.ts';
+	import { PROJECT_ZONE, useProjectOrder } from '#lib/features/reorder-projects/index.ts';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -23,7 +25,14 @@
 	const epicOrder = useEpicOrder(() => activeProjectKey);
 	const orderedEpics = $derived(epicOrder.sort(activeEpics));
 	const path = $derived(page.url.pathname);
+	const order = useProjectOrder(() => projects);
+	const { sortable } = order;
+	const dropBefore = $derived(sortable.active ? sortable.over?.beforeId : undefined);
 </script>
+
+{#snippet dropLine()}
+	<div class="-my-px h-0.5 rounded-full bg-brand" aria-hidden="true"></div>
+{/snippet}
 
 <div class="flex items-center justify-between px-2 pb-1">
 	<p class="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">Projects</p>
@@ -40,17 +49,20 @@
 	</CreateProjectDialog>
 </div>
 
-<ul class="space-y-0.5">
-	{#each projects as project (project.id)}
+<ul class="space-y-0.5" {@attach sortable.zone(PROJECT_ZONE)}>
+	{#each order.projects as project (project.id)}
 		{@const active = project.key === activeProjectKey}
 		{@const projectHref = resolve('/projects/[project]', { project: project.key })}
 		<li>
+			{#if dropBefore === project.id}{@render dropLine()}{/if}
 			<a
 				href={projectHref}
+				{@attach sortable.item(project.id, PROJECT_ZONE)}
 				onclick={onnavigate}
 				aria-current={path === projectHref ? 'page' : undefined}
 				class={cn(
-					'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-sidebar-accent',
+					'flex cursor-grab touch-manipulation items-center gap-2.5 rounded-md px-2 py-1.5 text-sm transition-colors select-none [-webkit-touch-callout:none] hover:bg-sidebar-accent',
+					sortable.active?.id === project.id && 'opacity-40',
 					active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
 				)}
 			>
@@ -95,6 +107,11 @@
 									size={12}
 								/>
 								<span class="truncate">{epic.title}</span>
+								<ReadinessBadge
+									compact
+									openQuestions={epic.openQuestions}
+									questionCount={epic.questionCount}
+								/>
 							</a>
 						</li>
 					{:else}
@@ -115,4 +132,7 @@
 	{:else}
 		<li class="px-2 py-1 text-xs text-muted-foreground">No projects yet</li>
 	{/each}
+	{#if order.projects.length > 0 && dropBefore === null}
+		<li aria-hidden="true">{@render dropLine()}</li>
+	{/if}
 </ul>

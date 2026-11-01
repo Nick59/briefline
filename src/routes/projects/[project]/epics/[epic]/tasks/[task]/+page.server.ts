@@ -2,7 +2,7 @@ import { error, redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 import { orHttpError } from '#lib/server/http/load.ts';
-import { loadPage } from '#lib/server/http/pagination.ts';
+import { firstPage } from '#lib/server/http/pagination.ts';
 import { operationActions } from '#lib/server/http/operation-actions.ts';
 
 export const load: PageServerLoad = ({ params, url }) => {
@@ -32,7 +32,7 @@ export const load: PageServerLoad = ({ params, url }) => {
 		project,
 		task,
 		selectedSpec: specId ? services.specs.get(specId) : null,
-		activity: loadPage(url, 'activity', (paging) => services.activity.forTask(task.id, paging)),
+		activity: firstPage((paging) => services.activity.forTask(task.id, paging)),
 		ticketUrl: task.externalRef ? services.ticketing.ticketUrl(project, task.externalRef) : null
 	};
 };

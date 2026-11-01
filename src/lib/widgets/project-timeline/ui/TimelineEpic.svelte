@@ -9,7 +9,7 @@
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { resolve } from '$app/paths';
 	import TimelineTaskRow from './TimelineTaskRow.svelte';
-	import { EpicMarker } from '#lib/entities/epic/index.ts';
+	import { EpicMarker, ReadinessBadge } from '#lib/entities/epic/index.ts';
 	import { StageBadge, StatusBadge } from '#lib/entities/work-status/index.ts';
 
 	interface Props {
@@ -50,6 +50,7 @@
 			{:else}
 				<StatusBadge {status} />
 			{/if}
+			<ReadinessBadge openQuestions={epic.openQuestions} questionCount={epic.questionCount} />
 		</div>
 		<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
 			<span>{pluralize(epic.taskCount, 'task')}</span>

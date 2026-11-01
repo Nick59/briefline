@@ -21,8 +21,20 @@ export const operationActions: Actions = {
 		}
 
 		try {
-			const result = await execute(app(), op, input, { actor: 'dashboard' });
+			const result = await execute(app(), op, input, { actor: app().profile.dashboardActor() });
 			return { result: JSON.parse(JSON.stringify(result ?? null)) };
+		} catch (error) {
+			const failure = toFailure(error);
+			return fail(failure.status, { message: failure.body.error.message });
+		}
+	},
+
+	/** Marks a spec as seen by a person. Not an API operation, so agent reads never count. */
+	viewed: async ({ request }) => {
+		const specId = String((await request.formData()).get('spec') ?? '');
+		try {
+			app().specs.markViewed(specId);
+			return { viewed: true };
 		} catch (error) {
 			const failure = toFailure(error);
 			return fail(failure.status, { message: failure.body.error.message });

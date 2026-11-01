@@ -257,7 +257,7 @@ describe('migration to ticketing connections', () => {
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
 		expect(byKey.THR.ticketing_post_comments).toBe(0);
 		expect(byKey.FOU.ticketing_connection_id).toBeNull();
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 4 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
 	});
 
 	it('keeps migrated projects working: connection resolves and falls back to the environment', async () => {

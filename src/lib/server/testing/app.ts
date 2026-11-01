@@ -1,4 +1,4 @@
-import { readConfig } from '../config.ts';
+import { readConfig, type ServerConfig } from '../config.ts';
 import { createContainer } from '../container.ts';
 import { openDatabase } from '../db/connection.ts';
 
@@ -10,7 +10,8 @@ export interface FetchCall {
 /** A fresh in-memory app. The fake fetch records every outgoing request instead of sending it. */
 export function testApp(
 	env: Record<string, string | undefined> = {},
-	respond: (call: FetchCall) => Response = () => Response.json({})
+	respond: (call: FetchCall) => Response = () => Response.json({}),
+	config: Partial<ServerConfig> = {}
 ) {
 	const calls: FetchCall[] = [];
 	const fetchImpl = (async (url: string | URL, init: RequestInit = {}) => {
@@ -19,7 +20,7 @@ export function testApp(
 		return respond(call);
 	}) as typeof fetch;
 	const app = createContainer(openDatabase(':memory:'), {
-		config: readConfig({}),
+		config: { ...readConfig({}), ...config },
 		env,
 		fetch: fetchImpl
 	});

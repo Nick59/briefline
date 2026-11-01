@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code-2';
@@ -8,6 +9,7 @@
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
 	import type { Spec } from '#lib/shared/domain/types.ts';
+	import { markSpecViewed } from '#lib/shared/lib/mark-spec-viewed.ts';
 	import { SpecBrief, SpecKindBadge } from '#lib/entities/spec/index.ts';
 	import { SpecEditorDialog } from '#lib/features/spec-editor/index.ts';
 	import { SpecReadModeButton } from '#lib/features/spec-read-mode/index.ts';
@@ -16,12 +18,18 @@
 
 	interface Props {
 		spec: Spec;
-		owner: { type: 'epic' | 'task'; id: string };
+		owner: { type: 'project' | 'epic' | 'task'; id: string };
 		extensions?: MarkdownExtension[];
+		/** True when a person picked this spec; the one selected by default is not counted as opened. */
+		chosen?: boolean;
 	}
 
-	let { spec, owner, extensions = [] }: Props = $props();
+	let { spec, owner, extensions = [], chosen = false }: Props = $props();
 	let view = $state<'brief' | 'source'>('brief');
+
+	onMount(() => {
+		if (chosen && !spec.viewedAt) void markSpecViewed(spec.id);
+	});
 </script>
 
 <article class="min-w-0 space-y-4">
@@ -35,7 +43,14 @@
 			<h3 class="text-lg font-semibold tracking-tight">{spec.title}</h3>
 		</div>
 		<div class="flex items-center gap-1">
-			<SpecReadModeButton {spec} {extensions} bind:view />
+			<SpecReadModeButton
+				{spec}
+				{extensions}
+				bind:view
+				onopen={() => {
+					if (!spec.viewedAt) void markSpecViewed(spec.id);
+				}}
+			/>
 			<TranslateSpecButton specId={spec.id} hasBrief={spec.brief !== null} />
 			<SpecEditorDialog {owner} {spec}>
 				{#snippet trigger({ props })}

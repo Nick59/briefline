@@ -7,6 +7,12 @@ const SYSTEM = `You translate engineering specs written by AI coding agents into
 product managers, designers, and stakeholders. Describe outcomes and impact, not code. Keep each list item to one
 plain sentence. Never invent requirements that the spec does not state; leave a list empty when the spec is silent.`;
 
+export const systemPrompt = (audience?: string) =>
+	audience ? `${SYSTEM}\n\nAbout the reader: ${audience}` : SYSTEM;
+
+export const userPrompt = ({ title, content, context }: BriefInput) =>
+	`${context ? `Context: ${context}\n\n` : ''}Spec title: ${title}\n\n<spec>\n${content}\n</spec>`;
+
 export class ClaudeTranslator implements BriefTranslator {
 	readonly id: string;
 	readonly #client: Anthropic;
@@ -19,18 +25,18 @@ export class ClaudeTranslator implements BriefTranslator {
 		this.id = `claude:${model}`;
 	}
 
-	async translate({ title, content, context }: BriefInput): Promise<BriefDraft> {
+	async translate(input: BriefInput): Promise<BriefDraft> {
 		const response = await this.#client.beta.messages.parse({
 			model: this.model,
 			max_tokens: 16000,
 			betas: ['server-side-fallback-2026-07-01'],
 			fallbacks: 'default',
 			output_config: { effort: 'medium', format: betaZodOutputFormat(briefSchema) },
-			system: SYSTEM,
+			system: systemPrompt(input.audience),
 			messages: [
 				{
 					role: 'user',
-					content: `${context ? `Context: ${context}\n\n` : ''}Spec title: ${title}\n\n<spec>\n${content}\n</spec>`
+					content: userPrompt(input)
 				}
 			]
 		});

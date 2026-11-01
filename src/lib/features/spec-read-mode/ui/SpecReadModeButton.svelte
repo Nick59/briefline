@@ -14,13 +14,14 @@
 		spec: Spec;
 		extensions?: MarkdownExtension[];
 		view?: 'brief' | 'source';
+		onopen?: () => void;
 	}
 
-	let { spec, extensions = [], view = $bindable('brief') }: Props = $props();
+	let { spec, extensions = [], view = $bindable('brief'), onopen }: Props = $props();
 	let open = $state(false);
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root bind:open onOpenChange={(value) => value && onopen?.()}>
 	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Button {...props} variant="ghost" size="sm" aria-label="Read mode">

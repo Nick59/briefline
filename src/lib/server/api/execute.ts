@@ -1,5 +1,6 @@
 import { ZodError, z } from 'zod';
 import type { Container } from '../container.ts';
+import { ANONYMOUS_ACTORS } from '#lib/shared/domain/actors.ts';
 import { DomainError } from '../core/errors.ts';
 import { runWithTransport } from '../core/operation-context.ts';
 import type { Operation, OperationContext } from './operation.ts';
@@ -24,6 +25,7 @@ export async function execute(
 	ctx: OperationContext
 ): Promise<unknown> {
 	try {
+		app.presence.touch(ctx.actor, ctx.transport ?? 'api');
 		const input = op.input.parse(rawInput ?? {});
 		const refusal = ctx.transport === 'mcp' ? op.mcp?.check?.(input) : null;
 		if (refusal) throw new ApiFailure(400, { error: { code: 'invalid_input', message: refusal } });
@@ -58,3 +60,5 @@ export function actorFrom(headers: Headers, fallback: string): string {
 	const actor = headers.get('x-actor')?.trim();
 	return actor && ACTOR_PATTERN.test(actor) ? actor : fallback;
 }
+
+export { ANONYMOUS_ACTORS };

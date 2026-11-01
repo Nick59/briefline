@@ -2,6 +2,7 @@
 	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import type { Task } from '#lib/shared/domain/types.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
@@ -56,6 +57,14 @@
 		<PriorityBadge priority={task.priority} />
 		{#if task.assignee}
 			<span class="inline-flex items-center gap-1"><UserIcon class="size-3" />{task.assignee}</span>
+		{/if}
+		{#if task.commentCount > 0}
+			<span
+				class="inline-flex items-center gap-1"
+				title="{task.commentCount} {task.commentCount === 1 ? 'comment' : 'comments'}"
+			>
+				<MessageSquareIcon class="size-3" />{task.commentCount}
+			</span>
 		{/if}
 	</div>
 </article>

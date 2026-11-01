@@ -2,7 +2,14 @@ import type { LayoutServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 
 export const load: LayoutServerLoad = ({ params, url }) => {
-	if (url.pathname === '/login') return { projects: [], activeProjectKey: null, activeEpics: [] };
+	if (url.pathname === '/login')
+		return {
+			projects: [],
+			activeProjectKey: null,
+			activeEpics: [],
+			profile: null,
+			presence: null
+		};
 	const projects = app().projects.list();
 	const projectParam = 'project' in params ? params.project : undefined;
 	const active = projectParam
@@ -11,6 +18,8 @@ export const load: LayoutServerLoad = ({ params, url }) => {
 	return {
 		projects,
 		activeProjectKey: active?.key ?? null,
-		activeEpics: active ? app().epics.list(active.id) : []
+		activeEpics: active ? app().epics.list(active.id) : [],
+		profile: app().profile.get(),
+		presence: app().presence.snapshot()
 	};
 };

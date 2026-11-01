@@ -1,5 +1,28 @@
 import { STAGE_LABELS, STATUS_LABELS } from '#lib/shared/domain/constants.ts';
+import { commentPhrase } from '#lib/shared/lib/comment-text.ts';
+import { questionPhrase } from '#lib/shared/lib/question-text.ts';
 import type { DomainEvent } from '../../core/events.ts';
+
+const QUESTION_FALLBACK = {
+	'question.updated': 'Edited',
+	'question.answered': 'Answered',
+	'question.ignored': 'Ignored',
+	'question.reopened': 'Reopened',
+	'question.replied': 'Replied in thread',
+	'question.deleted': 'Removed question'
+} as const;
+
+function describeQuestion(event: Extract<DomainEvent, { type: `question.${string}` }>): string {
+	const { data } = event;
+	const phrase = questionPhrase(event.type, data, { key: data.key });
+	if (phrase) return phrase;
+	if (event.type === 'question.added') {
+		return data.count && data.count > 1
+			? `Asked ${data.count} questions on ${data.key}`
+			: `Asked "${data.title}" on ${data.key}`;
+	}
+	return `${QUESTION_FALLBACK[event.type]} "${data.title}" on ${data.key}`;
+}
 
 /** One readable sentence per event, shown in the activity feed. */
 export function describeEvent(event: DomainEvent): string {
@@ -22,6 +45,10 @@ export function describeEvent(event: DomainEvent): string {
 			return `Deleted task ${event.data.key} "${event.data.title}"`;
 		case 'task.stage_changed':
 			return `Moved ${event.data.key} to ${STAGE_LABELS[event.data.stage]} · ${STATUS_LABELS[event.data.to]}`;
+		case 'task.commented':
+		case 'task.comment_updated':
+		case 'task.comment_deleted':
+			return commentPhrase(event.type, event.data.key, event.data.title);
 		case 'spec.created':
 			return `Added spec "${event.data.title}"`;
 		case 'spec.updated':
@@ -30,6 +57,14 @@ export function describeEvent(event: DomainEvent): string {
 			return `Removed spec "${event.data.title}"`;
 		case 'spec.translated':
 			return `Wrote a human brief for "${event.data.title}"`;
+		case 'question.added':
+		case 'question.updated':
+		case 'question.answered':
+		case 'question.ignored':
+		case 'question.reopened':
+		case 'question.replied':
+		case 'question.deleted':
+			return describeQuestion(event);
 		case 'ticket.synced':
 			return `Updated ticket ${event.data.key} in ${event.data.provider}`;
 		case 'ticket.sync_failed':

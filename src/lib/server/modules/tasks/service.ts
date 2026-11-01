@@ -1,4 +1,4 @@
-import { STAGES } from '#lib/shared/domain/constants.ts';
+import { STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	createTaskSchema,
 	moveTaskSchema,
@@ -11,7 +11,7 @@ import {
 } from '#lib/shared/domain/schemas.ts';
 import type { Epic, Task, TaskDetail } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
-import { InvalidInputError } from '../../core/errors.ts';
+import { InvalidInputError, OpenQuestionsError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
 import { transaction } from '../../db/connection.ts';
 import { requireEpic, requireProject, requireTask } from '../../core/lookup.ts';
@@ -45,7 +45,8 @@ export class TaskService {
 				externalRef: epic.externalRef
 			},
 			project: { id: project.id, key: project.key, name: project.name },
-			specs: repos.specs.listByEpic(epic.id, task.id).map(toSpecSummary)
+			specs: repos.specs.listByEpic(epic.id, task.id).map(toSpecSummary),
+			comments: repos.comments.listByTask(task.id)
 		};
 	}
 
@@ -69,6 +70,7 @@ export class TaskService {
 				? { ...data.externalRef, url: data.externalRef.url ?? null }
 				: null,
 			position: repos.tasks.nextPosition(epic.id),
+			commentCount: 0,
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -87,6 +89,10 @@ export class TaskService {
 		const data = updateTaskSchema.parse(input);
 		const current = this.get(idOrKey);
 		const epic = requireEpic(this.deps.repos, current.epicId);
+		for (const stage of STAGES) {
+			const to = data.stages?.[stage];
+			if (to) this.#assertCanChange(epic, current.stages[stage], to);
+		}
 		const task: Task = {
 			...current,
 			title: data.title ?? current.title,
@@ -131,6 +137,7 @@ export class TaskService {
 		const current = this.get(idOrKey);
 		if (current.stages[stage] === status) return current;
 		const epic = requireEpic(this.deps.repos, current.epicId);
+		this.#assertCanChange(epic, current.stages[stage], status);
 		const task: Task = {
 			...current,
 			stages: { ...current.stages, [stage]: status },
@@ -211,6 +218,13 @@ export class TaskService {
 		const epic = requireEpic(this.deps.repos, task.epicId);
 		this.deps.repos.tasks.delete(task.id);
 		this.#emit('task.deleted', epic, task, actor);
+	}
+
+	/** Work that already started may continue; only starting a stage waits for open questions. */
+	#assertCanChange(epic: Epic, from: WorkStatus, to: WorkStatus) {
+		if (from !== 'todo' || to === 'todo') return;
+		const open = this.deps.repos.questions.countOpen(epic.id);
+		if (open > 0) throw new OpenQuestionsError(epic.key, open);
 	}
 
 	#emit(

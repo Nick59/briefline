@@ -13,12 +13,12 @@ const event = {
 
 function fake() {
 	const close = vi.fn();
-	return { events: new EventBus(), db: { close } };
+	return { events: new EventBus(), presence: { subscribe: () => () => {} }, db: { close } };
 }
 
 describe('installContainer', () => {
 	it('forwards events of the container to the relay bus', () => {
-		const state: LiveState = { bus: new EventBus() };
+		const state: LiveState = { bus: new EventBus(), presence: new Set() };
 		const seen = vi.fn();
 		state.bus.subscribe(seen);
 		const container = installContainer(state, fake);
@@ -27,7 +27,7 @@ describe('installContainer', () => {
 	});
 
 	it('retires the previous container: no forwarding, database closed', () => {
-		const state: LiveState = { bus: new EventBus() };
+		const state: LiveState = { bus: new EventBus(), presence: new Set() };
 		const seen = vi.fn();
 		state.bus.subscribe(seen);
 		const first = installContainer(state, fake);
@@ -41,7 +41,7 @@ describe('installContainer', () => {
 	});
 
 	it('still installs when closing the old database throws', () => {
-		const state: LiveState = { bus: new EventBus() };
+		const state: LiveState = { bus: new EventBus(), presence: new Set() };
 		const first = installContainer(state, fake);
 		first.db.close.mockImplementation(() => {
 			throw new Error('boom');

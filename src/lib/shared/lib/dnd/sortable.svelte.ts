@@ -40,10 +40,12 @@ export class Sortable {
 		this.#options = options;
 	}
 
-	zone(name: string): Attachment<HTMLElement> {
+	/** A grid zone wraps its items into rows, so the drop point also depends on the pointer's x. */
+	zone(name: string, options: { grid?: boolean } = {}): Attachment<HTMLElement> {
 		return (node) => {
 			this.#zones.set(name, node);
 			node.dataset.dndZone = name;
+			node.dataset.dndGrid = options.grid ? 'true' : 'false';
 			return () => {
 				if (this.#zones.get(name) === node) this.#zones.delete(name);
 			};
@@ -193,7 +195,8 @@ export class Sortable {
 			);
 			const before = items.find((item) => {
 				const box = item.getBoundingClientRect();
-				return y < box.top + box.height / 2;
+				if (element.dataset.dndGrid !== 'true') return y < box.top + box.height / 2;
+				return y < box.top || (y < box.bottom && x < box.left + box.width / 2);
 			});
 			return { zone, beforeId: before?.dataset.dndId ?? null };
 		}

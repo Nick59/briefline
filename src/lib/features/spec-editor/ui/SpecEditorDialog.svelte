@@ -16,7 +16,7 @@
 	import { insertBlock, type DiagramTemplate } from '../model/diagram-templates.ts';
 	import InsertDiagramMenu from './InsertDiagramMenu.svelte';
 
-	type Owner = { type: 'epic'; id: string } | { type: 'task'; id: string };
+	type Owner = { type: 'project' | 'epic' | 'task'; id: string };
 
 	interface Props {
 		owner: Owner;
@@ -64,7 +64,7 @@
 					{ success: 'Spec saved' }
 				)
 			: await runOperation<Spec>(
-					owner.type === 'epic' ? 'add_epic_spec' : 'add_task_spec',
+					`add_${owner.type}_spec`,
 					{ [owner.type]: owner.id, ...fields },
 					{ success: 'Spec added', refresh: false }
 				);

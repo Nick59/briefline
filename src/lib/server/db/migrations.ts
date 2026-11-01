@@ -110,7 +110,108 @@ export const MIGRATIONS: Migration[] = [
 	`,
 	migrateToTicketingConnections,
 	removePhases,
-	`ALTER TABLE ticketing_connections ADD COLUMN headers_ciphertext TEXT;`
+	`ALTER TABLE ticketing_connections ADD COLUMN headers_ciphertext TEXT;`,
+	addProjectSpecs,
+	`
+	CREATE TABLE epic_questions (
+		id TEXT PRIMARY KEY,
+		epic_id TEXT NOT NULL REFERENCES epics(id) ON DELETE CASCADE,
+		position INTEGER NOT NULL,
+		question TEXT NOT NULL,
+		context TEXT,
+		options TEXT,
+		status TEXT NOT NULL DEFAULT 'open',
+		answer TEXT,
+		asked_by TEXT NOT NULL,
+		answered_by TEXT,
+		created_at TEXT NOT NULL,
+		answered_at TEXT
+	);
+	CREATE INDEX epic_questions_epic ON epic_questions(epic_id, position);
+	`,
+	`
+	ALTER TABLE activity ADD COLUMN seq INTEGER;
+	UPDATE activity SET seq = rowid;
+	CREATE UNIQUE INDEX activity_seq ON activity(seq);
+	CREATE TABLE activity_counter (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		value INTEGER NOT NULL
+	);
+	INSERT INTO activity_counter (id, value) SELECT 1, COALESCE(MAX(seq), 0) FROM activity;
+	CREATE TABLE activity_cursors (
+		actor TEXT NOT NULL,
+		scope TEXT NOT NULL,
+		cursor TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		PRIMARY KEY (actor, scope)
+	);
+	`,
+	`
+	CREATE TABLE user_profile (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		name TEXT NOT NULL,
+		role TEXT NOT NULL,
+		role_other TEXT,
+		coding_level TEXT NOT NULL,
+		language TEXT,
+		updated_at TEXT NOT NULL
+	);
+	`,
+	`
+	ALTER TABLE projects ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+	UPDATE projects SET position = (
+		SELECT COUNT(*) FROM projects other WHERE other.name < projects.name
+			OR (other.name = projects.name AND other.id < projects.id)
+	);
+	`,
+	`
+	CREATE TABLE agent_presence (
+		actor TEXT PRIMARY KEY,
+		last_seen_at TEXT NOT NULL,
+		transport TEXT NOT NULL
+	);
+	`,
+	`
+	CREATE TABLE question_messages (
+		id TEXT PRIMARY KEY,
+		question_id TEXT NOT NULL REFERENCES epic_questions(id) ON DELETE CASCADE,
+		author TEXT NOT NULL,
+		body TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX question_messages_question ON question_messages(question_id, created_at);
+	`,
+	`
+	CREATE TABLE agent_sessions (
+		id TEXT PRIMARY KEY,
+		actor TEXT NOT NULL,
+		client_name TEXT,
+		client_version TEXT,
+		summary TEXT,
+		started_at TEXT NOT NULL,
+		last_seen_at TEXT NOT NULL,
+		ended_at TEXT
+	);
+	CREATE INDEX agent_sessions_started ON agent_sessions(started_at);
+	ALTER TABLE activity ADD COLUMN session_id TEXT;
+	CREATE INDEX activity_session ON activity(session_id, seq);
+	`,
+	`
+	CREATE TABLE task_comments (
+		id TEXT PRIMARY KEY,
+		task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+		author TEXT NOT NULL,
+		body TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);
+	CREATE INDEX task_comments_task ON task_comments(task_id, created_at);
+	`,
+	`
+	ALTER TABLE task_comments ADD COLUMN author_kind TEXT NOT NULL DEFAULT 'agent';
+	UPDATE task_comments SET author_kind = 'human'
+	WHERE author IN ('dashboard', 'seed') OR author = (SELECT name FROM user_profile WHERE id = 1);
+	`
 ];
 
 const LEGACY_PROJECT_FIELDS: Record<string, string[]> = {
@@ -268,5 +369,36 @@ function removePhases(db: DatabaseSync) {
 		ALTER TABLE tasks_new RENAME TO tasks;
 		CREATE INDEX tasks_epic ON tasks(epic_id, position);
 		DROP TABLE phases;
+	`);
+}
+
+/**
+ * Specs can belong to a project, so epic_id becomes nullable and the table is rebuilt. Existing
+ * specs keep their owners and start as not viewed.
+ */
+function addProjectSpecs(db: DatabaseSync) {
+	db.exec(`
+		CREATE TABLE specs_new (
+			id TEXT PRIMARY KEY,
+			epic_id TEXT REFERENCES epics(id) ON DELETE CASCADE,
+			project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+			task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+			title TEXT NOT NULL,
+			kind TEXT NOT NULL DEFAULT 'spec',
+			content TEXT NOT NULL DEFAULT '',
+			brief TEXT,
+			position INTEGER NOT NULL,
+			viewed_at TEXT,
+			created_at TEXT NOT NULL,
+			updated_at TEXT NOT NULL,
+			CHECK (epic_id IS NOT NULL OR project_id IS NOT NULL)
+		);
+		INSERT INTO specs_new (id, epic_id, task_id, title, kind, content, brief, position, created_at, updated_at)
+		SELECT id, epic_id, task_id, title, kind, content, brief, position, created_at, updated_at
+		FROM specs;
+		DROP TABLE specs;
+		ALTER TABLE specs_new RENAME TO specs;
+		CREATE INDEX specs_owner ON specs(epic_id, task_id, position);
+		CREATE INDEX specs_project ON specs(project_id, position);
 	`);
 }

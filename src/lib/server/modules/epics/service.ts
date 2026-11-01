@@ -29,12 +29,15 @@ export class EpicService {
 	list(projectIdOrKey: string): EpicSummary[] {
 		const { repos } = this.deps;
 		const project = requireProject(repos, projectIdOrKey);
+		const questionCounts = repos.questions.countByProject(project.id);
 		return repos.epics.listByProject(project.id).map((epic) => {
 			const tasks = repos.tasks.listByEpic(epic.id);
 			return {
 				...epic,
 				progress: computeProgress(tasks),
-				taskCount: tasks.length
+				taskCount: tasks.length,
+				openQuestions: questionCounts.get(epic.id)?.open ?? 0,
+				questionCount: questionCounts.get(epic.id)?.total ?? 0
 			};
 		});
 	}
@@ -48,12 +51,16 @@ export class EpicService {
 		const epic = this.get(idOrKey);
 		const project = requireProject(repos, epic.projectId);
 		const tasks = repos.tasks.listByEpic(epic.id);
+		const questions = repos.questions.listByEpic(epic.id);
 		return {
 			...epic,
 			project: { id: project.id, key: project.key, name: project.name },
 			progress: computeProgress(tasks),
 			tasks,
-			specs: repos.specs.listByEpic(epic.id).map(toSpecSummary)
+			specs: repos.specs.listByEpic(epic.id).map(toSpecSummary),
+			questions,
+			openQuestions: repos.questions.countOpen(epic.id),
+			questionCount: questions.length
 		};
 	}
 

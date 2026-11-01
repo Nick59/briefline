@@ -16,6 +16,7 @@ interface TaskRow {
 	deploy_status: string;
 	external_ref: string | null;
 	position: number;
+	comment_count: number;
 	created_at: string;
 	updated_at: string;
 }
@@ -36,6 +37,7 @@ const toTask = (row: TaskRow): Task => ({
 	},
 	externalRef: fromJson<ExternalRef | null>(row.external_ref, null),
 	position: row.position,
+	commentCount: row.comment_count,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -51,19 +53,21 @@ const STAGE_COLUMN: Record<Stage, string> = {
 	deploy: 'deploy_status'
 };
 
+const SELECT_TASK = `SELECT t.*, (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS comment_count FROM tasks t`;
+
 export class TaskRepository {
 	constructor(private readonly db: Db) {}
 
 	listByEpic(epicId: string, filter: TaskFilter = {}): Task[] {
-		const where = ['epic_id = :epicId'];
+		const where = ['t.epic_id = :epicId'];
 		const params: Params = { epicId };
 		if (filter.status) {
-			where.push(`${STAGE_COLUMN[filter.stage ?? 'dev']} = :status`);
+			where.push(`t.${STAGE_COLUMN[filter.stage ?? 'dev']} = :status`);
 			params.status = filter.status;
 		}
 		return all<TaskRow>(
 			this.db,
-			`SELECT * FROM tasks WHERE ${where.join(' AND ')} ORDER BY position`,
+			`${SELECT_TASK} WHERE ${where.join(' AND ')} ORDER BY t.position`,
 			params
 		).map(toTask);
 	}
@@ -71,13 +75,13 @@ export class TaskRepository {
 	listByProject(projectId: string): Task[] {
 		return all<TaskRow>(
 			this.db,
-			'SELECT t.* FROM tasks t JOIN epics e ON e.id = t.epic_id WHERE e.project_id = :projectId',
+			`${SELECT_TASK} JOIN epics e ON e.id = t.epic_id WHERE e.project_id = :projectId`,
 			{ projectId }
 		).map(toTask);
 	}
 
 	find(idOrKey: string): Task | undefined {
-		const row = one<TaskRow>(this.db, 'SELECT * FROM tasks WHERE id = :v OR key = upper(:v)', {
+		const row = one<TaskRow>(this.db, `${SELECT_TASK} WHERE t.id = :v OR t.key = upper(:v)`, {
 			v: idOrKey
 		});
 		return row && toTask(row);
@@ -89,7 +93,7 @@ export class TaskRepository {
 		const params = Object.fromEntries(keys.map((key, i) => [`k${i}`, key]));
 		return all<TaskRow>(
 			this.db,
-			`SELECT * FROM tasks WHERE json_extract(external_ref, '$.key') COLLATE NOCASE IN (${marks}) ORDER BY key`,
+			`${SELECT_TASK} WHERE json_extract(t.external_ref, '$.key') COLLATE NOCASE IN (${marks}) ORDER BY t.key`,
 			params
 		).map(toTask);
 	}
@@ -98,9 +102,9 @@ export class TaskRepository {
 	searchByText(text: string, limit: number): Task[] {
 		return all<TaskRow>(
 			this.db,
-			`SELECT * FROM tasks
-			 WHERE key LIKE :prefix ESCAPE '\\' OR title LIKE :contains ESCAPE '\\'
-			 ORDER BY CASE WHEN key LIKE :prefix ESCAPE '\\' THEN 0 ELSE 1 END, updated_at DESC, key
+			`${SELECT_TASK}
+			 WHERE t.key LIKE :prefix ESCAPE '\\' OR t.title LIKE :contains ESCAPE '\\'
+			 ORDER BY CASE WHEN t.key LIKE :prefix ESCAPE '\\' THEN 0 ELSE 1 END, t.updated_at DESC, t.key
 			 LIMIT :limit`,
 			{ prefix: `${text}%`, contains: `%${text}%`, limit }
 		).map(toTask);

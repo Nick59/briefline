@@ -1,5 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { operations } from '#lib/server/api/operations.ts';
+import { operationActions } from '#lib/server/http/operation-actions.ts';
 import { apiToken } from '#lib/server/runtime.ts';
 
 export const load: PageServerLoad = ({ url }) => ({
@@ -13,3 +14,5 @@ export const load: PageServerLoad = ({ url }) => ({
 		tag
 	}))
 });
+
+export const actions = operationActions;

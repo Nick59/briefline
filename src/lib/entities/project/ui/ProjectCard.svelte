@@ -1,14 +1,25 @@
 <script lang="ts">
+	import type { HTMLAttributes } from 'svelte/elements';
 	import type { ProjectSummary } from '#lib/shared/domain/types.ts';
 	import { pluralize } from '#lib/shared/lib/format.ts';
 	import { ProgressBar } from '#lib/shared/ui/progress/index.ts';
+	import { cn } from '#lib/shared/lib/utils.ts';
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 
-	let { project, href }: { project: ProjectSummary; href: string } = $props();
+	interface Props extends HTMLAttributes<HTMLElement> {
+		project: ProjectSummary;
+		href: string;
+	}
+
+	let { project, href, class: className, ...rest }: Props = $props();
 </script>
 
 <article
-	class="group relative flex flex-col gap-4 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/20"
+	class={cn(
+		'group relative flex flex-col gap-4 rounded-xl border bg-card p-5 transition-colors hover:border-foreground/20',
+		className
+	)}
+	{...rest}
 >
 	<div class="flex items-start gap-3">
 		<span

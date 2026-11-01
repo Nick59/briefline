@@ -24,6 +24,10 @@ export type DomainEvent = Scope &
 				data: { key: string; title: string; fields?: string[] };
 		  }
 		| {
+				type: 'task.commented' | 'task.comment_updated' | 'task.comment_deleted';
+				data: { key: string; title: string; commentId: string; body: string };
+		  }
+		| {
 				type: 'task.stage_changed';
 				data: {
 					key: string;
@@ -36,8 +40,32 @@ export type DomainEvent = Scope &
 		  }
 		| {
 				type: 'spec.created' | 'spec.updated' | 'spec.deleted' | 'spec.translated';
-				/** key is the task key for a task spec, else the epic key. */
+				/** key is the task key for a task spec, the epic key for an epic spec, else the project key. */
 				data: { key?: string; title: string };
+		  }
+		| {
+				type:
+					| 'question.added'
+					| 'question.updated'
+					| 'question.answered'
+					| 'question.ignored'
+					| 'question.reopened'
+					| 'question.replied'
+					| 'question.deleted';
+				/**
+				 * key is the epic key; title is the first question; count is how many were added.
+				 * question and answer are the full texts, questionId and questionIds name the rows.
+				 */
+				data: {
+					key: string;
+					title: string;
+					count?: number;
+					questionId?: string;
+					questionIds?: string[];
+					question?: string;
+					answer?: string;
+					body?: string;
+				};
 		  }
 		| {
 				type: 'ticket.synced' | 'ticket.sync_failed';

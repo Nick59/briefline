@@ -1,5 +1,7 @@
 <script lang="ts">
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import type { SpecSummary } from '#lib/shared/domain/types.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import SpecKindBadge from './SpecKindBadge.svelte';
@@ -28,12 +30,15 @@
 		<SpecKindBadge kind={spec.kind} />
 		<span class="truncate font-medium">{spec.title}</span>
 	</span>
-	<span class="flex items-center gap-2 text-[11px] text-muted-foreground">
+	<span class="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
 		{#if owner}<span class="font-mono">{owner}</span>{/if}
 		{#if spec.hasBrief}
 			<span class="inline-flex items-center gap-1 text-brand"
 				><SparklesIcon class="size-3" />Brief ready</span
 			>
+		{/if}
+		{#if spec.viewedAt}
+			<ToneBadge tone="neutral"><EyeIcon class="size-3" />Viewed</ToneBadge>
 		{/if}
 	</span>
 </a>

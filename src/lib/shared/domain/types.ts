@@ -1,7 +1,10 @@
 import type {
+	CodingLevel,
 	Effort,
 	MappingKey,
 	Priority,
+	ProfileRole,
+	QuestionStatus,
 	SpecKind,
 	Stage,
 	SyncJobStatus,
@@ -73,6 +76,7 @@ export interface Project {
 	name: string;
 	description: string;
 	ticketing: ProjectTicketing;
+	position: number;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }
@@ -103,6 +107,20 @@ export interface Task {
 	stages: StageStatuses;
 	externalRef: ExternalRef | null;
 	position: number;
+	/** Number of comments on the task. */
+	commentCount: number;
+	createdAt: ISODate;
+	updatedAt: ISODate;
+}
+
+export interface TaskComment {
+	id: string;
+	taskId: string;
+	author: string;
+	/** Fixed when written, so a profile rename keeps a person's comments theirs. */
+	authorKind: 'human' | 'agent';
+	/** Markdown. */
+	body: string;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }
@@ -123,15 +141,49 @@ export interface HumanBrief {
 
 export interface Spec {
 	id: string;
-	epicId: string;
+	/** Null for a project spec. */
+	epicId: string | null;
+	/** Set only for a project spec. */
+	projectId: string | null;
 	taskId: string | null;
 	title: string;
 	kind: SpecKind;
 	content: string;
 	brief: HumanBrief | null;
 	position: number;
+	/** Set when a person has opened the spec in the dashboard; cleared when its content changes. */
+	viewedAt: ISODate | null;
 	createdAt: ISODate;
 	updatedAt: ISODate;
+}
+
+export interface QuestionMessage {
+	id: string;
+	questionId: string;
+	author: string;
+	/** Markdown. */
+	body: string;
+	createdAt: ISODate;
+}
+
+export interface EpicQuestion {
+	id: string;
+	epicId: string;
+	position: number;
+	/** Markdown. */
+	question: string;
+	/** Markdown. */
+	context: string | null;
+	/** Suggested answers. */
+	options: string[];
+	status: QuestionStatus;
+	answer: string | null;
+	askedBy: string;
+	answeredBy: string | null;
+	createdAt: ISODate;
+	answeredAt: ISODate | null;
+	/** Replies to the thread, oldest first. */
+	messages: QuestionMessage[];
 }
 
 export type SpecSummary = Omit<Spec, 'content' | 'brief'> & { hasBrief: boolean };
@@ -158,7 +210,39 @@ export interface Activity {
 	data: Record<string, unknown>;
 	/** The external ticket of the task, or of the epic for epic events, when one is linked. */
 	ticket?: ExternalRef;
+	/** Keys of what moved, for links; each is null once that entity is deleted, and the whole target is null when the project is gone. */
+	target: { projectKey: string; epicKey: string | null; taskKey: string | null } | null;
+	/** The agent session that made the change; null for the dashboard, the REST API and older entries. */
+	sessionId: string | null;
 	createdAt: ISODate;
+}
+
+export interface SessionRecap {
+	stageChanges: number;
+	/** Tasks whose last stage (deploy) was moved to done. */
+	tasksDone: number;
+	tasksCreated: number;
+	epicsCreated: number;
+	specsAdded: number;
+	specsUpdated: number;
+	threadsOpened: number;
+	replies: number;
+	answers: number;
+}
+
+export interface SessionSummary {
+	id: string;
+	actor: string;
+	clientName: string | null;
+	clientVersion: string | null;
+	/** Markdown recap written by the agent. */
+	summary: string | null;
+	startedAt: ISODate;
+	lastSeenAt: ISODate;
+	endedAt: ISODate | null;
+	activityCount: number;
+	projects: { id: string; key: string; name: string }[];
+	recap: SessionRecap;
 }
 
 export interface SyncJob {
@@ -197,6 +281,8 @@ export interface Progress {
 export interface EpicSummary extends Epic {
 	progress: Progress;
 	taskCount: number;
+	openQuestions: number;
+	questionCount: number;
 }
 
 export interface EpicDetail extends Epic {
@@ -204,6 +290,9 @@ export interface EpicDetail extends Epic {
 	progress: Progress;
 	tasks: Task[];
 	specs: SpecSummary[];
+	questions: EpicQuestion[];
+	openQuestions: number;
+	questionCount: number;
 }
 
 export interface ProjectSummary extends Project {
@@ -215,6 +304,7 @@ export interface TaskDetail extends Task {
 	epic: Pick<Epic, 'id' | 'key' | 'title' | 'projectId' | 'externalRef'>;
 	project: Pick<Project, 'id' | 'key' | 'name'>;
 	specs: SpecSummary[];
+	comments: TaskComment[];
 }
 
 export interface ProviderSetting {
@@ -250,4 +340,19 @@ export interface TicketProviderInfo {
 	supportsStates: boolean;
 	/** True when the provider can list its projects for the project target field. */
 	supportsProjects: boolean;
+}
+
+export interface UserProfile {
+	name: string;
+	role: ProfileRole;
+	roleOther: string | null;
+	codingLevel: CodingLevel;
+	language: string | null;
+	updatedAt: ISODate;
+}
+
+export interface UserProfileView {
+	profile: UserProfile | null;
+	/** How agents should write for this user; null until a profile is set. */
+	guidance: string | null;
 }

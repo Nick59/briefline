@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+	addEpicQuestionsSchema,
+	answerQuestionSchema,
 	createEpicSchema,
 	createProjectSchema,
 	createTicketingConnectionSchema,
@@ -7,19 +9,33 @@ import {
 	setSpecBriefSchema,
 	createTaskSchema,
 	listTasksQuerySchema,
+	moveProjectSchema,
 	moveTaskSchema,
+	questionStatusSchema,
+	replyToQuestionSchema,
+	updateQuestionSchema,
 	setProjectTicketingSchema,
 	setStageStatusSchema,
 	stageSchema,
+	taskCommentSchema,
 	updateEpicSchema,
 	updateProjectSchema,
 	updateSpecSchema,
 	updateTicketingConnectionSchema,
 	updateTaskSchema,
+	userProfileSchema,
 	workStatusSchema
 } from '#lib/shared/domain/schemas.ts';
+import { ACTIVITY_WHO } from '#lib/shared/domain/actors.ts';
 import { SYNC_JOB_STATUSES } from '#lib/shared/domain/constants.ts';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../modules/activity/repository.ts';
+import {
+	DEFAULT_PAGE_SIZE,
+	MAX_ACTIVITY_LIST_SIZE,
+	MAX_PAGE_SIZE
+} from '../modules/activity/repository.ts';
+import { summarySchema } from '../modules/sessions/service.ts';
+import { DEFAULT_CHANGES_LIMIT, MAX_CHANGES_LIMIT } from '../modules/activity/service.ts';
+import { ANONYMOUS_ACTORS } from './execute.ts';
 import type { Page } from '#lib/shared/domain/types.ts';
 import { defineOperation, type Operation } from './operation.ts';
 
@@ -27,6 +43,8 @@ const ref = (what: string) => z.string().min(1).describe(`${what} id or key`);
 const project = ref('Project (e.g. PMA)');
 const epic = ref('Epic (e.g. PMA-E1)');
 const task = ref('Task (e.g. PMA-12)');
+const question = z.string().min(1).describe('Question id');
+const comment = z.string().min(1).describe('Comment id');
 const spec = z.string().min(1).describe('Spec id');
 const limit = z.coerce.number().int().min(1).max(500).optional();
 const pageLimit = z.coerce
@@ -40,8 +58,17 @@ const offset = z.coerce.number().int().min(0).optional().describe('Entries to sk
 const ACTIVITY_PAGING =
 	'Paginated, newest first. Returns at most `limit` entries (default 10, max 100); use `offset`/`nextOffset` and `hasMore` to fetch older entries.';
 
-const pagedResult = <T>(page: Page<T>, paging: { limit?: number; offset?: number }) => {
-	const limit = Math.min(paging.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+const ACTIVITY_LIST_DEFAULT = 50;
+const ACTIVITY_LIST_MAX = MAX_ACTIVITY_LIST_SIZE;
+
+const pagedResult = <T>(page: Page<T>, paging: { limit?: number; offset?: number }) =>
+	listedPage(page, {
+		...paging,
+		limit: Math.min(paging.limit ?? DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+	});
+
+const listedPage = <T>(page: Page<T>, paging: { limit: number; offset?: number }) => {
+	const limit = paging.limit;
 	const offset = paging.offset ?? 0;
 	const end = offset + page.items.length;
 	const hasMore = end < page.total;
@@ -98,9 +125,13 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/projects/{project}',
 		tag: 'Projects',
-		summary: 'Get a project and its epics',
+		summary: 'Get a project with its epics and specs',
 		input: z.object({ project }),
-		run: (app, { project }) => ({ ...app.projects.get(project), epics: app.epics.list(project) })
+		run: (app, { project }) => ({
+			...app.projects.get(project),
+			epics: app.epics.list(project),
+			specs: app.specs.listForProject(project)
+		})
 	}),
 	defineOperation({
 		name: 'update_project',
@@ -111,6 +142,17 @@ export const operations: Operation[] = [
 		input: updateProjectSchema.extend({ project }),
 		run: (app, input, { actor }) =>
 			app.projects.update(input.project, pick(input, 'project'), actor)
+	}),
+	defineOperation({
+		name: 'move_project',
+		method: 'POST',
+		path: '/projects/{project}/move',
+		tag: 'Projects',
+		summary: 'Reorder projects: place a project before another one, or last',
+		description:
+			'Send beforeProject (id or key) to place the project just before it; omit it or send null for last. Returns the moved project.',
+		input: moveProjectSchema.extend({ project }),
+		run: (app, { project, ...input }) => app.projects.move(project, input)
 	}),
 	defineOperation({
 		name: 'delete_project',
@@ -125,6 +167,29 @@ export const operations: Operation[] = [
 		}
 	}),
 	defineOperation({
+		name: 'list_activity',
+		method: 'GET',
+		path: '/activity',
+		tag: 'Activity',
+		summary: 'Activity across all projects',
+		description: `${ACTIVITY_PAGING.replace('default 10, max 100', `default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX}`)} Filter by \`project\`, by exact \`actor\`, or by \`who\` (people are the dashboard and the profile name; agents are everyone else).`,
+		input: z.object({
+			project: project.optional(),
+			actor: z.string().min(1).optional().describe('Only entries by this actor'),
+			who: z.enum(ACTIVITY_WHO).default('all').describe('all, people or agents'),
+			limit: z.coerce
+				.number()
+				.int()
+				.min(1)
+				.max(ACTIVITY_LIST_MAX)
+				.optional()
+				.describe(`Entries per page (default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX})`),
+			offset
+		}),
+		run: (app, { limit = ACTIVITY_LIST_DEFAULT, offset = 0, ...filter }) =>
+			listedPage(app.activity.list({ ...filter, limit, offset }), { limit, offset })
+	}),
+	defineOperation({
 		name: 'get_project_activity',
 		method: 'GET',
 		path: '/projects/{project}/activity',
@@ -134,6 +199,129 @@ export const operations: Operation[] = [
 		input: z.object({ project, limit: pageLimit, offset }),
 		run: (app, { project, limit, offset }) =>
 			pagedResult(app.activity.forProject(project, { limit, offset }), { limit, offset })
+	}),
+	defineOperation({
+		name: 'list_agents',
+		method: 'GET',
+		path: '/agents',
+		tag: 'Activity',
+		summary: 'Agents that have used the API or MCP, with when they were last seen',
+		description:
+			'Any request with an X-Actor header counts as seen. `status` is online (seen in the last 5 minutes), away (5 to 20 minutes) or offline.',
+		input: z.object({}),
+		run: (app) => app.presence.withStatus()
+	}),
+	defineOperation({
+		name: 'get_activity_changes',
+		method: 'GET',
+		path: '/activity/changes',
+		tag: 'Activity',
+		summary: 'Activity that changed since your last pull',
+		description:
+			'Entries after a cursor, oldest first, across all projects or filtered by project or epic. `gap` is true when your cursor points before the oldest entry that still exists (for example after the database was reset), so you may have missed some. Without `since`, the cursor stored for your X-Actor (and this project/epic filter) is used, then updated to the returned `cursor`; with no stored cursor you get the latest `limit` entries. Without X-Actor and `since` you get the latest entries and nothing is stored. Pass the returned `cursor` as `since` to continue, and repeat while `hasMore` is true. Your own entries are left out unless excludeOwn is false.',
+		input: z.object({
+			since: z.string().min(1).optional().describe('Cursor from a previous call'),
+			project: project.optional(),
+			epic: epic.optional(),
+			excludeOwn: z
+				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
+				.default(true)
+				.describe('Leave out entries made by you (default true)'),
+			limit: z.coerce
+				.number()
+				.int()
+				.min(1)
+				.max(MAX_CHANGES_LIMIT)
+				.default(DEFAULT_CHANGES_LIMIT)
+				.describe(`Entries to return (default ${DEFAULT_CHANGES_LIMIT}, max ${MAX_CHANGES_LIMIT})`)
+		}),
+		run: (app, input, { actor }) =>
+			app.activity.changes(input, ANONYMOUS_ACTORS.has(actor) ? null : actor)
+	}),
+
+	// Sessions
+	defineOperation({
+		name: 'list_sessions',
+		method: 'GET',
+		path: '/sessions',
+		tag: 'Sessions',
+		summary: 'Agent sessions, newest first, with a recap of what each one did',
+		description: `${ACTIVITY_PAGING.replaceAll('entries', 'sessions')} A session is one MCP connection of an agent (from initialize to its last request). Each has the projects it touched, counts of what it changed (\`recap\`) and the summary the agent wrote. Sessions that recorded no activity are left out unless \`includeEmpty\` is true.`,
+		input: z.object({
+			actor: z.string().min(1).optional().describe('Only sessions of this actor'),
+			includeEmpty: z
+				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
+				.default(false)
+				.describe('Also list sessions without any activity (default false)'),
+			limit: pageLimit,
+			offset
+		}),
+		run: (app, { limit, offset, ...filter }) =>
+			pagedResult(app.sessions.list({ ...filter, limit, offset }), { limit, offset })
+	}),
+	defineOperation({
+		name: 'get_last_session',
+		method: 'GET',
+		path: '/sessions/last',
+		tag: 'Sessions',
+		summary: 'The previous agent session, for context on work already done',
+		description:
+			'Read the previous agent session: its summary, what it changed (recap counts) and its latest activity. Call at the start of a session for context on work already done; pass `project` to scope it. Your own current session is skipped, as are sessions without activity. Returns `{ session: null, message }` when there is none. Use `hasMore`/`nextOffset` and get_session to read older activity.',
+		input: z.object({
+			project: ref('Only sessions that touched this project').optional(),
+			actor: z.string().min(1).optional().describe('Only sessions of this actor (default: any)'),
+			activityLimit: z.coerce
+				.number()
+				.int()
+				.min(1)
+				.max(100)
+				.optional()
+				.describe('Activity entries to include, newest first (default 20, max 100)')
+		}),
+		run: (app, { project, actor, activityLimit }) => {
+			const limit = activityLimit ?? 20;
+			const detail = app.sessions.last({ project, actor, limit });
+			if (!detail) return { session: null, message: 'No previous session' };
+			return {
+				session: detail.session,
+				activity: pagedResult(detail.activity, { limit, offset: 0 })
+			};
+		}
+	}),
+	defineOperation({
+		name: 'get_session',
+		method: 'GET',
+		path: '/sessions/{session}',
+		tag: 'Sessions',
+		summary: 'One agent session with its summary and the activity it produced',
+		description: `The session's activity is ${ACTIVITY_PAGING.charAt(0).toLowerCase()}${ACTIVITY_PAGING.slice(1)}`,
+		input: z.object({
+			session: z.string().min(1).describe('Session id'),
+			limit: pageLimit,
+			offset
+		}),
+		run: (app, { session, limit, offset }) => {
+			const detail = app.sessions.get(session, { limit, offset });
+			return {
+				session: detail.session,
+				activity: pagedResult(detail.activity, { limit, offset })
+			};
+		}
+	}),
+	defineOperation({
+		name: 'set_session_summary',
+		method: 'PUT',
+		path: '/sessions/summary',
+		tag: 'Sessions',
+		summary: 'Write the recap of a session',
+		description:
+			'Write a short plain-language recap of what this session did, adapted to the user profile (role and coding level). Call it when you finish a chunk of work; each call overwrites the previous summary. Markdown is allowed. Without `session` it applies to your current MCP session.',
+		input: z.object({
+			summary: summarySchema.describe('Markdown recap; an empty string clears it'),
+			session: z.string().min(1).optional().describe('Session id (default: your current session)')
+		}),
+		mcp: { required: ['summary'] },
+		run: (app, { summary, session }) => app.sessions.setSummary(session, summary)
 	}),
 
 	// Epics
@@ -170,7 +358,9 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/epics/{epic}',
 		tag: 'Epics',
-		summary: 'Get an epic with its tasks, specs and progress',
+		summary: 'Get an epic with its tasks, specs, questions and progress',
+		description:
+			'questions lists every question thread of the epic with its replies in messages; openQuestions counts the open ones. Tasks cannot be started while any is open.',
 		input: z.object({ epic }),
 		run: (app, { epic }) => app.epics.detail(epic)
 	}),
@@ -282,7 +472,170 @@ export const operations: Operation[] = [
 		}
 	}),
 
+	// Task comments
+	defineOperation({
+		name: 'list_task_comments',
+		method: 'GET',
+		path: '/tasks/{task}/comments',
+		tag: 'Comments',
+		summary: 'List the comments of a task, oldest first',
+		input: z.object({ task }),
+		run: (app, { task }) => app.comments.list(task)
+	}),
+	defineOperation({
+		name: 'add_task_comment',
+		method: 'POST',
+		path: '/tasks/{task}/comments',
+		tag: 'Comments',
+		summary: 'Comment on a task',
+		description:
+			'Adds a markdown comment to the task. Agents use it to record findings, decisions or blockers while they work; people comment too, so read and act on their comments (get_task).',
+		input: taskCommentSchema.extend({ task }),
+		successStatus: 201,
+		run: (app, input, { actor }) => app.comments.add(input.task, pick(input, 'task'), actor)
+	}),
+	defineOperation({
+		name: 'update_task_comment',
+		method: 'PATCH',
+		path: '/task-comments/{comment}',
+		tag: 'Comments',
+		summary: 'Edit a task comment',
+		description:
+			"Agents can only edit their own comments, never a person's (403 forbidden otherwise).",
+		input: taskCommentSchema.extend({ comment }),
+		run: (app, input, { actor }) =>
+			app.comments.update(input.comment, pick(input, 'comment'), actor)
+	}),
+	defineOperation({
+		name: 'delete_task_comment',
+		method: 'DELETE',
+		path: '/task-comments/{comment}',
+		tag: 'Comments',
+		summary: 'Delete a task comment',
+		description:
+			"Agents can only delete their own comments, never a person's (403 forbidden otherwise).",
+		input: z.object({ comment }),
+		run: (app, { comment }, { actor }) => {
+			app.comments.delete(comment, actor);
+			return { deleted: true };
+		}
+	}),
+
+	// Questions
+	defineOperation({
+		name: 'list_epic_questions',
+		method: 'GET',
+		path: '/epics/{epic}/questions',
+		tag: 'Questions',
+		summary: 'List the question threads of an epic with their answers and replies',
+		description:
+			'status is open (waiting for a person), answered (follow the answer) or ignored (use your judgement). Filter with status. Each question is a thread: messages holds the replies, oldest first. A person may have opened it, so read and act on those too.',
+		input: z.object({ epic, status: questionStatusSchema.optional() }),
+		run: (app, { epic, status }) => app.questions.list(epic, status)
+	}),
+	defineOperation({
+		name: 'add_epic_questions',
+		method: 'POST',
+		path: '/epics/{epic}/questions',
+		tag: 'Questions',
+		summary: 'Ask one or more questions on an epic',
+		description:
+			'Opens question threads. Ask anything unclear before starting the epic; people open threads here too. While a question is open, no task of the epic can be started (409 open_questions). A person answers or ignores them in the dashboard; add details later with reply_to_question.',
+		input: addEpicQuestionsSchema.extend({ epic }),
+		successStatus: 201,
+		run: (app, input, { actor }) => app.questions.add(input.epic, pick(input, 'epic'), actor)
+	}),
+	defineOperation({
+		name: 'reply_to_question',
+		method: 'POST',
+		path: '/questions/{question}/replies',
+		tag: 'Questions',
+		summary: 'Reply in a question thread',
+		description:
+			'Adds a markdown message to the thread. Agents use it to add details or findings; it does not answer, ignore or reopen the question. Allowed in any status.',
+		input: replyToQuestionSchema.extend({ question }),
+		successStatus: 201,
+		run: (app, input, { actor }) =>
+			app.questions.reply(input.question, pick(input, 'question'), actor)
+	}),
+	defineOperation({
+		name: 'answer_question',
+		method: 'POST',
+		path: '/questions/{question}/answer',
+		tag: 'Questions',
+		summary: 'Answer a question',
+		description:
+			'Resolves the thread with a final answer. Use reply_to_question to add details without resolving it.',
+		input: answerQuestionSchema.extend({ question }),
+		run: (app, input, { actor }) =>
+			app.questions.answer(input.question, pick(input, 'question'), actor)
+	}),
+	defineOperation({
+		name: 'ignore_question',
+		method: 'POST',
+		path: '/questions/{question}/ignore',
+		tag: 'Questions',
+		summary: 'Ignore a question: the agent uses its own judgement',
+		input: z.object({ question }),
+		run: (app, { question }, { actor }) => app.questions.ignore(question, actor)
+	}),
+	defineOperation({
+		name: 'reopen_question',
+		method: 'POST',
+		path: '/questions/{question}/reopen',
+		tag: 'Questions',
+		summary: 'Reopen an answered or ignored question and clear its answer',
+		input: z.object({ question }),
+		run: (app, { question }, { actor }) => app.questions.reopen(question, actor)
+	}),
+	defineOperation({
+		name: 'update_question',
+		method: 'PATCH',
+		path: '/questions/{question}',
+		tag: 'Questions',
+		summary: 'Edit the text, context or suggested answers of a question',
+		input: updateQuestionSchema.extend({ question }),
+		run: (app, input, { actor }) =>
+			app.questions.update(input.question, pick(input, 'question'), actor)
+	}),
+	defineOperation({
+		name: 'delete_question',
+		method: 'DELETE',
+		path: '/questions/{question}',
+		tag: 'Questions',
+		summary: 'Delete a question',
+		input: z.object({ question }),
+		run: (app, { question }, { actor }) => {
+			app.questions.delete(question, actor);
+			return { deleted: true };
+		}
+	}),
+
 	// Specs
+	defineOperation({
+		name: 'list_project_specs',
+		method: 'GET',
+		path: '/projects/{project}/specs',
+		tag: 'Specs',
+		summary: 'List the specs of a project (without content)',
+		description:
+			'Project specs hold context that applies to every epic: architecture, conventions, product goals.',
+		input: z.object({ project }),
+		run: (app, { project }) => app.specs.listForProject(project)
+	}),
+	defineOperation({
+		name: 'add_project_spec',
+		method: 'POST',
+		path: '/projects/{project}/specs',
+		tag: 'Specs',
+		summary: 'Attach a markdown spec to a project',
+		description: BRIEF_GUIDANCE,
+		input: createSpecSchema.extend({ project }),
+		mcp: { required: ['brief'], check: briefCheck },
+		successStatus: 201,
+		run: (app, input, { actor }) =>
+			app.specs.createForProject(input.project, pick(input, 'project'), actor)
+	}),
 	defineOperation({
 		name: 'list_epic_specs',
 		method: 'GET',
@@ -377,9 +730,33 @@ export const operations: Operation[] = [
 			'Uses Claude when ANTHROPIC_API_KEY is set, otherwise an offline rule-based translator.',
 		input: z.object({
 			spec,
-			engine: z.string().optional().describe('heuristic, or the Claude engine id')
+			engine: z.string().optional().describe('heuristic, or the engine id')
 		}),
 		run: (app, { spec, engine }, { actor }) => app.specs.translate(spec, actor, engine)
+	}),
+
+	// Profile
+	defineOperation({
+		name: 'get_user_profile',
+		method: 'GET',
+		path: '/profile',
+		tag: 'Profile',
+		summary: 'Who the user is and how to write for them',
+		description:
+			'Returns the profile (null until the user fills it in) and a short guidance string. Adapt your tone and every spec brief to the role and coding level.',
+		input: z.object({}),
+		run: (app) => app.profile.view()
+	}),
+	defineOperation({
+		name: 'update_user_profile',
+		method: 'PUT',
+		path: '/profile',
+		tag: 'Profile',
+		summary: 'Set the user profile',
+		description:
+			'There is one profile per Briefline install. The dashboard asks for it on first launch.',
+		input: userProfileSchema,
+		run: (app, input) => app.profile.update(input)
 	}),
 
 	// Ticketing

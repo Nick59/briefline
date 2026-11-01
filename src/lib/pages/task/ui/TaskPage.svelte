@@ -16,6 +16,7 @@
 	import { PriorityBadge } from '#lib/entities/task/index.ts';
 	import { ExternalTicketBadge } from '#lib/entities/epic/index.ts';
 	import { StageStatusControl } from '#lib/features/change-task-status/index.ts';
+	import { TaskComments } from '#lib/features/task-comments/index.ts';
 	import { TaskFormDialog } from '#lib/features/task-form/index.ts';
 	import { LinkTicketDialog } from '#lib/features/link-ticket/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
@@ -100,6 +101,7 @@
 
 	<div class="grid gap-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
 		<div class="min-w-0 space-y-10">
+			<TaskComments taskId={task.id} comments={task.comments} />
 			<SpecPanel specs={task.specs} selected={selectedSpec} owner={{ type: 'task', id: task.id }} />
 		</div>
 		<ActivityFeed
@@ -108,6 +110,7 @@
 			pageCount={activity.pageCount}
 			total={activity.total}
 			pageSize={activity.pageSize}
+			query={{ task: task.id }}
 		/>
 	</div>
 </div>

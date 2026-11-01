@@ -4,6 +4,7 @@ import {
 	type Stage,
 	type WorkStatus
 } from '#lib/shared/domain/constants.ts';
+import { questionPhrase } from '#lib/shared/lib/question-text.ts';
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
 
 const VERBS: Record<string, string> = {
@@ -15,10 +16,20 @@ const VERBS: Record<string, string> = {
 	'task.created': 'Created task',
 	'task.updated': 'Updated task',
 	'task.deleted': 'Deleted task',
+	'task.commented': 'Commented',
+	'task.comment_updated': 'Edited comment',
+	'task.comment_deleted': 'Deleted comment',
 	'spec.created': 'Wrote spec',
 	'spec.updated': 'Updated spec',
 	'spec.deleted': 'Removed spec',
 	'spec.translated': 'Wrote brief',
+	'question.added': 'Asked question',
+	'question.updated': 'Edited question',
+	'question.answered': 'Answered question',
+	'question.ignored': 'Ignored question',
+	'question.reopened': 'Reopened question',
+	'question.replied': 'Replied in thread',
+	'question.deleted': 'Removed question',
 	'ticket.synced': 'Updated ticket',
 	'ticket.sync_failed': 'Ticket update failed'
 };
@@ -29,7 +40,7 @@ function verb(event: LiveEvent): string {
 		const status = STATUS_LABELS[event.data.to as WorkStatus] ?? String(event.data.to);
 		return `${stage}: ${status}`;
 	}
-	return VERBS[event.type] ?? event.message;
+	return questionPhrase(event.type, event.data) ?? VERBS[event.type] ?? event.message;
 }
 
 /** A short status line: the ticket key and what happened, e.g. "SOFT1-693 · Dev: Done". */

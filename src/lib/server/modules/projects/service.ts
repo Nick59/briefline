@@ -1,14 +1,17 @@
 import { computeProgress } from '#lib/shared/domain/progress.ts';
 import {
 	createProjectSchema,
+	moveProjectSchema,
 	updateProjectSchema,
 	type CreateProjectInput,
+	type MoveProjectInput,
 	type UpdateProjectInput
 } from '#lib/shared/domain/schemas.ts';
 import type { Project, ProjectSummary } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { ConflictError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
+import { transaction } from '../../db/connection.ts';
 import { requireProject } from '../../core/lookup.ts';
 
 export class ProjectService {
@@ -46,6 +49,7 @@ export class ProjectService {
 				autoSync: true,
 				postComments: true
 			},
+			position: repos.projects.nextPosition(),
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -80,6 +84,24 @@ export class ProjectService {
 			data: { name: project.name }
 		});
 		return project;
+	}
+
+	/** Places a project before another one, or last. Reordering is cosmetic, so it is not logged. */
+	move(idOrKey: string, input: MoveProjectInput): Project {
+		const { beforeProject } = moveProjectSchema.parse(input);
+		const { db, repos } = this.deps;
+		const project = this.get(idOrKey);
+		const before = beforeProject ? this.get(beforeProject) : null;
+		if (before?.id === project.id) return project;
+		return transaction(db, () => {
+			const order = repos.projects.list().filter((p) => p.id !== project.id);
+			const index = before ? order.findIndex((p) => p.id === before.id) : order.length;
+			order.splice(index, 0, project);
+			order.forEach((p, position) => {
+				if (p.position !== position) repos.projects.setPosition(p.id, position);
+			});
+			return this.get(project.id);
+		});
 	}
 
 	delete(idOrKey: string) {

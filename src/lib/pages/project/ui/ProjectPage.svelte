@@ -7,6 +7,8 @@
 		Activity,
 		PageView,
 		EpicSummary,
+		Spec,
+		SpecSummary,
 		Project,
 		SyncJob,
 		Task
@@ -21,15 +23,18 @@
 	import { ActivityFeed } from '#lib/widgets/activity-feed/index.ts';
 	import { SyncLog } from '#lib/widgets/sync-log/index.ts';
 	import { ProjectTimeline } from '#lib/widgets/project-timeline/index.ts';
+	import { ProjectSpecsDialog } from '#lib/widgets/spec-panel/index.ts';
 
 	interface Props {
 		project: Project;
 		epics: (EpicSummary & { tasks: Task[] })[];
+		specs: SpecSummary[];
+		selectedSpec: Spec | null;
 		activity: PageView<Activity>;
 		syncJobs: SyncJob[];
 	}
 
-	let { project, epics, activity, syncJobs }: Props = $props();
+	let { project, epics, specs, selectedSpec, activity, syncJobs }: Props = $props();
 </script>
 
 {#snippet newEpic()}
@@ -46,7 +51,12 @@
 					>Tickets synced with {project.ticketing.provider}</ToneBadge
 				>{/if}
 		{/snippet}
-		{#snippet description()}{project.description}{/snippet}
+		{#snippet description()}
+			{project.description}
+			<div class="mt-3">
+				<ProjectSpecsDialog projectId={project.id} {specs} selected={selectedSpec} />
+			</div>
+		{/snippet}
 		{#snippet actions()}
 			<Button
 				href={resolve('/projects/[project]/settings', { project: project.key })}
@@ -77,6 +87,7 @@
 				pageCount={activity.pageCount}
 				total={activity.total}
 				pageSize={activity.pageSize}
+				query={{ project: project.id }}
 			/>
 			{#if project.ticketing.provider}<SyncLog jobs={syncJobs} />{/if}
 		</div>

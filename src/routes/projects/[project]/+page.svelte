@@ -9,6 +9,8 @@
 <ProjectPage
 	project={data.project}
 	epics={data.epics}
+	specs={data.specs}
+	selectedSpec={data.selectedSpec}
 	activity={data.activity}
 	syncJobs={data.syncJobs}
 />

@@ -86,7 +86,7 @@
 					/>
 				</Field>
 				<Field label="Assignee" for="task-assignee">
-					<Input id="task-assignee" bind:value={assignee} placeholder="claude-code" />
+					<Input id="task-assignee" bind:value={assignee} placeholder="agent name or person" />
 				</Field>
 			</div>
 			<Field label="Description (markdown)" for="task-description">

@@ -1,15 +1,13 @@
 <script lang="ts">
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
-	import { page } from '$app/state';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
 	import type { MarkdownExtension } from '#lib/shared/ui/markdown/index.ts';
 	import type { Spec, SpecSummary } from '#lib/shared/domain/types.ts';
-	import { SpecListItem } from '#lib/entities/spec/index.ts';
 	import { SpecEditorDialog } from '#lib/features/spec-editor/index.ts';
-	import SpecViewer from './SpecViewer.svelte';
+	import SpecBrowser from './SpecBrowser.svelte';
 
 	interface Props {
 		specs: SpecSummary[];
@@ -22,12 +20,6 @@
 	}
 
 	let { specs, selected, owner, ownerLabel = () => null, extensions = [] }: Props = $props();
-
-	function hrefFor(spec: SpecSummary) {
-		const url = new URL(page.url.href);
-		url.searchParams.set('spec', spec.id);
-		return `${url.pathname}${url.search}#specs`;
-	}
 </script>
 
 <Section title="Specs" count={specs.length}>
@@ -47,26 +39,15 @@
 			{#snippet icon()}<FileTextIcon />{/snippet}
 		</EmptyState>
 	{:else}
-		<div id="specs" class="grid gap-6 rounded-xl border bg-card p-4 md:grid-cols-[15rem_1fr]">
-			<nav class="flex flex-col gap-0.5 md:border-r md:pr-3" aria-label="Specs">
-				{#each specs as spec (spec.id)}
-					<SpecListItem
-						{spec}
-						href={hrefFor(spec)}
-						active={spec.id === selected?.id}
-						owner={ownerLabel(spec)}
-					/>
-				{/each}
-			</nav>
-			{#if selected}
-				{#key selected.id}
-					<SpecViewer
-						spec={selected}
-						owner={selected.taskId ? { type: 'task', id: selected.taskId } : owner}
-						{extensions}
-					/>
-				{/key}
-			{/if}
-		</div>
+		<SpecBrowser
+			id="specs"
+			class="rounded-xl border bg-card p-4"
+			hash="#specs"
+			{specs}
+			{selected}
+			{owner}
+			{ownerLabel}
+			{extensions}
+		/>
 	{/if}
 </Section>

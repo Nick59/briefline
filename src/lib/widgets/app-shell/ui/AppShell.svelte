@@ -2,7 +2,9 @@
 	import type { Snippet } from 'svelte';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import HistoryIcon from '@lucide/svelte/icons/history';
 	import CableIcon from '@lucide/svelte/icons/cable';
+	import UserIcon from '@lucide/svelte/icons/user-round';
 	import PlugIcon from '@lucide/svelte/icons/plug';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -20,10 +22,13 @@
 		projects: ProjectSummary[];
 		activeProjectKey: string | null;
 		activeEpics: EpicSummary[];
+		profileName: string | null;
+		onprofile: () => void;
 		children: Snippet;
 	}
 
-	let { projects, activeProjectKey, activeEpics, children }: Props = $props();
+	let { projects, activeProjectKey, activeEpics, profileName, onprofile, children }: Props =
+		$props();
 	let mobileOpen = $state(false);
 
 	const links = [
@@ -32,6 +37,12 @@
 			label: 'Overview',
 			icon: LayoutGridIcon,
 			match: (p: string) => p === '/'
+		},
+		{
+			href: resolve('/sessions'),
+			label: 'Sessions',
+			icon: HistoryIcon,
+			match: (p: string) => p.startsWith('/sessions')
 		},
 		{
 			href: resolve('/ticketing'),
@@ -77,11 +88,19 @@
 		<div class="min-h-0 flex-1 overflow-y-auto">
 			<ProjectNav {projects} {activeProjectKey} {activeEpics} {onnavigate} />
 		</div>
-		{#if activeProjectKey}
-			<LiveActivityPanel />
-		{/if}
-		<div class="flex items-center justify-between border-t pt-3">
-			<span class="px-2 text-[11px] text-muted-foreground">Theme</span>
+		<LiveActivityPanel {onnavigate} />
+		<div class="flex items-center justify-between gap-2 border-t pt-3">
+			<button
+				type="button"
+				onclick={() => {
+					onnavigate?.();
+					onprofile();
+				}}
+				class="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+			>
+				<UserIcon class="size-4 shrink-0" />
+				<span class="truncate">{profileName ?? 'Profile'}</span>
+			</button>
 			<ThemeToggle />
 		</div>
 	</div>

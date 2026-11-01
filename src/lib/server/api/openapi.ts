@@ -49,7 +49,7 @@ export function buildOpenApi(origin: string) {
 				in: 'header',
 				required: false,
 				schema: { type: 'string' },
-				description: 'Who is making the change, e.g. claude-code'
+				description: 'Who is making the change, e.g. claude-code, codex or cursor'
 			}
 		];
 

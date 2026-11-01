@@ -1,5 +1,14 @@
 import { z } from 'zod';
-import { EFFORTS, PRIORITIES, SPEC_KINDS, STAGES, WORK_STATUSES } from './constants.ts';
+import {
+	CODING_LEVELS,
+	EFFORTS,
+	PRIORITIES,
+	PROFILE_ROLES,
+	QUESTION_STATUSES,
+	SPEC_KINDS,
+	STAGES,
+	WORK_STATUSES
+} from './constants.ts';
 
 const text = (max: number) => z.string().trim().max(max);
 const isoDate = z.iso.date().describe('Date as YYYY-MM-DD');
@@ -188,6 +197,14 @@ export const moveTaskSchema = z.object({
 	note: text(2000).optional()
 });
 
+export const moveProjectSchema = z.object({
+	beforeProject: z
+		.string()
+		.nullable()
+		.optional()
+		.describe('Place the project just before this project (id or key); omit or null puts it last')
+});
+
 export const createSpecSchema = z.object({
 	...specFields,
 	kind: specFields.kind.default('spec'),
@@ -197,6 +214,45 @@ export const createSpecSchema = z.object({
 
 export const updateSpecSchema = z
 	.object({ ...specFields, position: z.number().int().min(0), brief: optionalBrief })
+	.partial();
+
+const questionFields = {
+	question: text(5000).min(1).describe('The question, markdown'),
+	context: text(10000).nullable().describe('Why you ask and what depends on it, markdown'),
+	options: z
+		.array(text(500).min(1))
+		.max(10)
+		.describe('Suggested answers a person can pick; optional')
+};
+
+export const addEpicQuestionsSchema = z.object({
+	questions: z
+		.array(
+			z.object({
+				...questionFields,
+				context: questionFields.context.optional(),
+				options: questionFields.options.optional()
+			})
+		)
+		.min(1)
+		.max(20)
+		.describe('One or more questions to ask in one call')
+});
+
+export const questionStatusSchema = z.enum(QUESTION_STATUSES);
+export const replyToQuestionSchema = z.object({
+	body: text(10000).min(1).describe('The reply, markdown')
+});
+export const taskCommentSchema = z.object({
+	body: text(10000).min(1).describe('The comment, markdown')
+});
+export const answerQuestionSchema = z.object({ answer: text(10000).min(1) });
+export const updateQuestionSchema = z
+	.object({
+		question: questionFields.question,
+		context: questionFields.context,
+		options: questionFields.options
+	})
 	.partial();
 
 export const setSpecBriefSchema = z.object({ brief: briefSchema });
@@ -239,11 +295,24 @@ export type UpdateEpicInput = z.input<typeof updateEpicSchema>;
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type SetStageStatusInput = z.input<typeof setStageStatusSchema>;
+export type MoveProjectInput = z.input<typeof moveProjectSchema>;
 export type MoveTaskInput = z.input<typeof moveTaskSchema>;
 export type BriefInput = z.infer<typeof briefSchema>;
 export type SetSpecBriefInput = z.input<typeof setSpecBriefSchema>;
+export type AddEpicQuestionsInput = z.input<typeof addEpicQuestionsSchema>;
+export type UpdateQuestionInput = z.input<typeof updateQuestionSchema>;
 export type CreateSpecInput = z.input<typeof createSpecSchema>;
 export type UpdateSpecInput = z.input<typeof updateSpecSchema>;
 export type CreateTicketingConnectionInput = z.input<typeof createTicketingConnectionSchema>;
 export type UpdateTicketingConnectionInput = z.input<typeof updateTicketingConnectionSchema>;
 export type SetProjectTicketingInput = z.input<typeof setProjectTicketingSchema>;
+
+export const userProfileSchema = z.object({
+	name: text(80).min(1).describe('How agents should address the user'),
+	role: z.enum(PROFILE_ROLES),
+	roleOther: text(80).optional().describe('Describes the role when role is "other"'),
+	codingLevel: z.enum(CODING_LEVELS).describe('How comfortable the user is reading code'),
+	language: text(60).optional().describe('Preferred language for briefs, e.g. English or French')
+});
+
+export type UserProfileInput = z.infer<typeof userProfileSchema>;

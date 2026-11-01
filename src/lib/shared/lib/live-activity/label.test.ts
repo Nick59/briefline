@@ -31,6 +31,32 @@ describe('liveLabel', () => {
 		expect(liveLabel(moved)).toBe('SOFT1-693 · Dev: Done');
 	});
 
+	it('names question edits', () => {
+		expect(liveLabel(live({ type: 'question.updated', key: 'SHOP-E1' }))).toBe(
+			'SHOP-E1 · Edited question'
+		);
+	});
+
+	it('names thread replies', () => {
+		expect(liveLabel(live({ type: 'question.replied', key: 'SHOP-E1' }))).toBe(
+			'SHOP-E1 · Replied in thread'
+		);
+	});
+
+	it('names task comments', () => {
+		expect(liveLabel(live({ type: 'task.commented', key: 'SHOP-12' }))).toBe('SHOP-12 · Commented');
+	});
+
+	it('shows the question in the label', () => {
+		const data = { question: 'Which database should we use?', answer: 'Postgres' };
+		expect(liveLabel(live({ type: 'question.added', key: 'SHOP-E1', data }))).toBe(
+			'SHOP-E1 · Asked \u201cWhich database should we use?\u201d'
+		);
+		expect(liveLabel(live({ type: 'question.answered', key: 'SHOP-E1', data }))).toBe(
+			'SHOP-E1 · Answered \u201cWhich database should we use?\u201d: Postgres'
+		);
+	});
+
 	it('names ticket updates', () => {
 		expect(liveLabel(live({ type: 'ticket.synced', key: 'SOFT1-693' }))).toBe(
 			'SOFT1-693 · Updated ticket'

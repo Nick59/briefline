@@ -19,3 +19,17 @@ export function loadPage<T>(
 	}
 	return { ...result, page, pageCount, pageSize: size };
 }
+
+/** The first page of a list. Later pages are fetched by the component. */
+export function firstPage<T>(
+	fetchPage: (paging: { limit: number; offset: number }) => Page<T>,
+	size = ACTIVITY_PAGE_SIZE
+): PageView<T> {
+	const result = fetchPage({ limit: size, offset: 0 });
+	return {
+		...result,
+		page: 1,
+		pageCount: Math.max(1, Math.ceil(result.total / size)),
+		pageSize: size
+	};
+}

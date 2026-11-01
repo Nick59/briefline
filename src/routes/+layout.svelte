@@ -1,12 +1,13 @@
 <script lang="ts">
 	import './layout.css';
-	import { untrack } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { ModeWatcher } from 'mode-watcher';
 	import { page } from '$app/state';
 	import favicon from '#lib/assets/favicon.svg';
 	import { Toaster } from '#lib/shared/ui/primitives/sonner/index.js';
 	import { TooltipProvider } from '#lib/shared/ui/primitives/tooltip/index.js';
 	import { QuickJump } from '#lib/features/quick-jump/index.ts';
+	import { ProfileDialog } from '#lib/features/user-profile/index.ts';
 	import { AppShell } from '#lib/widgets/app-shell/index.ts';
 	import { LiveActivity, provideLiveActivity } from '#lib/shared/lib/live-activity/index.ts';
 	import type { LayoutProps } from './$types';
@@ -15,11 +16,40 @@
 
 	const live = new LiveActivity();
 	provideLiveActivity(live);
+	// Set during setup so the first paint, including the server render, shows the right agents.
+	untrack(() => live.setPresence(data.presence));
+	$effect.pre(() => live.setPresence(data.presence));
 
 	const projectKey = $derived(data.activeProjectKey);
+	const streaming = $derived(page.url.pathname !== '/login');
+
+	const LATER_KEY = 'briefline.profile-later';
+	let later = $state(false);
+	let editing = $state(false);
+
+	onMount(() => {
+		live.startPresenceClock();
+		try {
+			later = sessionStorage.getItem(LATER_KEY) === '1';
+		} catch {
+			// Storage can be blocked; the welcome modal then returns on every load.
+		}
+		return () => live.stopPresenceClock();
+	});
+
+	function postpone() {
+		later = true;
+		try {
+			sessionStorage.setItem(LATER_KEY, '1');
+		} catch {
+			// Hidden for this page view only.
+		}
+	}
+
+	const firstLaunch = $derived(data.profile === null);
 
 	$effect(() => {
-		if (!projectKey) return;
+		if (!streaming) return;
 		untrack(() => live.connect(projectKey));
 		return () => live.disconnect();
 	});
@@ -45,9 +75,20 @@
 			projects={data.projects}
 			activeProjectKey={data.activeProjectKey}
 			activeEpics={data.activeEpics}
+			profileName={data.profile?.name ?? null}
+			onprofile={() => (editing = true)}
 		>
 			{@render children()}
 		</AppShell>
 		<QuickJump />
+		<ProfileDialog
+			open={editing || (firstLaunch && !later)}
+			profile={data.profile}
+			onlater={() => {
+				postpone();
+				editing = false;
+			}}
+			onclose={() => (editing = false)}
+		/>
 	{/if}
 </TooltipProvider>

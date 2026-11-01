@@ -13,18 +13,31 @@
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
 	import { StageBadge, StatusBadge } from '#lib/entities/work-status/index.ts';
-	import { ExternalTicketBadge, StageProgressList } from '#lib/entities/epic/index.ts';
+	import {
+		ExternalTicketBadge,
+		ReadinessBadge,
+		StageProgressList
+	} from '#lib/entities/epic/index.ts';
 	import { EpicFormDialog } from '#lib/features/epic-form/index.ts';
 	import { TaskFormDialog } from '#lib/features/task-form/index.ts';
 	import { LinkTicketDialog } from '#lib/features/link-ticket/index.ts';
 	import { SyncNowButton } from '#lib/features/sync-ticket/index.ts';
+	import { NewThreadDialog, ThreadsDialog } from '#lib/features/epic-threads/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
 
 	let {
 		epic,
 		project,
-		ticketUrl
-	}: { epic: EpicDetail; project: Project; ticketUrl: string | null } = $props();
+		ticketUrl,
+		questionsOpen = $bindable(false),
+		focusQuestion = $bindable(null)
+	}: {
+		epic: EpicDetail;
+		project: Project;
+		ticketUrl: string | null;
+		questionsOpen?: boolean;
+		focusQuestion?: string | null;
+	} = $props();
 	const remaining = $derived(epic.targetDate ? daysUntil(epic.targetDate) : null);
 </script>
 
@@ -39,12 +52,25 @@
 				/>{/if}
 			{#if epic.externalRef}<ExternalTicketBadge ref={epic.externalRef} url={ticketUrl} />{/if}
 		{/snippet}
+		{#snippet titleAddon()}
+			<ReadinessBadge
+				openQuestions={epic.openQuestions}
+				questionCount={epic.questionCount}
+				onclick={() => (questionsOpen = true)}
+			/>
+		{/snippet}
 		{#snippet actions()}
 			<TaskFormDialog epicId={epic.id}>
 				{#snippet trigger({ props })}
 					<Button {...props} size="sm"><PlusIcon />New task</Button>
 				{/snippet}
 			</TaskFormDialog>
+			<ThreadsDialog
+				threads={epic.questions}
+				bind:open={questionsOpen}
+				bind:focus={focusQuestion}
+			/>
+			<NewThreadDialog epicId={epic.id} />
 			<LinkTicketDialog
 				target={{ type: 'epic', id: epic.id }}
 				current={epic.externalRef}

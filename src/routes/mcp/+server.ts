@@ -1,10 +1,13 @@
 import type { RequestHandler } from './$types';
 import { actorFrom } from '#lib/server/api/execute.ts';
 import { readJsonBody } from '#lib/server/http/responses.ts';
-import { handleMcp } from '#lib/server/mcp/handler.ts';
+import { handleMcpRequest, validSessionId } from '#lib/server/mcp/handler.ts';
 import { app } from '#lib/server/runtime.ts';
 
-// Stateless Streamable HTTP transport: every POST carries one JSON-RPC message or a batch, answered as JSON.
+const SESSION_HEADER = 'mcp-session-id';
+
+// Streamable HTTP transport without a server-initiated stream: every POST carries one JSON-RPC message
+// or a batch, answered as JSON. `initialize` opens a session, returned in the Mcp-Session-Id header.
 export const POST: RequestHandler = async ({ request }) => {
 	let payload: unknown;
 	try {
@@ -15,12 +18,23 @@ export const POST: RequestHandler = async ({ request }) => {
 			{ status: 400 }
 		);
 	}
-	const response = await handleMcp(app(), payload, actorFrom(request.headers, 'mcp'));
-	return response === null ? new Response(null, { status: 202 }) : Response.json(response);
+	const { body, newSessionId } = await handleMcpRequest(
+		app(),
+		payload,
+		actorFrom(request.headers, 'mcp'),
+		request.headers.get(SESSION_HEADER)
+	);
+	const headers = newSessionId ? { 'Mcp-Session-Id': newSessionId } : undefined;
+	return body === null
+		? new Response(null, { status: 202, headers })
+		: Response.json(body, { headers });
 };
 
-// No server-initiated stream and no sessions in stateless mode.
 export const GET: RequestHandler = () =>
-	new Response(null, { status: 405, headers: { allow: 'POST' } });
-export const DELETE: RequestHandler = () =>
-	new Response(null, { status: 405, headers: { allow: 'POST' } });
+	new Response(null, { status: 405, headers: { allow: 'POST, DELETE' } });
+
+export const DELETE: RequestHandler = ({ request }) => {
+	const id = validSessionId(request.headers.get(SESSION_HEADER));
+	if (id) app().sessions.end(id);
+	return new Response(null, { status: 204 });
+};

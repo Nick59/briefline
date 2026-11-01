@@ -3,6 +3,8 @@ import { SvelteMap } from 'svelte/reactivity';
 import { invalidateAll } from '$app/navigation';
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
 import { isRecentlyChanged, liveStatus, type Connection, type LiveStatus } from './status.ts';
+import type { AgentPresence, PresenceSnapshot } from '#lib/shared/domain/presence.ts';
+import { PRESENCE_TICK_MS, presenceRows } from './presence.ts';
 import { isBriefOfPrevious } from './label.ts';
 import { notifyAgentEvent } from './toasts.ts';
 
@@ -15,20 +17,32 @@ export class LiveActivity {
 	recent = $state<LiveEvent[]>([]);
 	lastAgentAt = $state<number | null>(null);
 	now = $state(Date.now());
+	agents = $state<AgentPresence[]>([]);
+	/** Server time minus browser time, so the presence status does not depend on the browser clock. */
+	clockOffset = $state(0);
+	presenceNow = $state(Date.now());
+	presence = $derived(presenceRows(this.agents, this.presenceNow + this.clockOffset));
 	recentlyChanged = new SvelteMap<string, number>();
 	muted = $state(readMuted());
+	/** Pages that must not reload under the reader, such as a later page of a list, set this. */
+	holdRefresh = false;
+	#heldListeners = new Set<() => void>();
 
 	status = $derived<LiveStatus>(liveStatus(this.connected, this.lastAgentAt, this.now));
 
 	#source: EventSource | null = null;
 	#tick: ReturnType<typeof setInterval> | null = null;
 	#refresh: ReturnType<typeof setTimeout> | null = null;
+	#presenceTick: ReturnType<typeof setInterval> | null = null;
 	#hadOpen = false;
 
-	connect(projectKey: string) {
+	/** Streams one project's events, or every project's when `projectKey` is null. */
+	connect(projectKey: string | null) {
 		this.disconnect();
 		this.connected = 'connecting';
-		const source = new EventSource(`/projects/${encodeURIComponent(projectKey)}/events`);
+		const source = new EventSource(
+			projectKey ? `/projects/${encodeURIComponent(projectKey)}/events` : '/activity/events'
+		);
 		this.#source = source;
 		this.#hadOpen = false;
 		source.onopen = () => {
@@ -41,6 +55,13 @@ export class LiveActivity {
 		source.onerror = () => {
 			this.connected = source.readyState === EventSource.CLOSED ? 'closed' : 'connecting';
 		};
+		source.addEventListener('presence', (message) => {
+			try {
+				this.setPresence(JSON.parse((message as MessageEvent<string>).data) as PresenceSnapshot);
+			} catch (error) {
+				console.error('[live] unreadable presence', error);
+			}
+		});
 		source.onmessage = (message) => {
 			try {
 				this.#handle(JSON.parse(message.data) as LiveEvent);
@@ -48,6 +69,24 @@ export class LiveActivity {
 				console.error('[live] unreadable event', error);
 			}
 		};
+	}
+
+	setPresence(snapshot: PresenceSnapshot | null) {
+		if (!snapshot) return;
+		this.agents = snapshot.agents;
+		this.clockOffset = Date.parse(snapshot.serverTime) - Date.now();
+		this.presenceNow = Date.now();
+	}
+
+	/** Re-evaluates the presence status every 30 seconds, so agents age without new events. */
+	startPresenceClock() {
+		if (this.#presenceTick) return;
+		this.#presenceTick = setInterval(() => (this.presenceNow = Date.now()), PRESENCE_TICK_MS);
+	}
+
+	stopPresenceClock() {
+		if (this.#presenceTick) clearInterval(this.#presenceTick);
+		this.#presenceTick = null;
 	}
 
 	disconnect() {
@@ -95,9 +134,18 @@ export class LiveActivity {
 		}, 1000);
 	}
 
+	/** While a refresh is held, the listener runs instead, so a held list can update itself. */
+	onHeldRefresh(listener: () => void) {
+		this.#heldListeners.add(listener);
+		return () => this.#heldListeners.delete(listener);
+	}
+
 	#scheduleRefresh() {
 		if (this.#refresh) clearTimeout(this.#refresh);
-		this.#refresh = setTimeout(() => void invalidateAll(), REFRESH_DEBOUNCE_MS);
+		this.#refresh = setTimeout(() => {
+			if (!this.holdRefresh) void invalidateAll();
+			else for (const listener of this.#heldListeners) listener();
+		}, REFRESH_DEBOUNCE_MS);
 	}
 }
 

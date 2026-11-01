@@ -56,4 +56,25 @@ describe('activity list', () => {
 		expect(deleted.ticket).toBeUndefined();
 		expect(deleted.message).toContain('SHOP-1');
 	});
+
+	it('resolves the keys of what moved, and drops the task key once it is deleted', () => {
+		const app = seeded();
+		const epicKey = app.tasks.get('SHOP-1').epicId && app.epics.get('SHOP-E1').key;
+		app.tasks.setStage('SHOP-1', { stage: 'dev', status: 'in_progress' }, 't');
+		expect(app.activity.forTask('SHOP-1').items[0].target).toEqual({
+			projectKey: 'SHOP',
+			epicKey,
+			taskKey: 'SHOP-1'
+		});
+
+		app.tasks.delete('SHOP-1', 't');
+		const targets = app.activity.forEpic(epicKey).items.map((i) => i.target);
+		expect(targets.length).toBeGreaterThan(0);
+		expect(targets.every((t) => t?.epicKey === epicKey && t.taskKey !== 'SHOP-1')).toBe(true);
+		expect(app.activity.forEpic(epicKey).items[0].target).toEqual({
+			projectKey: 'SHOP',
+			epicKey,
+			taskKey: null
+		});
+	});
 });

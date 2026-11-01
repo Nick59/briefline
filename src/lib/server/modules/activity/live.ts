@@ -5,14 +5,14 @@ import { describeEvent } from './describe.ts';
 
 const text = (value: unknown) => (typeof value === 'string' ? value : null);
 
-/** Returns the wire form of an event for the live view, or null when it belongs to another project. */
+/** Returns the wire form of an event for the live view, or null when it belongs to another project than `projectId` (null accepts every project). */
 export function toLiveEvent(
 	event: DomainEvent,
-	projectId: string,
+	projectId: string | null,
 	externalKeyOf: (event: DomainEvent) => string | null,
 	at: Date = new Date()
 ): LiveEvent | null {
-	if (event.projectId !== projectId) return null;
+	if (projectId !== null && event.projectId !== projectId) return null;
 	const data = event.data as Record<string, unknown>;
 	const internalKey = text(data.key);
 	const externalKey = event.type.startsWith('ticket.') ? null : externalKeyOf(event);

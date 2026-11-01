@@ -10,6 +10,7 @@ interface ProjectRow {
 	ticketing_provider: string | null;
 	ticketing_target: string;
 	status_mapping: string;
+	position: number;
 	ticketing_auto_sync: number;
 	ticketing_post_comments: number;
 	created_at: string;
@@ -29,6 +30,7 @@ const toProject = (row: ProjectRow): Project => ({
 		autoSync: row.ticketing_auto_sync !== 0,
 		postComments: row.ticketing_post_comments !== 0
 	},
+	position: row.position,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -40,7 +42,7 @@ export class ProjectRepository {
 	constructor(private readonly db: Db) {}
 
 	list(): Project[] {
-		return all<ProjectRow>(this.db, `${SELECT} ORDER BY p.name`).map(toProject);
+		return all<ProjectRow>(this.db, `${SELECT} ORDER BY p.position, p.created_at`).map(toProject);
 	}
 
 	find(idOrKey: string): Project | undefined {
@@ -54,14 +56,30 @@ export class ProjectRepository {
 		return one(this.db, 'SELECT 1 FROM projects WHERE key = :key', { key }) !== undefined;
 	}
 
+	nextPosition(): number {
+		return one<{ next: number }>(
+			this.db,
+			'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM projects'
+		)!.next;
+	}
+
+	setPosition(id: string, position: number) {
+		run(this.db, 'UPDATE projects SET position = :position WHERE id = :id', { id, position });
+	}
+
 	insert(project: Project) {
 		run(
 			this.db,
 			`INSERT INTO projects (id, key, name, description, ticketing_connection_id, ticketing_target, status_mapping,
-			 ticketing_auto_sync, ticketing_post_comments, created_at, updated_at)
+			 ticketing_auto_sync, ticketing_post_comments, position, created_at, updated_at)
 			 VALUES (:id, :key, :name, :description, :connectionId, :target, :statusMapping, :autoSync, :postComments,
-			 :createdAt, :updatedAt)`,
-			{ ...this.#params(project), key: project.key, createdAt: project.createdAt }
+			 :position, :createdAt, :updatedAt)`,
+			{
+				...this.#params(project),
+				key: project.key,
+				position: project.position,
+				createdAt: project.createdAt
+			}
 		);
 	}
 

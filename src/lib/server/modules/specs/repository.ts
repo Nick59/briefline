@@ -4,13 +4,15 @@ import { all, fromJson, one, run, toJson, type Db } from '../../db/connection.ts
 
 interface SpecRow {
 	id: string;
-	epic_id: string;
+	epic_id: string | null;
+	project_id: string | null;
 	task_id: string | null;
 	title: string;
 	kind: string;
 	content: string;
 	brief: string | null;
 	position: number;
+	viewed_at: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -18,12 +20,14 @@ interface SpecRow {
 const toSpec = (row: SpecRow): Spec => ({
 	id: row.id,
 	epicId: row.epic_id,
+	projectId: row.project_id,
 	taskId: row.task_id,
 	title: row.title,
 	kind: row.kind as SpecKind,
 	content: row.content,
 	brief: fromJson<HumanBrief | null>(row.brief, null),
 	position: row.position,
+	viewedAt: row.viewed_at,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -48,26 +52,47 @@ export class SpecRepository {
 		).map(toSpec);
 	}
 
+	listByProject(projectId: string): Spec[] {
+		return all<SpecRow>(
+			this.db,
+			'SELECT * FROM specs WHERE project_id = :projectId ORDER BY position, created_at',
+			{ projectId }
+		).map(toSpec);
+	}
+
 	find(id: string): Spec | undefined {
 		const row = one<SpecRow>(this.db, 'SELECT * FROM specs WHERE id = :id', { id });
 		return row && toSpec(row);
 	}
 
-	nextPosition(epicId: string, taskId: string | null): number {
-		const row = one<{ next: number }>(
-			this.db,
-			`SELECT COALESCE(MAX(position) + 1, 0) AS next FROM specs WHERE epic_id = :epicId AND task_id IS :taskId`,
-			{ epicId, taskId }
-		);
+	nextPosition(owner: { epicId: string; taskId: string | null } | { projectId: string }): number {
+		const row =
+			'projectId' in owner
+				? one<{ next: number }>(
+						this.db,
+						'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM specs WHERE project_id = :projectId',
+						owner
+					)
+				: one<{ next: number }>(
+						this.db,
+						'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM specs WHERE epic_id = :epicId AND task_id IS :taskId',
+						owner
+					);
 		return row?.next ?? 0;
 	}
 
 	insert(spec: Spec) {
 		run(
 			this.db,
-			`INSERT INTO specs (id, epic_id, task_id, title, kind, content, brief, position, created_at, updated_at)
-			 VALUES (:id, :epicId, :taskId, :title, :kind, :content, :brief, :position, :createdAt, :updatedAt)`,
-			{ ...this.#params(spec), epicId: spec.epicId, taskId: spec.taskId, createdAt: spec.createdAt }
+			`INSERT INTO specs (id, epic_id, project_id, task_id, title, kind, content, brief, position, viewed_at, created_at, updated_at)
+			 VALUES (:id, :epicId, :projectId, :taskId, :title, :kind, :content, :brief, :position, :viewedAt, :createdAt, :updatedAt)`,
+			{
+				...this.#params(spec),
+				epicId: spec.epicId,
+				projectId: spec.projectId,
+				taskId: spec.taskId,
+				createdAt: spec.createdAt
+			}
 		);
 	}
 
@@ -75,9 +100,13 @@ export class SpecRepository {
 		run(
 			this.db,
 			`UPDATE specs SET title = :title, kind = :kind, content = :content, brief = :brief, position = :position,
-			 updated_at = :updatedAt WHERE id = :id`,
+			 viewed_at = :viewedAt, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(spec)
 		);
+	}
+
+	markViewed(id: string, viewedAt: string) {
+		run(this.db, 'UPDATE specs SET viewed_at = :viewedAt WHERE id = :id', { id, viewedAt });
 	}
 
 	delete(id: string) {
@@ -92,6 +121,7 @@ export class SpecRepository {
 			content: spec.content,
 			brief: toJson(spec.brief),
 			position: spec.position,
+			viewedAt: spec.viewedAt,
 			updatedAt: spec.updatedAt
 		};
 	}

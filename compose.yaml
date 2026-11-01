@@ -1,0 +1,30 @@
+services:
+  briefline:
+    build: .
+    image: briefline:latest
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PM_DATABASE_PATH: /app/data/briefline.db
+      PM_PUBLIC_URL: ${BRIEFLINE_SCHEME:-http}://${BRIEFLINE_DOMAIN:-briefline.localhost}
+      # Traefik terminates the connection; trust its forwarded headers so form posts are not rejected as cross-site.
+      PROTOCOL_HEADER: x-forwarded-proto
+      HOST_HEADER: x-forwarded-host
+    volumes:
+      - briefline-data:/app/data
+    networks:
+      - traefik
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.briefline.rule: Host(`${BRIEFLINE_DOMAIN:-briefline.localhost}`)
+      traefik.http.routers.briefline.entrypoints: ${BRIEFLINE_ENTRYPOINT:-web}
+      traefik.http.services.briefline.loadbalancer.server.port: '3000'
+
+volumes:
+  briefline-data:
+
+networks:
+  traefik:
+    external: true
