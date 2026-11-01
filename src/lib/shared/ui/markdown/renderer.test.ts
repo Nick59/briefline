@@ -48,4 +48,14 @@ describe('markdown renderer', () => {
 		};
 		expect(render('hello', [shout])).toContain('HELLO');
 	});
+
+	it('renders uploaded images as a link to the full image and still drops data: and javascript: images', () => {
+		const html = render('![shot](/attachments/3f1c2a5e-1111-4222-8333-444455556666)');
+		expect(html).toContain(
+			'<a href="/attachments/3f1c2a5e-1111-4222-8333-444455556666" target="_blank" rel="noopener noreferrer"><img src="/attachments/3f1c2a5e-1111-4222-8333-444455556666" alt="shot"'
+		);
+		const unsafe = render('![a](data:image/png;base64,AAAA) ![b](javascript:alert(1))');
+		expect(unsafe).not.toContain('<img');
+		expect(unsafe).not.toContain('data:');
+	});
 });

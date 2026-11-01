@@ -61,3 +61,41 @@ describe('describeEvent for questions', () => {
 		);
 	});
 });
+
+describe('describeEvent for attachments', () => {
+	const attachment = (
+		type: 'attachment.added' | 'attachment.deleted',
+		target: 'task' | 'spec' | 'project'
+	) =>
+		({
+			type,
+			projectId: 'p',
+			epicId: null,
+			taskId: null,
+			actor: 'claude',
+			data: {
+				attachmentId: 'a',
+				filename: 'screenshot.png',
+				size: 1,
+				mime: 'image/png',
+				target: { type: target, id: 'x' },
+				key: 'SHOP-12',
+				title: 'Fix cart'
+			}
+		}) as DomainEvent;
+
+	it('names the task, spec or project', () => {
+		expect(describeEvent(attachment('attachment.added', 'task'))).toBe(
+			'Added image “screenshot.png” to SHOP-12 “Fix cart”'
+		);
+		expect(describeEvent(attachment('attachment.added', 'spec'))).toBe(
+			'Added image “screenshot.png” to spec “Fix cart”'
+		);
+		expect(describeEvent(attachment('attachment.added', 'project'))).toBe(
+			'Added image “screenshot.png” to project'
+		);
+		expect(describeEvent(attachment('attachment.deleted', 'task'))).toBe(
+			'Removed image “screenshot.png” from SHOP-12 “Fix cart”'
+		);
+	});
+});

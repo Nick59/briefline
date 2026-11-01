@@ -20,7 +20,7 @@ import type { TicketProviderInfo, TicketUpdate } from './provider.ts';
 import type { TicketProviderRegistry } from './registry.ts';
 import type { SyncJobFilter } from './repository.ts';
 
-const SYNC_TRIGGERS = new Set<DomainEvent['type']>([
+export const SYNC_TRIGGERS = new Set<DomainEvent['type']>([
 	'task.stage_changed',
 	'task.created',
 	'task.deleted',

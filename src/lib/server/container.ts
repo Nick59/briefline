@@ -4,6 +4,8 @@ import type { Repositories, ServiceDeps } from './core/deps.ts';
 import { EventBus } from './core/events.ts';
 import { ActivityRepository } from './modules/activity/repository.ts';
 import { ActivityService } from './modules/activity/service.ts';
+import { AttachmentRepository } from './modules/attachments/repository.ts';
+import { AttachmentService } from './modules/attachments/service.ts';
 import { ClaudeTranslator } from './modules/briefs/claude-translator.ts';
 import { BriefService } from './modules/briefs/service.ts';
 import { CommentRepository } from './modules/comments/repository.ts';
@@ -59,6 +61,7 @@ export function createContainer(
 		epics: new EpicRepository(db),
 		tasks: new TaskRepository(db),
 		comments: new CommentRepository(db),
+		attachments: new AttachmentRepository(db),
 		specs: new SpecRepository(db),
 		questions: new QuestionRepository(db),
 		activity: new ActivityRepository(db),
@@ -74,6 +77,11 @@ export function createContainer(
 			? new ClaudeTranslator(config.anthropicApiKey, config.anthropicModel)
 			: null
 	);
+	const attachments = new AttachmentService(deps, config.attachmentsDir);
+	// Rows cascade with their owner; the files are removed afterwards.
+	for (const type of ['task.deleted', 'spec.deleted', 'epic.deleted'] as const) {
+		deps.events.subscribe((event) => event.type === type && attachments.sweepOrphans());
+	}
 	const activity = new ActivityService(deps);
 	const tasks = new TaskService(deps);
 	const specs = new SpecService(deps, briefs);
@@ -92,7 +100,8 @@ export function createContainer(
 	return {
 		db,
 		events: deps.events,
-		projects: new ProjectService(deps),
+		attachments,
+		projects: new ProjectService(deps, () => attachments.sweepOrphans()),
 		epics: new EpicService(deps, tasks, specs),
 		tasks,
 		comments: new CommentService(deps),

@@ -1,6 +1,8 @@
 import { Marked } from 'marked';
 import { escapeHtml, safeUrl, type MarkdownExtension } from './extension.ts';
 
+const ATTACHMENT_URL = /^\/attachments\/[\w-]+$/;
+
 /**
  * Markdown from AI agents is untrusted. The base safety layer escapes every raw HTML
  * token and drops links and images with unsafe protocols (javascript:, data:, ...).
@@ -24,7 +26,11 @@ const safety: MarkdownExtension = {
 				const url = safeUrl(href);
 				if (!url) return escapeHtml(text);
 				const titleAttr = title ? ` title="${escapeHtml(title)}"` : '';
-				return `<img src="${escapeHtml(url)}" alt="${escapeHtml(text)}"${titleAttr} loading="lazy" />`;
+				const img = `<img src="${escapeHtml(url)}" alt="${escapeHtml(text)}"${titleAttr} loading="lazy" />`;
+				// Uploaded images open full size in a new tab.
+				return ATTACHMENT_URL.test(url)
+					? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${img}</a>`
+					: img;
 			}
 		}
 	}

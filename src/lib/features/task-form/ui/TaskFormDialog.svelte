@@ -1,4 +1,10 @@
 <script lang="ts">
+	import {
+		AddImageButton,
+		imageUpload,
+		type ImageTarget
+	} from '#lib/features/attachment-upload/index.ts';
+	import { page } from '$app/state';
 	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
@@ -27,6 +33,15 @@
 	let priority = $state<Priority>('medium');
 	let assignee = $state('');
 	let busy = $state(false);
+	let descriptionEl = $state<HTMLTextAreaElement | null>(null);
+	// A new task has no id yet, so its images go to the project.
+	const imageTarget = $derived<ImageTarget | null>(
+		task
+			? { type: 'task', id: task.id }
+			: page.params.project
+				? { type: 'project', id: page.params.project }
+				: null
+	);
 
 	$effect(() => {
 		if (open) {
@@ -92,10 +107,15 @@
 			<Field label="Description (markdown)" for="task-description">
 				<Textarea
 					id="task-description"
+					bind:ref={descriptionEl}
 					bind:value={description}
+					{@attach imageUpload(() => imageTarget)}
 					rows={10}
 					class="font-mono text-xs leading-relaxed"
 				/>
+				<div class="flex justify-end">
+					<AddImageButton textarea={descriptionEl} target={imageTarget} />
+				</div>
 			</Field>
 			<Dialog.Footer>
 				<Button type="button" variant="outline" onclick={() => (open = false)}>Cancel</Button>

@@ -211,6 +211,23 @@ export const MIGRATIONS: Migration[] = [
 	ALTER TABLE task_comments ADD COLUMN author_kind TEXT NOT NULL DEFAULT 'agent';
 	UPDATE task_comments SET author_kind = 'human'
 	WHERE author IN ('dashboard', 'seed') OR author = (SELECT name FROM user_profile WHERE id = 1);
+	`,
+	`
+	CREATE TABLE attachments (
+		id TEXT PRIMARY KEY,
+		project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
+		spec_id TEXT REFERENCES specs(id) ON DELETE CASCADE,
+		filename TEXT NOT NULL,
+		mime TEXT NOT NULL,
+		size INTEGER NOT NULL,
+		sha256 TEXT NOT NULL,
+		uploaded_by TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX attachments_project ON attachments(project_id);
+	CREATE INDEX attachments_task ON attachments(task_id);
+	CREATE INDEX attachments_spec ON attachments(spec_id);
 	`
 ];
 

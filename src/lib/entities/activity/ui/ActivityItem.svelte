@@ -104,6 +104,14 @@
 				{activity.message}
 			{/if}
 		</p>
+		{#if activity.action === 'attachment.added' && typeof activity.data.attachmentId === 'string'}
+			<img
+				src="/attachments/{activity.data.attachmentId}"
+				alt={typeof activity.data.filename === 'string' ? activity.data.filename : ''}
+				loading="lazy"
+				class="size-12 rounded-md border object-cover"
+			/>
+		{/if}
 		{#if failed && typeof activity.data.error === 'string'}
 			<p class="truncate font-mono text-[11px] text-muted-foreground" title={activity.data.error}>
 				{activity.data.error}

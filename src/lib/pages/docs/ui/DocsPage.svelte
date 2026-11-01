@@ -172,6 +172,7 @@ When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) na
 - Every spec includes a plain-language \`brief\` for non-engineers.
 - Move each task as you work with \`set_task_stage_status\`: dev, then test, then deploy; in_progress when you start, done when you finish.
 - Read a task's comments in \`get_task\` (people comment too, act on them) and record findings, decisions or blockers with \`add_task_comment\`.
+- Attach screenshots with \`upload_attachment\` and embed the returned \`markdown\` in specs, task descriptions and comments.
 - Before you end your work, call \`set_session_summary\` with a short recap of what the session did; it shows on the Sessions page.
 - Never create a Briefline project yourself; ask when the repository names none.`
 )}
@@ -202,6 +203,7 @@ curl -X PUT ${origin}/api/v1/tasks/SHOP-3/stages/dev \\
 - OpenAPI 3.1: [\`/api/v1/openapi.json\`](${origin}/api/v1/openapi.json)
 - Ids and keys are interchangeable: \`SHOP\`, \`SHOP-E1\` and \`SHOP-12\` work wherever an id is expected.
 - Send \`X-Actor\` so the activity log and ticket comments show who made the change.
+- Upload an image with \`upload_attachment\` (\`POST /api/v1/attachments\`, base64 \`data\`) and paste the returned \`markdown\` (\`![name](/attachments/<id>)\`) into a spec, task description or comment. PNG, JPEG, GIF or WebP, up to 10 MB.
 - Errors are JSON: \`{ "error": { "code", "message", "issues" } }\`.
 
 > [!TIP]

@@ -68,6 +68,19 @@ export type DomainEvent = Scope &
 				};
 		  }
 		| {
+				type: 'attachment.added' | 'attachment.deleted';
+				/** key is the task key, or the epic key for an epic spec; title is the task or spec title. */
+				data: {
+					attachmentId: string;
+					filename: string;
+					size: number;
+					mime: string;
+					target: { type: 'project' | 'task' | 'spec'; id: string };
+					key?: string;
+					title?: string;
+				};
+		  }
+		| {
 				type: 'ticket.synced' | 'ticket.sync_failed';
 				data: { provider: string; key: string; error?: string };
 		  }

@@ -15,6 +15,7 @@ FROM node:24-alpine
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
+    BODY_SIZE_LIMIT=15M \
     PM_DATABASE_PATH=/app/data/briefline.db
 COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/build ./build

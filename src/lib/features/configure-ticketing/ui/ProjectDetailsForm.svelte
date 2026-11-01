@@ -1,4 +1,9 @@
 <script lang="ts">
+	import {
+		AddImageButton,
+		imageUpload,
+		type ImageTarget
+	} from '#lib/features/attachment-upload/index.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
 	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
@@ -10,6 +15,8 @@
 	let name = $state('');
 	let description = $state('');
 	let busy = $state(false);
+	let descriptionEl = $state<HTMLTextAreaElement | null>(null);
+	const imageTarget = $derived<ImageTarget>({ type: 'project', id: project.id });
 
 	$effect.pre(() => {
 		name = project.name;
@@ -37,8 +44,17 @@
 			><Input id="project-key" value={project.key} disabled class="font-mono" /></Field
 		>
 	</div>
-	<Field label="Description" for="project-description"
-		><Textarea id="project-description" bind:value={description} rows={3} /></Field
-	>
+	<Field label="Description" for="project-description">
+		<Textarea
+			id="project-description"
+			bind:ref={descriptionEl}
+			bind:value={description}
+			{@attach imageUpload(() => imageTarget)}
+			rows={3}
+		/>
+		<div class="flex justify-end">
+			<AddImageButton textarea={descriptionEl} target={imageTarget} />
+		</div>
+	</Field>
 	<div><Button type="submit" disabled={busy || !name}>Save</Button></div>
 </form>

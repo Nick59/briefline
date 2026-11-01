@@ -54,7 +54,8 @@ export function recapChips(recap: SessionRecap): string[] {
 		[specs, 'spec'],
 		[recap.threadsOpened, 'thread opened', 'threads opened'],
 		[recap.replies, 'reply', 'replies'],
-		[recap.answers, 'answer']
+		[recap.answers, 'answer'],
+		[recap.images, 'image']
 	];
 	return chips
 		.filter(([count]) => count > 0)

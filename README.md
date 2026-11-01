@@ -184,6 +184,20 @@ curl -X PUT localhost:5173/api/v1/tasks/SHOP-7/stages/dev -H 'content-type: appl
 
 Task comments: `get_task` returns `comments` (markdown, oldest first) and task lists carry a `commentCount`. `add_task_comment` (`POST /api/v1/tasks/{task}/comments`) and `list_task_comments` work for anyone; `update_task_comment` and `delete_task_comment` (`/api/v1/task-comments/{comment}`) only for the comment's author (403 otherwise).
 
+### Image uploads
+
+Images (PNG, JPEG, GIF, WebP, up to 10 MB; the type is detected from the bytes, SVG is refused) can be embedded in the
+markdown of tasks, specs, comments, threads and project descriptions. In the dashboard, paste or drop an image into a
+markdown field, or press **Add image**; it is uploaded and `![name](/attachments/<id>)` is inserted at the cursor. While
+a task, spec or thread reply is still being created, the image is stored on its project. Agents call `upload_attachment`
+(`POST /api/v1/attachments`, `{ "target": { "type": "project|task|spec", "id" }, "filename", "data": "<base64>" }`) and
+paste the returned `markdown` into a spec, task description or comment. `list_attachments` (`GET /api/v1/attachments?type=&id=`)
+and `delete_attachment` (`DELETE /api/v1/attachments/{attachment}`) manage them. The dashboard form posts
+`multipart/form-data` (`file`, `targetType`, `targetId`) to `POST /attachments`. Images are served at
+`/attachments/<id>` behind the same sign-in as the dashboard, and deleted with their project, task or spec. Files live
+in an `attachments` folder next to the database (`BRIEFLINE_ATTACHMENTS_DIR` overrides it); the Docker image sets
+`BODY_SIZE_LIMIT=15M` so adapter-node accepts the base64 payload.
+
 Projects keep a user-defined order (drag them in the sidebar or on the projects page, or call `move_project` with `beforeProject`; omit it to move last).
 
 Conventions: ids and keys are interchangeable (`SHOP`, `SHOP-E1`, `SHOP-12`); `X-Actor` names who made a change in
@@ -337,15 +351,16 @@ Pass it with `<MarkdownViewer source={md} extensions={[jiraKeys]} />` (or `exten
 
 ## Configuration
 
-| Variable                    | Default                   | Purpose                                                                   |
-| --------------------------- | ------------------------- | ------------------------------------------------------------------------- |
-| `PM_DATABASE_PATH`          | `data/project-manager.db` | SQLite file                                                               |
-| `PM_API_TOKEN`              | —                         | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in     |
-| `PM_PUBLIC_URL`             | —                         | Dashboard URL used in ticket comments                                     |
-| `PM_SEED_DEMO`              | `true`                    | Create the demo project when the database is empty                        |
-| `BRIEFLINE_SECRET_KEY`      | —                         | Encrypts API keys saved on ticketing connections                          |
-| `BRIEFLINE_DEBUG_TICKETING` | —                         | Set to `1` to log every ticketing request (failed ones are always logged) |
-| `ANTHROPIC_API_KEY`         | —                         | Use Claude for human briefs                                               |
-| `PM_BRIEF_MODEL`            | `claude-opus-5-5`         | Claude model for briefs                                                   |
+| Variable                    | Default                         | Purpose                                                                   |
+| --------------------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| `PM_DATABASE_PATH`          | `data/project-manager.db`       | SQLite file                                                               |
+| `BRIEFLINE_ATTACHMENTS_DIR` | `<database folder>/attachments` | Where uploaded images are stored                                          |
+| `PM_API_TOKEN`              | —                               | Requires a bearer token on `/api` and `/mcp`, and a dashboard sign-in     |
+| `PM_PUBLIC_URL`             | —                               | Dashboard URL used in ticket comments                                     |
+| `PM_SEED_DEMO`              | `true`                          | Create the demo project when the database is empty                        |
+| `BRIEFLINE_SECRET_KEY`      | —                               | Encrypts API keys saved on ticketing connections                          |
+| `BRIEFLINE_DEBUG_TICKETING` | —                               | Set to `1` to log every ticketing request (failed ones are always logged) |
+| `ANTHROPIC_API_KEY`         | —                               | Use Claude for human briefs                                               |
+| `PM_BRIEF_MODEL`            | `claude-opus-5-5`               | Claude model for briefs                                                   |
 
 Requests with an `Origin` header from another site are refused on `/api` and `/mcp`.

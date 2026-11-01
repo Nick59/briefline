@@ -24,6 +24,7 @@ interface StatsRow {
 	threads_opened: number;
 	replies: number;
 	answers: number;
+	images: number;
 }
 
 interface ProjectRow {
@@ -61,7 +62,8 @@ const EMPTY_RECAP: SessionRecap = {
 	specsUpdated: 0,
 	threadsOpened: 0,
 	replies: 0,
-	answers: 0
+	answers: 0,
+	images: 0
 };
 
 export class SessionRepository {
@@ -183,7 +185,8 @@ export class SessionRepository {
 					SUM(CASE WHEN action = 'question.added'
 						THEN COALESCE(json_extract(data, '$.count'), 1) ELSE 0 END) AS threads_opened,
 					SUM(action = 'question.replied') AS replies,
-					SUM(action = 'question.answered') AS answers
+					SUM(action = 'question.answered') AS answers,
+					SUM(action = 'attachment.added') AS images
 				 FROM activity WHERE session_id IN (${marks.join(', ')}) GROUP BY session_id`,
 				params
 			).map((row) => [row.session_id, row])
@@ -223,7 +226,8 @@ export class SessionRepository {
 							specsUpdated: s.specs_updated,
 							threadsOpened: s.threads_opened,
 							replies: s.replies,
-							answers: s.answers
+							answers: s.answers,
+							images: s.images
 						}
 					: { ...EMPTY_RECAP }
 			};

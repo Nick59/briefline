@@ -4,9 +4,8 @@ import { DatabaseSync } from 'node:sqlite';
 import { execute } from '../../api/execute.ts';
 import { operations } from '../../api/operations.ts';
 import { createContainer } from '../../container.ts';
-import { readConfig } from '../../config.ts';
 import { migrate } from '../../db/connection.ts';
-import { connectProject, testApp } from '../../testing/app.ts';
+import { connectProject, testApp, testConfig } from '../../testing/app.ts';
 
 const PROJECT_UUID = '3f1c2a5e-1111-4222-8333-444455556666';
 const KEY = randomBytes(32).toString('base64');
@@ -257,7 +256,7 @@ describe('migration to ticketing connections', () => {
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
 		expect(byKey.THR.ticketing_post_comments).toBe(0);
 		expect(byKey.FOU.ticketing_connection_id).toBeNull();
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 
 	it('keeps migrated projects working: connection resolves and falls back to the environment', async () => {
@@ -265,7 +264,7 @@ describe('migration to ticketing connections', () => {
 		migrate(db);
 		const calls: string[] = [];
 		const app = createContainer(db, {
-			config: readConfig({}),
+			config: testConfig(),
 			env: { PLANE_API_KEY: 'env-key' },
 			fetch: (async (url: string) => {
 				calls.push(String(url));
@@ -445,7 +444,7 @@ describe('unreadable stored secrets', () => {
 			headers: [{ name: 'CF-Access-Client-Id', value: 'id' }]
 		});
 		const db = first.app.db;
-		const app = createContainer(db, { config: readConfig({}), env });
+		const app = createContainer(db, { config: testConfig(), env });
 		return { app, id: connection.id };
 	}
 	const otherKey = { BRIEFLINE_SECRET_KEY: randomBytes(32).toString('base64') };

@@ -246,6 +246,18 @@ export const replyToQuestionSchema = z.object({
 export const taskCommentSchema = z.object({
 	body: text(10000).min(1).describe('The comment, markdown')
 });
+export const attachmentTargetSchema = z
+	.object({
+		type: z.enum(['project', 'task', 'spec']).describe('What the image belongs to'),
+		id: z.string().min(1).describe('Project, task or spec id or key')
+	})
+	.describe('Where the image lives; it is deleted together with this project, task or spec');
+export const uploadAttachmentSchema = z.object({
+	target: attachmentTargetSchema,
+	filename: z.string().min(1).max(500).describe('File name, e.g. screenshot.png'),
+	mime: z.string().optional().describe('Ignored; the type is detected from the image bytes'),
+	data: z.string().min(1).describe('The image file, base64 encoded (PNG, JPEG, GIF or WebP)')
+});
 export const answerQuestionSchema = z.object({ answer: text(10000).min(1) });
 export const updateQuestionSchema = z
 	.object({

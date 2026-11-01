@@ -15,6 +15,7 @@ export function app(): Container {
 		container = installContainer(liveState(), () =>
 			createContainer(openDatabase(config.databasePath), { config, env })
 		);
+		container.attachments.sweepOrphans();
 		if (config.seedDemo) seedDemo(container);
 	}
 	return container;

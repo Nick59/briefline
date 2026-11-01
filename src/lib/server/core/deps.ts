@@ -1,5 +1,6 @@
 import type { Db } from '../db/connection.ts';
 import type { ActivityRepository } from '../modules/activity/repository.ts';
+import type { AttachmentRepository } from '../modules/attachments/repository.ts';
 import type { CommentRepository } from '../modules/comments/repository.ts';
 import type { EpicRepository } from '../modules/epics/repository.ts';
 import type { ProfileRepository } from '../modules/profile/repository.ts';
@@ -17,6 +18,7 @@ export interface Repositories {
 	epics: EpicRepository;
 	tasks: TaskRepository;
 	comments: CommentRepository;
+	attachments: AttachmentRepository;
 	specs: SpecRepository;
 	questions: QuestionRepository;
 	activity: ActivityRepository;

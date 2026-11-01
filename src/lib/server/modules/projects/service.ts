@@ -15,7 +15,10 @@ import { transaction } from '../../db/connection.ts';
 import { requireProject } from '../../core/lookup.ts';
 
 export class ProjectService {
-	constructor(private readonly deps: ServiceDeps) {}
+	constructor(
+		private readonly deps: ServiceDeps,
+		private readonly afterDelete: () => void = () => {}
+	) {}
 
 	list(): ProjectSummary[] {
 		const { repos } = this.deps;
@@ -106,5 +109,6 @@ export class ProjectService {
 
 	delete(idOrKey: string) {
 		this.deps.repos.projects.delete(this.get(idOrKey).id);
+		this.afterDelete();
 	}
 }

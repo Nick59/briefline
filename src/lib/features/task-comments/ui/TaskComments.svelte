@@ -1,4 +1,9 @@
 <script lang="ts">
+	import {
+		AddImageButton,
+		imageUpload,
+		type ImageTarget
+	} from '#lib/features/attachment-upload/index.ts';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
@@ -24,6 +29,9 @@
 	let busy = $state(false);
 	let editingId = $state<string | null>(null);
 	let editDraft = $state('');
+	let draftEl = $state<HTMLTextAreaElement | null>(null);
+	let editEl = $state<HTMLTextAreaElement | null>(null);
+	const imageTarget = $derived<ImageTarget>({ type: 'task', id: taskId });
 
 	const text = $derived(draft.trim());
 	const editText = $derived(editDraft.trim());
@@ -110,12 +118,15 @@
 					</div>
 					{#if editingId === comment.id}
 						<Textarea
+							bind:ref={editEl}
 							bind:value={editDraft}
+							{@attach imageUpload(() => imageTarget)}
 							rows={3}
 							aria-label="Edit comment"
 							onkeydown={(event) => submitOnModEnter(event, () => save(comment))}
 						/>
 						<div class="flex justify-end gap-2">
+							<AddImageButton textarea={editEl} target={imageTarget} class="mr-auto" />
 							<Button variant="outline" size="sm" onclick={() => (editingId = null)}>Cancel</Button>
 							<Button size="sm" disabled={busy || editText === ''} onclick={() => save(comment)}
 								>Save</Button
@@ -131,13 +142,16 @@
 
 	<div class="grid gap-2">
 		<Textarea
+			bind:ref={draftEl}
 			bind:value={draft}
+			{@attach imageUpload(() => imageTarget)}
 			rows={3}
 			placeholder="Write a comment (markdown). Ctrl or ⌘ + Enter to post."
 			aria-label="New comment"
 			onkeydown={(event) => submitOnModEnter(event, add)}
 		/>
-		<div class="flex justify-end">
+		<div class="flex justify-end gap-2">
+			<AddImageButton textarea={draftEl} target={imageTarget} class="mr-auto" />
 			<Button size="sm" onclick={add} disabled={busy || text === ''}>Comment</Button>
 		</div>
 	</div>

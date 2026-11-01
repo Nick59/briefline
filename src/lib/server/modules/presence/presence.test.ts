@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PRESENCE_OFFLINE_MS, PRESENCE_ONLINE_MS } from '#lib/shared/domain/constants.ts';
 import { presenceStatus, type PresenceSnapshot } from '#lib/shared/domain/presence.ts';
-import { readConfig } from '../../config.ts';
+import { testConfig } from '../../testing/app.ts';
 import { createContainer } from '../../container.ts';
 import { openDatabase } from '../../db/connection.ts';
 import { handleMcp } from '../../mcp/handler.ts';
@@ -10,7 +10,7 @@ import { operationsByName } from '../../api/operations.ts';
 
 function setup(db = openDatabase(':memory:'), start = Date.parse('2026-01-01T00:00:00Z')) {
 	const time = { now: start };
-	const app = createContainer(db, { config: readConfig({}), env: {}, clock: () => time.now });
+	const app = createContainer(db, { config: testConfig(), env: {}, clock: () => time.now });
 	const events: PresenceSnapshot[] = [];
 	app.presence.subscribe((s) => events.push(s));
 	return { app, db, time, events };

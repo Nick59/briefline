@@ -228,6 +228,7 @@ export interface SessionRecap {
 	threadsOpened: number;
 	replies: number;
 	answers: number;
+	images: number;
 }
 
 export interface SessionSummary {

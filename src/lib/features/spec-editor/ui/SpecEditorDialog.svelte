@@ -1,5 +1,10 @@
 <script lang="ts">
 	import { tick, type Snippet } from 'svelte';
+	import {
+		AddImageButton,
+		imageUpload,
+		type ImageTarget
+	} from '#lib/features/attachment-upload/index.ts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
@@ -34,6 +39,17 @@
 	let busy = $state(false);
 	let tab = $state('write');
 	let editor = $state<HTMLTextAreaElement | null>(null);
+
+	// A spec being created has no id yet, so its images go to the project.
+	const imageTarget = $derived<ImageTarget | null>(
+		spec
+			? { type: 'spec', id: spec.id }
+			: owner.type === 'project'
+				? { type: 'project', id: owner.id }
+				: page.params.project
+					? { type: 'project', id: page.params.project }
+					: null
+	);
 
 	async function insertDiagram(template: DiagramTemplate) {
 		const cursor = editor?.selectionStart ?? content.length;
@@ -111,12 +127,16 @@
 						<Tabs.Trigger value="write">Write</Tabs.Trigger>
 						<Tabs.Trigger value="preview">Preview</Tabs.Trigger>
 					</Tabs.List>
-					<InsertDiagramMenu oninsert={insertDiagram} />
+					<div class="flex items-center gap-1">
+						<AddImageButton textarea={editor} target={imageTarget} />
+						<InsertDiagramMenu oninsert={insertDiagram} />
+					</div>
 				</div>
 				<Tabs.Content value="write">
 					<Textarea
 						bind:ref={editor}
 						bind:value={content}
+						{@attach imageUpload(() => imageTarget)}
 						rows={18}
 						class="font-mono text-xs leading-relaxed"
 						aria-label="Markdown content"

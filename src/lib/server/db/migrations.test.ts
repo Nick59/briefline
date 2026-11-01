@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { readConfig } from '../config.ts';
+import { testConfig } from '../testing/app.ts';
 import { createContainer } from '../container.ts';
 import { migrate } from './connection.ts';
 
@@ -49,7 +49,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -64,7 +64,7 @@ describe('migration that removes phases', () => {
 		db.exec(`INSERT INTO activity (id, project_id, epic_id, actor, action, message, data, created_at)
 			VALUES ('a1', 'p1', 'e1', 'bot', 'phase.created', 'Added phase "Build"', '{"name":"Build"}', 't')`);
 		migrate(db);
-		const app = createContainer(db, { config: readConfig({}), env: {}, fetch });
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
 		expect(app.activity.forEpic('PMA-E1').items).toMatchObject([
 			{ action: 'phase.created', message: 'Added phase "Build"' }
 		]);
@@ -82,7 +82,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 });
 
@@ -110,7 +110,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -129,7 +129,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -170,7 +170,7 @@ describe('activity cursor and profile migrations', () => {
 			{ id: 'a1', seq: 1 },
 			{ id: 'a2', seq: 2 }
 		]);
-		const app = createContainer(db, { config: readConfig({}), env: {}, fetch });
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
 		app.projects.update('PMA', { name: 'Renamed' }, 'bot');
 		expect(
 			app.activity.changes({ since: 'act_1', excludeOwn: false, limit: 10 }, null).items
@@ -182,7 +182,7 @@ describe('activity cursor and profile migrations', () => {
 		expect(tables).toEqual(
 			expect.arrayContaining(['activity_counter', 'activity_cursors', 'user_profile'])
 		);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 });
 
@@ -203,7 +203,7 @@ describe('project order migration', () => {
 			{ key: 'MID', position: 2 },
 			{ key: 'ZED', position: 3 }
 		]);
-		const app = createContainer(db, { config: readConfig({}), env: {}, fetch });
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
 		expect(app.projects.list().map((p) => p.key)).toEqual(['ALP', 'BET', 'MID', 'ZED']);
 		app.projects.create({ key: 'NEW', name: 'Aaa' }, 'test');
 		expect(app.projects.list().map((p) => p.key)).toEqual(['ALP', 'BET', 'MID', 'ZED', 'NEW']);
@@ -240,7 +240,7 @@ describe('agent sessions migration', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 });
 
@@ -268,7 +268,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 14 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
 	});
 });
 

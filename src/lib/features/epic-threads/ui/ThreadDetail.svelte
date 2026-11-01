@@ -4,6 +4,11 @@
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import UserIcon from '@lucide/svelte/icons/user-round';
+	import {
+		AddImageButton,
+		imageUpload,
+		type ImageTarget
+	} from '#lib/features/attachment-upload/index.ts';
 	import { page } from '$app/state';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
@@ -29,6 +34,10 @@
 
 	let draft = $state('');
 	let busy = $state(false);
+	let replyEl = $state<HTMLTextAreaElement | null>(null);
+	const imageTarget = $derived<ImageTarget | null>(
+		page.params.project ? { type: 'project', id: page.params.project } : null
+	);
 	const text = $derived(draft.trim());
 
 	const tones: Record<QuestionStatus, Tone> = {
@@ -170,9 +179,17 @@
 	{/if}
 
 	<Field label="Your reply (markdown)" for="thread-reply" hint="Ctrl or ⌘ + Enter to reply">
-		<Textarea id="thread-reply" bind:value={draft} {onkeydown} rows={3} />
+		<Textarea
+			id="thread-reply"
+			bind:ref={replyEl}
+			bind:value={draft}
+			{onkeydown}
+			{@attach imageUpload(() => imageTarget)}
+			rows={3}
+		/>
 	</Field>
 	<div class="flex flex-wrap items-center justify-end gap-2">
+		<AddImageButton textarea={replyEl} target={imageTarget} class="mr-auto" />
 		<Button variant="outline" size="sm" onclick={reply} disabled={busy || text === ''}>Reply</Button
 		>
 		{#if thread.status !== 'answered'}

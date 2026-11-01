@@ -82,3 +82,10 @@ describe('isBriefOfPrevious', () => {
 		expect(isBriefOfPrevious(brief, live({ type: 'task.stage_changed' }))).toBe(false);
 	});
 });
+
+describe('liveLabel for attachments', () => {
+	it('shows a short verb', () => {
+		expect(liveLabel(live({ type: 'attachment.added' }))).toBe('SHOP-10 · Added image');
+		expect(liveLabel(live({ type: 'attachment.deleted' }))).toBe('SHOP-10 · Removed image');
+	});
+});

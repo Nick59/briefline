@@ -24,6 +24,16 @@ function describeQuestion(event: Extract<DomainEvent, { type: `question.${string
 	return `${QUESTION_FALLBACK[event.type]} "${data.title}" on ${data.key}`;
 }
 
+function describeAttachment(event: Extract<DomainEvent, { type: `attachment.${string}` }>): string {
+	const { filename, target, key, title } = event.data;
+	const verb = event.type === 'attachment.added' ? 'Added' : 'Removed';
+	const where = event.type === 'attachment.added' ? 'to' : 'from';
+	let place = 'project';
+	if (target.type === 'task') place = `${key} “${title}”`;
+	else if (target.type === 'spec') place = `spec “${title}”`;
+	return `${verb} image “${filename}” ${where} ${place}`;
+}
+
 /** One readable sentence per event, shown in the activity feed. */
 export function describeEvent(event: DomainEvent): string {
 	switch (event.type) {
@@ -65,6 +75,9 @@ export function describeEvent(event: DomainEvent): string {
 		case 'question.replied':
 		case 'question.deleted':
 			return describeQuestion(event);
+		case 'attachment.added':
+		case 'attachment.deleted':
+			return describeAttachment(event);
 		case 'ticket.synced':
 			return `Updated ticket ${event.data.key} in ${event.data.provider}`;
 		case 'ticket.sync_failed':

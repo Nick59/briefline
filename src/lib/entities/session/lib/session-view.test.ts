@@ -59,7 +59,8 @@ describe('session view helpers', () => {
 			specsUpdated: 1,
 			threadsOpened: 1,
 			replies: 0,
-			answers: 0
+			answers: 0,
+			images: 0
 		};
 		expect(recapChips(recap)).toEqual([
 			'3 tasks done',

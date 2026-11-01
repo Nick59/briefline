@@ -5,6 +5,7 @@ const optional = (value: string | undefined) => value;
 const names = [
 	'BRIEFLINE_SECRET_KEY',
 	'PM_DATABASE_PATH',
+	'BRIEFLINE_ATTACHMENTS_DIR',
 	'PM_API_TOKEN',
 	'PM_PUBLIC_URL',
 	'PM_SEED_DEMO',

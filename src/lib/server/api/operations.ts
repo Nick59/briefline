@@ -18,6 +18,8 @@ import {
 	setStageStatusSchema,
 	stageSchema,
 	taskCommentSchema,
+	uploadAttachmentSchema,
+	attachmentTargetSchema,
 	updateEpicSchema,
 	updateProjectSchema,
 	updateSpecSchema,
@@ -37,6 +39,7 @@ import { summarySchema } from '../modules/sessions/service.ts';
 import { DEFAULT_CHANGES_LIMIT, MAX_CHANGES_LIMIT } from '../modules/activity/service.ts';
 import { ANONYMOUS_ACTORS } from './execute.ts';
 import type { Page } from '#lib/shared/domain/types.ts';
+import { InvalidInputError } from '../core/errors.ts';
 import { defineOperation, type Operation } from './operation.ts';
 
 const ref = (what: string) => z.string().min(1).describe(`${what} id or key`);
@@ -73,6 +76,12 @@ const listedPage = <T>(page: Page<T>, paging: { limit: number; offset?: number }
 	const end = offset + page.items.length;
 	const hasMore = end < page.total;
 	return { ...page, limit, offset, hasMore, nextOffset: hasMore ? end : null };
+};
+
+const decodeBase64 = (data: string) => {
+	// Padding-free input is accepted; anything else outside the alphabet is not an image anyway.
+	if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(data)) throw new InvalidInputError('data is not base64');
+	return Buffer.from(data, 'base64');
 };
 
 const BRIEF_GUIDANCE = `The brief is for humans who are not engineers (product managers, designers, stakeholders): describe outcomes and impact, not code. Keep each list item to one plain sentence. Never invent requirements the spec does not state; leave a list empty when the spec is silent. effort is a T-shirt size (S, M, L or XL); readingMinutes is about the spec's word count divided by 200.`;
@@ -517,6 +526,63 @@ export const operations: Operation[] = [
 		input: z.object({ comment }),
 		run: (app, { comment }, { actor }) => {
 			app.comments.delete(comment, actor);
+			return { deleted: true };
+		}
+	}),
+
+	// Attachments
+	defineOperation({
+		name: 'upload_attachment',
+		method: 'POST',
+		path: '/attachments',
+		tag: 'Attachments',
+		summary: 'Upload an image and get markdown to embed it',
+		description:
+			'Upload an image (e.g. a screenshot) and paste the returned `markdown` into a spec, task description or comment. PNG, JPEG, GIF or WebP up to 10 MB, sent base64 encoded in `data`; the type is detected from the bytes. The image is attached to the target and deleted with it.',
+		input: uploadAttachmentSchema,
+		successStatus: 201,
+		run: (app, { target, filename, data }, { actor }) =>
+			app.attachments.upload({ target, filename, data: decodeBase64(data) }, actor)
+	}),
+	defineOperation({
+		name: 'list_attachments',
+		method: 'GET',
+		path: '/attachments',
+		tag: 'Attachments',
+		summary: 'List the images uploaded to a project, task or spec',
+		description:
+			'Pass type (project, task or spec) and id as query parameters over REST, or target over MCP. A project lists only its own images, not those of its tasks and specs.',
+		input: z.object({
+			target: attachmentTargetSchema.optional(),
+			type: attachmentTargetSchema.shape.type.optional(),
+			id: attachmentTargetSchema.shape.id.optional()
+		}),
+		mcp: { required: ['target'] },
+		run: (app, { target, type, id }) => {
+			const resolved = target ?? (type && id ? { type, id } : null);
+			if (!resolved) throw new InvalidInputError('Give a target (type and id)');
+			return app.attachments.list(resolved).map((a) => ({
+				id: a.id,
+				url: `/attachments/${a.id}`,
+				markdown: `![${a.filename.replace(/[[\]]/g, '')}](/attachments/${a.id})`,
+				filename: a.filename,
+				mime: a.mime,
+				size: a.size,
+				uploadedBy: a.uploadedBy,
+				createdAt: a.createdAt
+			}));
+		}
+	}),
+	defineOperation({
+		name: 'delete_attachment',
+		method: 'DELETE',
+		path: '/attachments/{attachment}',
+		tag: 'Attachments',
+		summary: 'Delete an uploaded image',
+		description: 'Markdown that still points at the image will show a broken image.',
+		input: z.object({ attachment: z.string().min(1).describe('Attachment id') }),
+		run: (app, { attachment }, { actor }) => {
+			app.attachments.delete(attachment, actor);
 			return { deleted: true };
 		}
 	}),

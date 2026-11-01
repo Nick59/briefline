@@ -31,6 +31,7 @@ Typical flow for an agent:
    the plain-language summary for non-engineers is written by you, in the same call (set_spec_brief rewrites it alone).
    Project-wide context (architecture, conventions, product goals) goes in project specs via add_project_spec; read it with list_project_specs before planning.
    Add diagrams as \`\`\`mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
+   Attach screenshots with upload_attachment and embed the returned markdown in specs, task descriptions and comments.
 Linked tickets in Jira, GitHub, Linear, Plane or a webhook are updated automatically when ticket sync is on.
 5. Before you end your work, call set_session_summary with a short plain-language recap of what this session did, written for the user's profile. Call it again after later chunks of work; it overwrites the previous summary.
 Ids and keys are interchangeable: PMA, PMA-E1 and PMA-12 work wherever an id is expected.`;

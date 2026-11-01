@@ -30,6 +30,8 @@ const VERBS: Record<string, string> = {
 	'question.reopened': 'Reopened question',
 	'question.replied': 'Replied in thread',
 	'question.deleted': 'Removed question',
+	'attachment.added': 'Added image',
+	'attachment.deleted': 'Removed image',
 	'ticket.synced': 'Updated ticket',
 	'ticket.sync_failed': 'Ticket update failed'
 };

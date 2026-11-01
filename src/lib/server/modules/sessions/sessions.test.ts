@@ -149,7 +149,8 @@ describe('session service', () => {
 		expect(app.sessions.list().items[0].recap).toMatchObject({
 			threadsOpened: 2,
 			replies: 1,
-			answers: 1
+			answers: 1,
+			images: 0
 		});
 	});
 

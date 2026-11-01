@@ -1,6 +1,14 @@
+import { randomUUID } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { readConfig, type ServerConfig } from '../config.ts';
 import { createContainer } from '../container.ts';
 import { openDatabase } from '../db/connection.ts';
+
+/** A throwaway directory, so a test never sweeps the files of a real data directory. */
+export const testAttachmentsDir = () => join(tmpdir(), `briefline-attachments-${randomUUID()}`);
+
+export const testConfig = () => ({ ...readConfig({}), attachmentsDir: testAttachmentsDir() });
 
 export interface FetchCall {
 	url: string;
@@ -20,7 +28,7 @@ export function testApp(
 		return respond(call);
 	}) as typeof fetch;
 	const app = createContainer(openDatabase(':memory:'), {
-		config: { ...readConfig({}), ...config },
+		config: { ...testConfig(), ...config },
 		env,
 		fetch: fetchImpl
 	});
