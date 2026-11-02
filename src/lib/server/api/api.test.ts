@@ -813,3 +813,56 @@ describe('task comments', () => {
 		expect(init.result.instructions).toContain('add_task_comment');
 	});
 });
+
+describe('epic order', () => {
+	const run = (app: ReturnType<typeof testApp>['app'], name: string, input: object) =>
+		execute(app, operationsByName.get(name)!, input, { actor: 'dashboard' }) as Promise<
+			Record<string, unknown>
+		>;
+	const keys = async (app: ReturnType<typeof testApp>['app'], project = 'AAA') =>
+		((await run(app, 'list_epics', { project })) as unknown as { key: string }[]).map((e) => e.key);
+	function setup() {
+		const { app } = testApp();
+		for (const key of ['AAA', 'BBB']) {
+			app.projects.create({ key, name: key }, 'test');
+			for (const title of ['One', 'Two', 'Three']) app.epics.create(key, { title }, 'test');
+		}
+		return app;
+	}
+
+	it('lists epics in creation order and puts new epics last', async () => {
+		const app = setup();
+		expect(await keys(app)).toEqual(['AAA-E1', 'AAA-E2', 'AAA-E3']);
+		app.epics.create('AAA', { title: 'Four' }, 'test');
+		expect(await keys(app)).toEqual(['AAA-E1', 'AAA-E2', 'AAA-E3', 'AAA-E4']);
+	});
+
+	it('moves an epic before another one or last, without touching other projects', async () => {
+		const app = setup();
+		await run(app, 'move_epic', { epic: 'AAA-E3', beforeEpic: 'AAA-E1' });
+		expect(await keys(app)).toEqual(['AAA-E3', 'AAA-E1', 'AAA-E2']);
+		await run(app, 'move_epic', { epic: 'AAA-E3', beforeEpic: null });
+		expect(await keys(app)).toEqual(['AAA-E1', 'AAA-E2', 'AAA-E3']);
+		await run(app, 'move_epic', { epic: 'aaa-e1' });
+		expect(await keys(app)).toEqual(['AAA-E2', 'AAA-E3', 'AAA-E1']);
+		expect(await keys(app, 'BBB')).toEqual(['BBB-E1', 'BBB-E2', 'BBB-E3']);
+	});
+
+	it('rejects a target from another project and unknown epics', async () => {
+		const app = setup();
+		await expect(
+			run(app, 'move_epic', { epic: 'AAA-E1', beforeEpic: 'BBB-E1' })
+		).rejects.toMatchObject({ status: 400 });
+		await expect(run(app, 'move_epic', { epic: 'NOPE-E1' })).rejects.toMatchObject({
+			status: 404
+		});
+		expect(await keys(app)).toEqual(['AAA-E1', 'AAA-E2', 'AAA-E3']);
+	});
+
+	it('does not log a reorder', async () => {
+		const app = setup();
+		const before = app.activity.forProject('AAA').total;
+		await run(app, 'move_epic', { epic: 'AAA-E2', beforeEpic: 'AAA-E1' });
+		expect(app.activity.forProject('AAA').total).toBe(before);
+	});
+});

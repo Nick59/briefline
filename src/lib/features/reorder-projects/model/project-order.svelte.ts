@@ -1,7 +1,7 @@
 import type { ProjectSummary } from '#lib/shared/domain/types.ts';
 import { Sortable, type DropEvent } from '#lib/shared/lib/dnd/index.ts';
 import { runOperation } from '#lib/shared/lib/run-operation.ts';
-import { applyMove, planMove } from './reorder.ts';
+import { applyMove, planMove } from '#lib/shared/lib/reorder.ts';
 
 export const PROJECT_ZONE = 'projects';
 

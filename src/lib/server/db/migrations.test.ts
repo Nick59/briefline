@@ -49,7 +49,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -82,7 +82,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 	});
 });
 
@@ -110,7 +110,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -129,7 +129,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -182,7 +182,7 @@ describe('activity cursor and profile migrations', () => {
 		expect(tables).toEqual(
 			expect.arrayContaining(['activity_counter', 'activity_cursors', 'user_profile'])
 		);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 	});
 });
 
@@ -240,7 +240,7 @@ describe('agent sessions migration', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 	});
 });
 
@@ -268,7 +268,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 15 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 16 });
 	});
 });
 
@@ -299,6 +299,28 @@ describe('comment author kind migration', () => {
 			{ id: 'claude', author_kind: 'agent' },
 			{ id: 'dashboard', author_kind: 'human' },
 			{ id: 'seed', author_kind: 'human' }
+		]);
+	});
+});
+
+describe('epic order migration', () => {
+	it('orders existing epics by creation date within each project', () => {
+		const db = new DatabaseSync(':memory:');
+		migrate(db, 15);
+		db.exec(`
+			INSERT INTO projects (id, key, name, created_at, updated_at) VALUES ('p1', 'AAA', 'A', 't', 't');
+			INSERT INTO projects (id, key, name, created_at, updated_at) VALUES ('p2', 'BBB', 'B', 't', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e3', 'p1', 'AAA-E3', 'E', '2026-03', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e1', 'p1', 'AAA-E1', 'E', '2026-01', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e2', 'p1', 'AAA-E2', 'E', '2026-02', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e4', 'p2', 'BBB-E1', 'E', '2026-04', 't');
+		`);
+		migrate(db);
+		expect(db.prepare('SELECT key, position FROM epics ORDER BY key').all()).toEqual([
+			{ key: 'AAA-E1', position: 0 },
+			{ key: 'AAA-E2', position: 1 },
+			{ key: 'AAA-E3', position: 2 },
+			{ key: 'BBB-E1', position: 0 }
 		]);
 	});
 });

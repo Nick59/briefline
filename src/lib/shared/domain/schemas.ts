@@ -205,6 +205,16 @@ export const moveProjectSchema = z.object({
 		.describe('Place the project just before this project (id or key); omit or null puts it last')
 });
 
+export const moveEpicSchema = z.object({
+	beforeEpic: z
+		.string()
+		.nullable()
+		.optional()
+		.describe(
+			'Place the epic just before this epic of the same project (id or key); omit or null puts it last'
+		)
+});
+
 export const createSpecSchema = z.object({
 	...specFields,
 	kind: specFields.kind.default('spec'),
@@ -308,6 +318,7 @@ export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type SetStageStatusInput = z.input<typeof setStageStatusSchema>;
 export type MoveProjectInput = z.input<typeof moveProjectSchema>;
+export type MoveEpicInput = z.input<typeof moveEpicSchema>;
 export type MoveTaskInput = z.input<typeof moveTaskSchema>;
 export type BriefInput = z.infer<typeof briefSchema>;
 export type SetSpecBriefInput = z.input<typeof setSpecBriefSchema>;

@@ -89,6 +89,7 @@ export interface Epic {
 	summary: string;
 	externalRef: ExternalRef | null;
 	targetDate: ISODate | null;
+	position: number;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }

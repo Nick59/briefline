@@ -228,6 +228,16 @@ export const MIGRATIONS: Migration[] = [
 	CREATE INDEX attachments_project ON attachments(project_id);
 	CREATE INDEX attachments_task ON attachments(task_id);
 	CREATE INDEX attachments_spec ON attachments(spec_id);
+	`,
+	`
+	ALTER TABLE epics ADD COLUMN position INTEGER NOT NULL DEFAULT 0;
+	UPDATE epics SET position = (
+		SELECT COUNT(*) FROM epics other WHERE other.project_id = epics.project_id
+			AND (other.created_at < epics.created_at
+				OR (other.created_at = epics.created_at AND other.id < epics.id))
+	);
+	DROP INDEX epics_project;
+	CREATE INDEX epics_project ON epics(project_id, position);
 	`
 ];
 
