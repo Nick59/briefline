@@ -20,6 +20,7 @@
 
 	let { stage, status, tasks, projectKey, epicKey, sortable }: Props = $props();
 
+	const counted = $derived(tasks.filter((t) => !t.cancelledAt).length);
 	const zone = $derived(`${stage}:${status}`);
 	const isTarget = $derived(sortable.active !== null && sortable.over?.zone === zone);
 	const dropBefore = $derived(isTarget ? sortable.over!.beforeId : undefined);
@@ -34,13 +35,13 @@
 		'flex min-h-48 flex-col gap-2 rounded-xl border border-transparent bg-sunken p-2 transition-colors duration-(--duration-fast)',
 		isTarget && 'border-brand/40 bg-brand/5'
 	)}
-	aria-label="{STATUS_LABELS[status]}: {tasks.length} tasks"
+	aria-label="{STATUS_LABELS[status]}: {counted} tasks"
 	{@attach sortable.zone(zone)}
 >
 	<header class="flex items-center gap-2 px-1.5 pt-1 text-xs font-medium">
 		<StatusIcon {status} tone={status === 'todo' ? undefined : stageTone[stage]} size={13} />
 		{STATUS_LABELS[status]}
-		<span class="font-mono text-muted-foreground tabular-nums">{tasks.length}</span>
+		<span class="font-mono text-muted-foreground tabular-nums">{counted}</span>
 	</header>
 	{#each tasks as task (task.id)}
 		{#if dropBefore === task.id}{@render dropLine()}{/if}
@@ -52,13 +53,14 @@
 				task: task.key
 			})}
 			class={cn(
-				'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none]',
+				!task.cancelledAt &&
+					'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none]',
 				sortable.active?.id === task.id && 'opacity-40'
 			)}
-			{@attach sortable.item(task.id, zone)}
+			{@attach task.cancelledAt ? undefined : sortable.item(task.id, zone)}
 		>
 			{#snippet actions()}
-				<StageStatusMenu {task} {stage} />
+				{#if !task.cancelledAt}<StageStatusMenu {task} {stage} />{/if}
 			{/snippet}
 		</TaskCard>
 	{:else}

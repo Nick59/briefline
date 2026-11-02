@@ -13,6 +13,7 @@
 	import { CreateProjectDialog } from '#lib/features/project-form/index.ts';
 	import { PROJECT_ZONE, useProjectOrder } from '#lib/features/reorder-projects/index.ts';
 	import { useEpicOrder } from '#lib/features/reorder-epics/index.ts';
+	import { Sortable } from '#lib/shared/lib/dnd/index.ts';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -27,6 +28,10 @@
 	const order = useProjectOrder(() => projects);
 	const { sortable } = order;
 	const dropBefore = $derived(sortable.active ? sortable.over?.beforeId : undefined);
+
+	const EPIC_ZONE = 'nav-epics';
+	const epicSortable = new Sortable({ ondrop: ({ id, beforeId }) => epicOrder.move(id, beforeId) });
+	const epicDropBefore = $derived(epicSortable.active ? epicSortable.over?.beforeId : undefined);
 </script>
 
 {#snippet dropLine()}
@@ -83,7 +88,10 @@
 				/>
 			</a>
 			{#if active}
-				<ul class="my-1 ml-[1.15rem] space-y-0.5 border-l pl-2">
+				<ul
+					class="my-1 ml-[1.15rem] space-y-0.5 border-l pl-2"
+					{@attach epicSortable.zone(EPIC_ZONE)}
+				>
 					{#each epicOrder.epics as epic (epic.id)}
 						{@const stage = epicDisplayStage(epic.progress)}
 						{@const epicHref = resolve('/projects/[project]/epics/[epic]', {
@@ -91,12 +99,15 @@
 							epic: epic.key
 						})}
 						<li>
+							{#if epicDropBefore === epic.id}{@render dropLine()}{/if}
 							<a
 								href={epicHref}
+								{@attach epicSortable.item(epic.id, EPIC_ZONE)}
 								onclick={onnavigate}
 								aria-current={path.startsWith(epicHref) ? 'page' : undefined}
 								class={cn(
-									'flex items-center gap-2 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground',
+									'flex cursor-grab touch-manipulation items-center gap-2 rounded-md px-2 py-1 text-[13px] text-muted-foreground transition-colors select-none [-webkit-touch-callout:none] hover:bg-sidebar-accent hover:text-foreground',
+									epicSortable.active?.id === epic.id && 'opacity-40',
 									path.startsWith(epicHref) && 'bg-sidebar-accent text-foreground'
 								)}
 							>
@@ -116,6 +127,7 @@
 					{:else}
 						<li class="px-2 py-1 text-xs text-muted-foreground">No epics yet</li>
 					{/each}
+					{#if epicDropBefore === null}<li aria-hidden="true">{@render dropLine()}</li>{/if}
 					<li>
 						<a
 							href={resolve('/projects/[project]/settings', { project: project.key })}

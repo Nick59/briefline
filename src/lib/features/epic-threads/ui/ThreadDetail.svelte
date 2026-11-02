@@ -62,7 +62,7 @@
 
 	const reply = () => text && run('reply_to_question', { body: text }, { clear: true, done: true });
 	const answer = () =>
-		text && run('answer_question', { answer: text }, { clear: true, done: true });
+		text && run('update_question', { answer: text }, { clear: true, done: true });
 
 	function pick(option: string) {
 		draft = draft === option ? '' : option;
@@ -86,14 +86,15 @@
 					variant="outline"
 					size="xs"
 					disabled={busy}
-					onclick={() => run('ignore_question', {}, { done: true })}>Ignore</Button
+					onclick={() => run('update_question', { status: 'ignored' }, { done: true })}
+					>Ignore</Button
 				>
 			{:else}
 				<Button
 					variant="outline"
 					size="xs"
 					disabled={busy}
-					onclick={() => run('reopen_question', {})}><RotateCcwIcon />Reopen</Button
+					onclick={() => run('update_question', { status: 'open' })}><RotateCcwIcon />Reopen</Button
 				>
 			{/if}
 		</div>

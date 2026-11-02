@@ -38,7 +38,7 @@ export class EpicService {
 			return {
 				...epic,
 				progress: computeProgress(tasks),
-				taskCount: tasks.length,
+				taskCount: tasks.filter((task) => !task.cancelledAt).length,
 				openQuestions: questionCounts.get(epic.id)?.open ?? 0,
 				questionCount: questionCounts.get(epic.id)?.total ?? 0
 			};

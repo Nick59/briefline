@@ -9,6 +9,9 @@ export function notifyAgentEvent(event: LiveEvent) {
 	if (event.type === 'task.stage_changed') {
 		const stage = STAGE_LABELS[event.data.stage as Stage] ?? String(event.data.stage);
 		toast(`${event.actor} moved ${event.key} → ${stage}`, { id });
+	} else if (event.type === 'task.cancelled' || event.type === 'task.restored') {
+		const verb = event.type === 'task.cancelled' ? 'cancelled' : 'restored';
+		toast(`${event.actor} ${verb} ${event.key}`, { id });
 	} else if (event.type === 'spec.created') {
 		toast(`${event.actor} added spec "${event.title}"`, { id });
 	} else if (isCommentEvent(event.type)) {

@@ -1,9 +1,11 @@
 import { STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
+	cancelTaskSchema,
 	createTaskSchema,
 	moveTaskSchema,
 	setStageStatusSchema,
 	updateTaskSchema,
+	type CancelTaskInput,
 	type CreateTaskInput,
 	type MoveTaskInput,
 	type SetStageStatusInput,
@@ -71,6 +73,7 @@ export class TaskService {
 				: null,
 			position: repos.tasks.nextPosition(epic.id),
 			commentCount: 0,
+			cancelledAt: null,
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -89,6 +92,7 @@ export class TaskService {
 		const data = updateTaskSchema.parse(input);
 		const current = this.get(idOrKey);
 		const epic = requireEpic(this.deps.repos, current.epicId);
+		if (data.stages) this.#assertNotCancelled(current);
 		for (const stage of STAGES) {
 			const to = data.stages?.[stage];
 			if (to) this.#assertCanChange(epic, current.stages[stage], to);
@@ -135,6 +139,7 @@ export class TaskService {
 	setStage(idOrKey: string, input: SetStageStatusInput, actor: string): Task {
 		const { stage, status, note } = setStageStatusSchema.parse(input);
 		const current = this.get(idOrKey);
+		this.#assertNotCancelled(current);
 		if (current.stages[stage] === status) return current;
 		const epic = requireEpic(this.deps.repos, current.epicId);
 		this.#assertCanChange(epic, current.stages[stage], status);
@@ -177,6 +182,7 @@ export class TaskService {
 		const target = destination ? requireEpic(repos, destination) : source;
 		if (target.projectId !== source.projectId)
 			throw new InvalidInputError('Tasks can only move within the same project');
+		if (stage && status) this.#assertNotCancelled(task);
 		const transferring = target.id !== source.id;
 		const before = beforeTask ? this.get(beforeTask) : null;
 		if (before && before.epicId !== target.id) {
@@ -213,11 +219,55 @@ export class TaskService {
 		});
 	}
 
+	/** Idempotent: a task that is already cancelled is returned as is. */
+	cancel(idOrKey: string, input: CancelTaskInput, actor: string): Task {
+		const { reason } = cancelTaskSchema.parse(input);
+		const current = this.get(idOrKey);
+		if (current.cancelledAt) return current;
+		const epic = requireEpic(this.deps.repos, current.epicId);
+		const timestamp = now();
+		const task: Task = { ...current, cancelledAt: timestamp, updatedAt: timestamp };
+		this.deps.repos.tasks.update(task);
+		this.deps.events.emit({
+			type: 'task.cancelled',
+			projectId: epic.projectId,
+			epicId: epic.id,
+			taskId: task.id,
+			actor,
+			data: { key: task.key, title: task.title, reason }
+		});
+		return task;
+	}
+
+	/** Idempotent: a task that is not cancelled is returned as is. */
+	restore(idOrKey: string, actor: string): Task {
+		const current = this.get(idOrKey);
+		if (!current.cancelledAt) return current;
+		const epic = requireEpic(this.deps.repos, current.epicId);
+		const task: Task = { ...current, cancelledAt: null, updatedAt: now() };
+		this.deps.repos.tasks.update(task);
+		this.deps.events.emit({
+			type: 'task.restored',
+			projectId: epic.projectId,
+			epicId: epic.id,
+			taskId: task.id,
+			actor,
+			data: { key: task.key, title: task.title }
+		});
+		return task;
+	}
+
 	delete(idOrKey: string, actor: string) {
 		const task = this.get(idOrKey);
 		const epic = requireEpic(this.deps.repos, task.epicId);
 		this.deps.repos.tasks.delete(task.id);
 		this.#emit('task.deleted', epic, task, actor);
+	}
+
+	#assertNotCancelled(task: Task) {
+		if (task.cancelledAt) {
+			throw new InvalidInputError(`Task ${task.key} is cancelled; restore it first`);
+		}
 	}
 
 	/** Work that already started may continue; only starting a stage waits for open questions. */

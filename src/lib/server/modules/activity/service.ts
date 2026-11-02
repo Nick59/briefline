@@ -46,6 +46,7 @@ export interface ChangesResult {
 
 export interface ActivityQuery extends Paging {
 	project?: string;
+	epic?: string;
 	actor?: string;
 	who?: ActivityWho;
 }
@@ -100,15 +101,16 @@ export class ActivityService {
 		return rewrite(this.deps.repos.activity.list({ ...paging }));
 	}
 
-	/** All activity, filtered by project, actor, and people or agents. */
+	/** All activity, filtered by project, epic, actor, and people or agents. */
 	list(query: ActivityQuery = {}): Page<Activity> {
 		const { repos } = this.deps;
-		const { project, actor, who = 'all', ...paging } = query;
+		const { project, epic, actor, who = 'all', ...paging } = query;
 		const name = repos.profile.get()?.name;
 		const people = name ? [...HUMAN_ACTORS, name] : [...HUMAN_ACTORS];
 		return rewrite(
 			repos.activity.list({
 				projectId: project ? requireProject(repos, project).id : undefined,
+				epicId: epic ? requireEpic(repos, epic).id : undefined,
 				actor,
 				actorIn: who === 'people' ? people : undefined,
 				actorNotIn: who === 'agents' ? people : undefined,

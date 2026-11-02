@@ -26,14 +26,16 @@ Typical flow for an agent:
    Questions are threads: a person can open one too, and anyone can add replies over time. Read the replies in each question's \`messages\` (list_epic_questions or get_epic), reply or act on threads a person opened, and add details or findings with reply_to_question.
    Tasks cannot be started while an epic has open questions, whoever opened them. Read the answers and follow them; an ignored question means use your judgement.
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
+   A task that will not be done: update_task { cancelled: true, cancelReason }; it stays visible but leaves the progress. cancelled: false restores it.
    Read a task's comments in get_task; people comment too, so act on their comments, and use add_task_comment to record findings, decisions or blockers on the task as you work.
-4. Attach your specs/plans as markdown with add_project_spec, add_epic_spec or add_task_spec, always including the \`brief\` argument:
+4. Attach your specs/plans as markdown with add_spec { project | epic | task }, always including the \`brief\` argument:
    the plain-language summary for non-engineers is written by you, in the same call (set_spec_brief rewrites it alone).
-   Project-wide context (architecture, conventions, product goals) goes in project specs via add_project_spec; read it with list_project_specs before planning.
+   Project-wide context (architecture, conventions, product goals) goes in project specs via add_spec { project }; read it with list_specs { project } before planning.
    Add diagrams as \`\`\`mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
    Attach screenshots with upload_attachment and embed the returned markdown in specs, task descriptions and comments.
 Linked tickets in Jira, GitHub, Linear, Plane or a webhook are updated automatically when ticket sync is on.
 5. Before you end your work, call set_session_summary with a short plain-language recap of what this session did, written for the user's profile. Call it again after later chunks of work; it overwrites the previous summary.
+Setup tools (projects, ticketing connections, profile) are listed only when the client connects with /mcp?tools=all.
 Ids and keys are interchangeable: PMA, PMA-E1 and PMA-12 work wherever an id is expected.`;
 
 interface JsonRpcRequest {
@@ -47,26 +49,52 @@ type JsonRpcResponse = { jsonrpc: '2.0'; id: string | number | null } & (
 	{ result: unknown } | { error: { code: number; message: string } }
 );
 
+export interface McpOptions {
+	/** Lists the hidden setup and admin tools too; they are callable either way. */
+	allTools?: boolean;
+}
+
+const DROPPED_KEYWORDS = new Set(['$schema', 'maxLength', 'minLength', 'format']);
+const SCHEMA_MAPS = new Set(['properties', '$defs', 'definitions']);
+const isUnboundedInteger = (value: unknown) =>
+	typeof value === 'number' && Math.abs(value) === Number.MAX_SAFE_INTEGER;
+
+/** Drops validation keywords the server re-checks with zod anyway, to keep tools/list small. */
+export function compactSchema(node: unknown): unknown {
+	if (Array.isArray(node)) return node.map(compactSchema);
+	if (node === null || typeof node !== 'object') return node;
+	const out: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(node)) {
+		if (DROPPED_KEYWORDS.has(key)) continue;
+		if ((key === 'minimum' || key === 'maximum') && isUnboundedInteger(value)) continue;
+		out[key] = SCHEMA_MAPS.has(key)
+			? Object.fromEntries(
+					Object.entries(value as object).map(([name, child]) => [name, compactSchema(child)])
+				)
+			: compactSchema(value);
+	}
+	return out;
+}
+
 function toolInputSchema(op: Operation) {
-	const schema = inputJsonSchema(op.input);
+	const schema = compactSchema(inputJsonSchema(op.input)) as ReturnType<typeof inputJsonSchema>;
 	const required = [...new Set([...(schema.required ?? []), ...(op.mcp?.required ?? [])])];
 	return required.length ? { ...schema, required } : schema;
 }
 
-function tools() {
-	return operations.map((op) => ({
-		name: op.name,
-		title: op.summary,
-		description: [op.summary, op.description, `REST: ${op.method} /api/v1${op.path}`]
-			.filter(Boolean)
-			.join('\n'),
-		inputSchema: toolInputSchema(op),
-		annotations: {
-			readOnlyHint: op.readOnly,
-			destructiveHint: op.method === 'DELETE',
-			idempotentHint: op.method !== 'POST'
-		}
-	}));
+function tools(options: McpOptions) {
+	return operations
+		.filter((op) => options.allTools || !op.mcp?.hidden)
+		.map((op) => ({
+			name: op.name,
+			description: [op.summary, op.description].filter(Boolean).join('\n'),
+			inputSchema: toolInputSchema(op),
+			annotations: {
+				readOnlyHint: op.readOnly,
+				destructiveHint: op.method === 'DELETE',
+				idempotentHint: op.method !== 'POST'
+			}
+		}));
 }
 
 async function callTool(app: Container, params: Record<string, unknown>, actor: string) {
@@ -95,7 +123,8 @@ async function callTool(app: Container, params: Record<string, unknown>, actor: 
 async function dispatch(
 	app: Container,
 	request: JsonRpcRequest,
-	actor: string
+	actor: string,
+	options: McpOptions
 ): Promise<JsonRpcResponse | null> {
 	app.presence.touch(actor, 'mcp');
 	const id = request.id ?? null;
@@ -120,7 +149,7 @@ async function dispatch(
 		case 'ping':
 			return reply({ result: {} });
 		case 'tools/list':
-			return reply({ result: { tools: tools() } });
+			return reply({ result: { tools: tools(options) } });
 		case 'tools/call':
 			return reply(await callTool(app, request.params ?? {}, actor));
 		default:
@@ -159,12 +188,17 @@ const clientInfoOf = (request: JsonRpcRequest) => {
 	};
 };
 
-async function dispatchAll(app: Container, payload: unknown, actor: string): Promise<unknown> {
+async function dispatchAll(
+	app: Container,
+	payload: unknown,
+	actor: string,
+	options: McpOptions
+): Promise<unknown> {
 	if (Array.isArray(payload)) {
 		const responses = [];
 		for (const message of payload) {
 			const response = isValid(message)
-				? await dispatch(app, message, actor)
+				? await dispatch(app, message, actor, options)
 				: { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid request' } };
 			if (response) responses.push(response);
 		}
@@ -172,7 +206,7 @@ async function dispatchAll(app: Container, payload: unknown, actor: string): Pro
 	}
 	if (!isValid(payload))
 		return { jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Invalid request' } };
-	return dispatch(app, payload, actor);
+	return dispatch(app, payload, actor, options);
 }
 
 /**
@@ -183,7 +217,8 @@ export async function handleMcpRequest(
 	app: Container,
 	payload: unknown,
 	actor: string,
-	sessionHeader?: string | null
+	sessionHeader?: string | null,
+	options: McpOptions = {}
 ): Promise<McpReply> {
 	const messages = Array.isArray(payload) ? payload : [payload];
 	const init = messages.find((m): m is JsonRpcRequest => isValid(m) && m.method === 'initialize');
@@ -194,11 +229,18 @@ export async function handleMcpRequest(
 	} else if (sessionId) {
 		app.sessions.touch(sessionId, actor);
 	}
-	const body = await runInRequestContext({ sessionId }, () => dispatchAll(app, payload, actor));
+	const body = await runInRequestContext({ sessionId }, () =>
+		dispatchAll(app, payload, actor, options)
+	);
 	return { body, newSessionId };
 }
 
 /** Handles one JSON-RPC message or a batch outside any session. Returns null when nothing needs a response. */
-export async function handleMcp(app: Container, payload: unknown, actor: string): Promise<unknown> {
-	return dispatchAll(app, payload, actor);
+export async function handleMcp(
+	app: Container,
+	payload: unknown,
+	actor: string,
+	options: McpOptions = {}
+): Promise<unknown> {
+	return dispatchAll(app, payload, actor, options);
 }

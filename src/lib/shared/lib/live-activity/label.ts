@@ -16,6 +16,8 @@ const VERBS: Record<string, string> = {
 	'task.created': 'Created task',
 	'task.updated': 'Updated task',
 	'task.deleted': 'Deleted task',
+	'task.cancelled': 'Cancelled task',
+	'task.restored': 'Restored task',
 	'task.commented': 'Commented',
 	'task.comment_updated': 'Edited comment',
 	'task.comment_deleted': 'Deleted comment',

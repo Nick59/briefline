@@ -191,7 +191,7 @@ export class Sortable {
 			if (rect.width === 0 || x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
 				continue;
 			const items = [...element.querySelectorAll<HTMLElement>('[data-dnd-id]')].filter(
-				(item) => item.dataset.dndId !== draggedId
+				(item) => item.dataset.dndId !== draggedId && item.closest('[data-dnd-zone]') === element
 			);
 			const before = items.find((item) => {
 				const box = item.getBoundingClientRect();

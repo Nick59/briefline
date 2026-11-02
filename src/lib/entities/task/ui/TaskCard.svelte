@@ -5,6 +5,7 @@
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import type { Task } from '#lib/shared/domain/types.ts';
+	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { taskTintClass } from '#lib/shared/config/tokens/index.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
@@ -26,8 +27,8 @@
 	class={cn(
 		'group relative rounded-lg border bg-card p-3 shadow-xs transition-[border-color,box-shadow,background-color] duration-(--duration-fast) hover:border-foreground/20 hover:shadow-sm',
 		taskTintClass(task.stages),
-		live?.isChanged(task.key) &&
-			'bg-brand/15 duration-1500 motion-reduce:transition-none',
+		task.cancelledAt && 'opacity-60',
+		live?.isChanged(task.key) && 'bg-brand/15 duration-1500 motion-reduce:transition-none',
 		className
 	)}
 	{...rest}
@@ -36,12 +37,17 @@
 		<div class="flex items-center gap-2">
 			<KeyChip value={displayKey(task)} title={displayKeyTitle(task)} />
 			<TaskStageStrip stages={task.stages} size={12} />
+			{#if task.cancelledAt}
+				<ToneBadge tone="neutral">Cancelled</ToneBadge>
+			{/if}
 		</div>
 		{#if actions}
 			<div class="relative z-10 flex items-center">{@render actions()}</div>
 		{/if}
 	</div>
-	<h3 class="text-sm leading-snug font-medium text-pretty">
+	<h3
+		class={cn('text-sm leading-snug font-medium text-pretty', task.cancelledAt && 'line-through')}
+	>
 		<a
 			{href}
 			draggable="false"

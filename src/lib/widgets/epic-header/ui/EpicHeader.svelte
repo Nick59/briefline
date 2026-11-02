@@ -111,7 +111,7 @@
 			<div class="text-sm">
 				<p class="font-medium">Overall progress</p>
 				<p class="text-muted-foreground">
-					{pluralize(epic.tasks.length, 'task')}
+					{pluralize(epic.tasks.filter((t) => !t.cancelledAt).length, 'task')}
 				</p>
 			</div>
 		</div>

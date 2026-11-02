@@ -53,6 +53,10 @@ export function describeEvent(event: DomainEvent): string {
 			return `Updated ${event.data.fields?.join(', ') || 'details'} of ${event.data.key}`;
 		case 'task.deleted':
 			return `Deleted task ${event.data.key} "${event.data.title}"`;
+		case 'task.cancelled':
+			return `Cancelled task ${event.data.key}${event.data.reason ? ` — ${event.data.reason}` : ''}`;
+		case 'task.restored':
+			return `Restored task ${event.data.key}`;
 		case 'task.stage_changed':
 			return `Moved ${event.data.key} to ${STAGE_LABELS[event.data.stage]} · ${STATUS_LABELS[event.data.to]}`;
 		case 'task.commented':

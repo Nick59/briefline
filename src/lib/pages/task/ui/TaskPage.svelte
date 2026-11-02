@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
+	import ArrowLeftIcon from '@lucide/svelte/icons/arrow-left';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import UserIcon from '@lucide/svelte/icons/user-round';
@@ -7,6 +8,8 @@
 	import { STAGES } from '#lib/shared/domain/constants.ts';
 	import { taskOverallStatus } from '#lib/shared/domain/progress.ts';
 	import type { Activity, PageView, Project, Spec, TaskDetail } from '#lib/shared/domain/types.ts';
+	import { formatDate } from '#lib/shared/lib/format.ts';
+	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
@@ -15,6 +18,7 @@
 	import { StatusBadge } from '#lib/entities/work-status/index.ts';
 	import { PriorityBadge } from '#lib/entities/task/index.ts';
 	import { ExternalTicketBadge } from '#lib/entities/epic/index.ts';
+	import { CancelTaskButton } from '#lib/features/cancel-task/index.ts';
 	import { StageStatusControl } from '#lib/features/change-task-status/index.ts';
 	import { TaskComments } from '#lib/features/task-comments/index.ts';
 	import { TaskFormDialog } from '#lib/features/task-form/index.ts';
@@ -40,6 +44,9 @@
 
 <div class="space-y-10">
 	<div class="space-y-4">
+		<Button href={epicHref} variant="ghost" size="xs" class="-ml-2"
+			><ArrowLeftIcon />{displayKey(task.epic)} · {task.epic.title}</Button
+		>
 		<Crumbs
 			items={[
 				{ label: project.name, href: resolve('/projects/[project]', { project: project.key }) },
@@ -50,7 +57,11 @@
 		<PageHeader title={task.title}>
 			{#snippet eyebrow()}
 				<KeyChip value={displayKey(task)} title={displayKeyTitle(task)} />
-				<StatusBadge status={taskOverallStatus(task.stages)} />
+				{#if task.cancelledAt}
+					<ToneBadge tone="neutral">Cancelled {formatDate(task.cancelledAt)}</ToneBadge>
+				{:else}
+					<StatusBadge status={taskOverallStatus(task.stages)} />
+				{/if}
 				<PriorityBadge priority={task.priority} />
 				{#if task.assignee}<span class="inline-flex items-center gap-1 text-xs"
 						><UserIcon class="size-3" />{task.assignee}</span
@@ -72,6 +83,7 @@
 							><PencilIcon />Edit</Button
 						>{/snippet}
 				</TaskFormDialog>
+				<CancelTaskButton {task} />
 				<DeleteButton
 					operation="delete_task"
 					input={{ task: task.id }}
@@ -84,9 +96,14 @@
 	</div>
 
 	<Section title="Progress">
+		{#if task.cancelledAt}
+			<p class="mb-2 text-sm text-muted-foreground">
+				This task is cancelled and not counted in progress. Restore it to change its stages.
+			</p>
+		{/if}
 		<div class="grid gap-2 lg:grid-cols-3">
 			{#each STAGES as stage (stage)}
-				<StageStatusControl {task} {stage} />
+				<StageStatusControl {task} {stage} disabled={!!task.cancelledAt} />
 			{/each}
 		</div>
 	</Section>

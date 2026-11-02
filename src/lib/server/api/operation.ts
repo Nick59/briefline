@@ -22,6 +22,8 @@ export interface Operation<S extends z.ZodObject = z.ZodObject> {
 	input: S;
 	/** Rules that only apply to MCP tool calls; the REST API and dashboard are unaffected. */
 	mcp?: {
+		/** Hidden from tools/list unless the client connects with ?tools=all; still callable. */
+		hidden?: boolean;
 		/** Fields marked required in the tool's input schema. */
 		required?: string[];
 		/** Returns an error message when the call must be refused. */
