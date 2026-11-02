@@ -53,8 +53,9 @@ Requires Node 22.17 or later. Copy `.env.example` to `.env` to configure the ser
 
 `make up` builds the image and starts Briefline on the external `traefik` Docker network, at
 `http://briefline.localhost` by default. Set `BRIEFLINE_DOMAIN` in `.env` to use another domain, and
-`BRIEFLINE_ENTRYPOINT=websecure` with `BRIEFLINE_SCHEME=https` when Traefik terminates TLS. The database lives in the
-`briefline-data` volume; `make clean` deletes it. Run `make` to list every target.
+`BRIEFLINE_ENTRYPOINT=websecure` with `BRIEFLINE_SCHEME=https` when Traefik terminates TLS. The database (`data/briefline.db`) and
+the uploaded images (`data/attachments/`) live in the `data/` folder of the repository, so removing the container
+or running `make clean` keeps them. Back up that folder to back up Briefline. Run `make` to list every target.
 
 ## Connect an AI agent
 

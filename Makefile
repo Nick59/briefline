@@ -14,6 +14,7 @@ build: ## Build the Docker image
 	$(COMPOSE) build
 
 up: env ## Start the app behind Traefik
+	@mkdir -p data
 	$(COMPOSE) up -d --build
 	@echo "Briefline: http://$$(grep -E '^BRIEFLINE_DOMAIN=' .env | cut -d= -f2- | grep . || echo briefline.localhost)"
 
@@ -24,6 +25,7 @@ restart: ## Restart the app container
 	$(COMPOSE) restart $(SERVICE)
 
 rebuild: ## Rebuild the image without cache and restart
+	@mkdir -p data
 	$(COMPOSE) build --no-cache
 	$(COMPOSE) up -d
 
@@ -36,8 +38,8 @@ ps: ## Show container status
 shell: ## Open a shell in the running container
 	$(COMPOSE) exec $(SERVICE) sh
 
-clean: ## Stop the app and delete its database volume
-	$(COMPOSE) down -v
+clean: ## Stop the app and remove its containers; data/ is kept
+	$(COMPOSE) down --remove-orphans
 
 install: ## Install dependencies locally
 	pnpm install

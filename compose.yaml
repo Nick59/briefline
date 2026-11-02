@@ -13,7 +13,7 @@ services:
       PROTOCOL_HEADER: x-forwarded-proto
       HOST_HEADER: x-forwarded-host
     volumes:
-      - briefline-data:/app/data
+      - ./data:/app/data
     networks:
       - traefik
     labels:
@@ -21,9 +21,6 @@ services:
       traefik.http.routers.briefline.rule: Host(`${BRIEFLINE_DOMAIN:-briefline.localhost}`)
       traefik.http.routers.briefline.entrypoints: ${BRIEFLINE_ENTRYPOINT:-web}
       traefik.http.services.briefline.loadbalancer.server.port: '3000'
-
-volumes:
-  briefline-data:
 
 networks:
   traefik:

@@ -1,0 +1,10 @@
+.git
+node_modules
+.svelte-kit
+build
+data
+.env
+.env.*
+!.env.example
+.playwright-mcp
+*.log
