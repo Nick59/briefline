@@ -365,3 +365,7 @@ Pass it with `<MarkdownViewer source={md} extensions={[jiraKeys]} />` (or `exten
 | `PM_BRIEF_MODEL`            | `claude-opus-5-5`               | Claude model for briefs                                                   |
 
 Requests with an `Origin` header from another site are refused on `/api` and `/mcp`.
+
+## License
+
+Copyright (C) 2026 BinariesWorld. Briefline is free software under the [GNU Affero General Public License v3.0](LICENSE). You can use, modify, self-host and share it, including at work. If you distribute a modified version, or run one as a network service, you must publish its full source under the same license.
