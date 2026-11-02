@@ -9,6 +9,7 @@ import {
 	setSpecBriefSchema,
 	createTaskSchema,
 	listTasksQuerySchema,
+	moveEpicSchema,
 	moveProjectSchema,
 	moveTaskSchema,
 	questionStatusSchema,
@@ -381,6 +382,17 @@ export const operations: Operation[] = [
 		summary: 'Update an epic, including its linked external ticket',
 		input: updateEpicSchema.extend({ epic }),
 		run: (app, input, { actor }) => app.epics.update(input.epic, pick(input, 'epic'), actor)
+	}),
+	defineOperation({
+		name: 'move_epic',
+		method: 'POST',
+		path: '/epics/{epic}/move',
+		tag: 'Epics',
+		summary: 'Reorder epics: place an epic before another one of the same project, or last',
+		description:
+			'Send beforeEpic (id or key) to place the epic just before it; omit it or send null for last. Returns the moved epic.',
+		input: moveEpicSchema.extend({ epic }),
+		run: (app, { epic, ...input }) => app.epics.move(epic, input)
 	}),
 	defineOperation({
 		name: 'delete_epic',

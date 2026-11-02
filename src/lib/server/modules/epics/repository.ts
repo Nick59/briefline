@@ -9,6 +9,7 @@ interface EpicRow {
 	summary: string;
 	external_ref: string | null;
 	target_date: string | null;
+	position: number;
 	created_at: string;
 	updated_at: string;
 }
@@ -21,6 +22,7 @@ const toEpic = (row: EpicRow): Epic => ({
 	summary: row.summary,
 	externalRef: fromJson<ExternalRef | null>(row.external_ref, null),
 	targetDate: row.target_date,
+	position: row.position,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -31,11 +33,21 @@ export class EpicRepository {
 	listByProject(projectId: string): Epic[] {
 		return all<EpicRow>(
 			this.db,
-			'SELECT * FROM epics WHERE project_id = :projectId ORDER BY created_at DESC',
-			{
-				projectId
-			}
+			'SELECT * FROM epics WHERE project_id = :projectId ORDER BY position, created_at',
+			{ projectId }
 		).map(toEpic);
+	}
+
+	nextPosition(projectId: string): number {
+		return one<{ next: number }>(
+			this.db,
+			'SELECT COALESCE(MAX(position) + 1, 0) AS next FROM epics WHERE project_id = :projectId',
+			{ projectId }
+		)!.next;
+	}
+
+	setPosition(id: string, position: number) {
+		run(this.db, 'UPDATE epics SET position = :position WHERE id = :id', { id, position });
 	}
 
 	find(idOrKey: string): Epic | undefined {
@@ -59,9 +71,15 @@ export class EpicRepository {
 	insert(epic: Epic) {
 		run(
 			this.db,
-			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, created_at, updated_at)
-			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :createdAt, :updatedAt)`,
-			{ ...this.#params(epic), projectId: epic.projectId, key: epic.key, createdAt: epic.createdAt }
+			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, position, created_at, updated_at)
+			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :position, :createdAt, :updatedAt)`,
+			{
+				...this.#params(epic),
+				projectId: epic.projectId,
+				key: epic.key,
+				position: epic.position,
+				createdAt: epic.createdAt
+			}
 		);
 	}
 

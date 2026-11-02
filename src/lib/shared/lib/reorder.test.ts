@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ProjectSummary } from '#lib/shared/domain/types.ts';
 import { applyMove, planMove } from './reorder.ts';
 
-const list = ['a', 'b', 'c'].map((id) => ({ id }) as ProjectSummary);
-const ids = (projects: ProjectSummary[]) => projects.map((p) => p.id);
+const list = ['a', 'b', 'c'].map((id) => ({ id }));
+const ids = (items: { id: string }[]) => items.map((item) => item.id);
 
-describe('project reorder', () => {
-	it('moves before another project or last', () => {
+describe('reorder', () => {
+	it('moves before another item or last', () => {
 		expect(ids(applyMove(list, 'c', 'a'))).toEqual(['c', 'a', 'b']);
 		expect(ids(applyMove(list, 'a', null))).toEqual(['b', 'c', 'a']);
 	});

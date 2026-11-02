@@ -1,12 +1,15 @@
 import { computeProgress } from '#lib/shared/domain/progress.ts';
 import {
 	createEpicSchema,
+	moveEpicSchema,
 	updateEpicSchema,
 	type CreateEpicInput,
+	type MoveEpicInput,
 	type UpdateEpicInput
 } from '#lib/shared/domain/schemas.ts';
 import type { Epic, EpicDetail, EpicSummary, ExternalRef } from '#lib/shared/domain/types.ts';
 import { transaction } from '../../db/connection.ts';
+import { InvalidInputError } from '../../core/errors.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
@@ -80,6 +83,7 @@ export class EpicService {
 				summary: data.summary,
 				externalRef: normalizeRef(data.externalRef),
 				targetDate: data.targetDate ?? null,
+				position: repos.epics.nextPosition(project.id),
 				createdAt: timestamp,
 				updatedAt: timestamp
 			};
@@ -126,6 +130,26 @@ export class EpicService {
 			data: { key: epic.key, title: epic.title, fields: Object.keys(data) }
 		});
 		return epic;
+	}
+
+	/** Places an epic before another epic of its project, or last. Reordering is cosmetic, so it is not logged. */
+	move(idOrKey: string, input: MoveEpicInput): Epic {
+		const { beforeEpic } = moveEpicSchema.parse(input);
+		const { db, repos } = this.deps;
+		const epic = this.get(idOrKey);
+		const before = beforeEpic ? this.get(beforeEpic) : null;
+		if (before && before.projectId !== epic.projectId)
+			throw new InvalidInputError('beforeEpic must belong to the same project');
+		if (before?.id === epic.id) return epic;
+		return transaction(db, () => {
+			const order = repos.epics.listByProject(epic.projectId).filter((e) => e.id !== epic.id);
+			const index = before ? order.findIndex((e) => e.id === before.id) : order.length;
+			order.splice(index, 0, epic);
+			order.forEach((e, position) => {
+				if (e.position !== position) repos.epics.setPosition(e.id, position);
+			});
+			return this.get(epic.id);
+		});
 	}
 
 	delete(idOrKey: string, actor: string) {

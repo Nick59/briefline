@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
-	import { useEpicOrder } from '#lib/shared/lib/epic-order/index.svelte.ts';
+	import { useEpicOrder } from '#lib/features/reorder-epics/index.ts';
 	import { resolve } from '$app/paths';
 	import type { EpicSummary, Task } from '#lib/shared/domain/types.ts';
 	import { Sortable, type DropEvent } from '#lib/shared/lib/dnd/index.ts';
@@ -9,7 +9,7 @@
 
 	let { epics, projectKey }: { epics: (EpicSummary & { tasks: Task[] })[]; projectKey: string } =
 		$props();
-	const epicOrder = useEpicOrder(() => projectKey);
+	const epicOrder = useEpicOrder(() => epics);
 	const taskSortable = new Sortable({
 		ondrop: async ({ id, zone, beforeId }) => {
 			await runOperation(
@@ -22,24 +22,10 @@
 	const zone = 'project-epics';
 	const sortable = new Sortable({ ondrop: drop });
 	const dropBefore = $derived(sortable.over?.zone === zone ? sortable.over.beforeId : undefined);
-	function drop(event: DropEvent) {
-		const next = ordered.map((epic) => epic.id).filter((id) => id !== event.id);
-		const index = event.beforeId === null ? next.length : next.indexOf(event.beforeId);
-		if (index < 0) return;
-		next.splice(index, 0, event.id);
-		persist(next);
+	function drop({ id, beforeId }: DropEvent) {
+		return epicOrder.move(id, beforeId);
 	}
-	const ordered = $derived(epicOrder.sort(epics));
-	const persist = (ids: string[]) => epicOrder.save(ids);
-	function move(id: string, target: string) {
-		const next = ordered.map((epic) => epic.id);
-		const from = next.indexOf(id),
-			to = next.indexOf(target);
-		if (from < 0 || to < 0 || from === to) return;
-		next.splice(from, 1);
-		next.splice(to, 0, id);
-		persist(next);
-	}
+	const ordered = $derived(epicOrder.epics);
 </script>
 
 <div {@attach sortable.zone(zone)}>
@@ -67,13 +53,13 @@
 					class="cursor-grab px-1 text-xs text-muted-foreground disabled:opacity-25"
 					aria-label="Move {epic.title} up"
 					disabled={index === 0}
-					onclick={() => move(epic.id, ordered[index - 1].id)}>↑</button
+					onclick={() => epicOrder.move(epic.id, ordered[index - 1].id)}>↑</button
 				>
 				<button
 					class="cursor-grab px-1 text-xs text-muted-foreground disabled:opacity-25"
 					aria-label="Move {epic.title} down"
 					disabled={index === ordered.length - 1}
-					onclick={() => move(epic.id, ordered[index + 1].id)}>↓</button
+					onclick={() => epicOrder.move(epic.id, ordered[index + 2]?.id ?? null)}>↓</button
 				>
 			</div>
 			<ol>

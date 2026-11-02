@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { useEpicOrder } from '#lib/shared/lib/epic-order/index.svelte.ts';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
 	import { resolve } from '$app/paths';
@@ -13,6 +12,7 @@
 	import { ReadinessBadge } from '#lib/entities/epic/index.ts';
 	import { CreateProjectDialog } from '#lib/features/project-form/index.ts';
 	import { PROJECT_ZONE, useProjectOrder } from '#lib/features/reorder-projects/index.ts';
+	import { useEpicOrder } from '#lib/features/reorder-epics/index.ts';
 
 	interface Props {
 		projects: ProjectSummary[];
@@ -22,8 +22,7 @@
 	}
 
 	let { projects, activeProjectKey, activeEpics, onnavigate }: Props = $props();
-	const epicOrder = useEpicOrder(() => activeProjectKey);
-	const orderedEpics = $derived(epicOrder.sort(activeEpics));
+	const epicOrder = useEpicOrder(() => activeEpics);
 	const path = $derived(page.url.pathname);
 	const order = useProjectOrder(() => projects);
 	const { sortable } = order;
@@ -85,7 +84,7 @@
 			</a>
 			{#if active}
 				<ul class="my-1 ml-[1.15rem] space-y-0.5 border-l pl-2">
-					{#each orderedEpics as epic (epic.id)}
+					{#each epicOrder.epics as epic (epic.id)}
 						{@const stage = epicDisplayStage(epic.progress)}
 						{@const epicHref = resolve('/projects/[project]/epics/[epic]', {
 							project: project.key,

@@ -200,6 +200,7 @@ in an `attachments` folder next to the database (`BRIEFLINE_ATTACHMENTS_DIR` ove
 `BODY_SIZE_LIMIT=15M` so adapter-node accepts the base64 payload.
 
 Projects keep a user-defined order (drag them in the sidebar or on the projects page, or call `move_project` with `beforeProject`; omit it to move last).
+Epics keep a user-defined order within their project (drag them on the project timeline, or call `move_epic` with `beforeEpic`; omit it to move last).
 
 Conventions: ids and keys are interchangeable (`SHOP`, `SHOP-E1`, `SHOP-12`); `X-Actor` names who made a change in
 the activity log and ticket comments; errors are `{ "error": { "code", "message", "issues" } }`.
