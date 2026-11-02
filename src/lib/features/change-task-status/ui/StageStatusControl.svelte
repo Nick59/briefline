@@ -11,7 +11,11 @@
 	import { StatusIcon, StageIcon } from '#lib/entities/work-status/index.ts';
 	import { moveTask } from '../model/move-task.ts';
 
-	let { task, stage }: { task: Task; stage: Stage } = $props();
+	let {
+		task,
+		stage,
+		disabled = false
+	}: { task: Task; stage: Stage; disabled?: boolean } = $props();
 </script>
 
 <div class="flex items-center justify-between gap-3 rounded-lg border bg-card p-2 pl-3">
@@ -29,8 +33,9 @@
 				type="button"
 				role="radio"
 				aria-checked={active}
+				{disabled}
 				class={cn(
-					'flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors',
+					'flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors disabled:pointer-events-none disabled:opacity-60',
 					active ? 'bg-card font-medium shadow-xs' : 'text-muted-foreground hover:text-foreground'
 				)}
 				onclick={() => !active && moveTask(task.id, stage, status)}

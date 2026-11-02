@@ -22,6 +22,8 @@ import type { SyncJobFilter } from './repository.ts';
 
 export const SYNC_TRIGGERS = new Set<DomainEvent['type']>([
 	'task.stage_changed',
+	'task.cancelled',
+	'task.restored',
 	'task.created',
 	'task.deleted',
 	'epic.created',
@@ -110,7 +112,12 @@ export class TicketSyncService {
 				this.#enqueue(epic, null, epic.externalRef, this.#epicUpdate(epic, comment))
 			);
 		}
-		if (event.type === 'task.stage_changed' && event.taskId) {
+		if (
+			(event.type === 'task.stage_changed' ||
+				event.type === 'task.cancelled' ||
+				event.type === 'task.restored') &&
+			event.taskId
+		) {
 			const task = this.deps.repos.tasks.find(event.taskId);
 			if (task?.externalRef?.provider === project.ticketing.provider) {
 				this.#background(
@@ -126,12 +133,19 @@ export class TicketSyncService {
 	}
 
 	#comment(event: DomainEvent): string | null {
+		const footer = `_Updated by ${event.actor} from the AI project dashboard._`;
+		if (event.type === 'task.cancelled') {
+			const { key, title, reason } = event.data;
+			return [`**${key}** ${title}: cancelled`, reason, footer].filter(Boolean).join('\n\n');
+		}
+		if (event.type === 'task.restored') {
+			const { key, title } = event.data;
+			return [`**${key}** ${title}: restored`, footer].join('\n\n');
+		}
 		if (event.type !== 'task.stage_changed') return null;
 		const { key, title, stage, to, note } = event.data;
 		const line = `**${key}** ${title}: ${STAGE_LABELS[stage]} → ${STATUS_LABELS[to]}`;
-		return [line, note, `_Updated by ${event.actor} from the AI project dashboard._`]
-			.filter(Boolean)
-			.join('\n\n');
+		return [line, note, footer].filter(Boolean).join('\n\n');
 	}
 
 	#epicUpdate(epic: Epic, comment: string | null): TicketUpdate {

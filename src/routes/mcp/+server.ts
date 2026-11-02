@@ -8,7 +8,7 @@ const SESSION_HEADER = 'mcp-session-id';
 
 // Streamable HTTP transport without a server-initiated stream: every POST carries one JSON-RPC message
 // or a batch, answered as JSON. `initialize` opens a session, returned in the Mcp-Session-Id header.
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
 	let payload: unknown;
 	try {
 		payload = await readJsonBody(request);
@@ -22,7 +22,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		app(),
 		payload,
 		actorFrom(request.headers, 'mcp'),
-		request.headers.get(SESSION_HEADER)
+		request.headers.get(SESSION_HEADER),
+		{ allTools: url.searchParams.get('tools') === 'all' }
 	);
 	const headers = newSessionId ? { 'Mcp-Session-Id': newSessionId } : undefined;
 	return body === null

@@ -12,6 +12,29 @@ const task = (dev: string, test: string, deploy: string) => ({
 });
 
 describe('computeProgress', () => {
+	const cancelled = (dev: string, test: string, deploy: string) => ({
+		...task(dev, test, deploy),
+		cancelledAt: '2026-01-01T00:00:00.000Z'
+	});
+
+	it('ignores cancelled tasks', () => {
+		const progress = computeProgress([
+			task('done', 'done', 'done'),
+			cancelled('todo', 'todo', 'todo')
+		]);
+		expect(progress).toMatchObject({ percent: 100, status: 'done', currentStage: null });
+		expect(progress.stages.dev.total).toBe(1);
+	});
+
+	it('is empty when every task is cancelled', () => {
+		const progress = computeProgress([
+			cancelled('done', 'done', 'done'),
+			cancelled('todo', 'todo', 'todo')
+		]);
+		expect(progress).toMatchObject({ percent: 0, status: 'todo', currentStage: null });
+		expect(progress.stages.dev.total).toBe(0);
+	});
+
 	it('is empty and todo without tasks', () => {
 		const progress = computeProgress([]);
 		expect(progress).toMatchObject({ percent: 0, status: 'todo', currentStage: null });

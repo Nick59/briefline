@@ -228,6 +228,9 @@ export const MIGRATIONS: Migration[] = [
 	CREATE INDEX attachments_project ON attachments(project_id);
 	CREATE INDEX attachments_task ON attachments(task_id);
 	CREATE INDEX attachments_spec ON attachments(spec_id);
+	`,
+	`
+	ALTER TABLE tasks ADD COLUMN cancelled_at TEXT;
 	`
 ];
 

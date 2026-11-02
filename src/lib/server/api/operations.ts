@@ -1,12 +1,12 @@
 import { z } from 'zod';
 import {
 	addEpicQuestionsSchema,
-	answerQuestionSchema,
 	createEpicSchema,
 	createProjectSchema,
 	createTicketingConnectionSchema,
 	createSpecSchema,
 	setSpecBriefSchema,
+	cancelTaskSchema,
 	createTaskSchema,
 	listTasksQuerySchema,
 	moveProjectSchema,
@@ -92,6 +92,12 @@ const connection = z.string().min(1).describe('Ticketing connection id');
 const pick = <T extends Record<string, unknown>, K extends keyof T>(input: T, ...keys: K[]) =>
 	Object.fromEntries(Object.entries(input).filter(([k]) => !keys.includes(k as K))) as Omit<T, K>;
 
+const specOwner = (input: { project?: string; epic?: string; task?: string }) => {
+	const owners = (['project', 'epic', 'task'] as const).filter((type) => input[type]);
+	if (owners.length !== 1) throw new InvalidInputError('Send exactly one of project, epic or task');
+	return { type: owners[0], id: input[owners[0]]! };
+};
+
 export const operations: Operation[] = [
 	defineOperation({
 		name: 'find_tickets',
@@ -120,6 +126,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'create_project',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/projects',
 		tag: 'Projects',
@@ -154,6 +161,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'move_project',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/projects/{project}/move',
 		tag: 'Projects',
@@ -165,6 +173,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'delete_project',
+		mcp: { hidden: true },
 		method: 'DELETE',
 		path: '/projects/{project}',
 		tag: 'Projects',
@@ -180,10 +189,11 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/activity',
 		tag: 'Activity',
-		summary: 'Activity across all projects',
-		description: `${ACTIVITY_PAGING.replace('default 10, max 100', `default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX}`)} Filter by \`project\`, by exact \`actor\`, or by \`who\` (people are the dashboard and the profile name; agents are everyone else).`,
+		summary: 'Activity across all projects, or in one project or epic',
+		description: `${ACTIVITY_PAGING.replace('default 10, max 100', `default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX}`)} Filter by \`project\` or \`epic\`, by exact \`actor\`, or by \`who\` (people are the dashboard and the profile name; agents are everyone else).`,
 		input: z.object({
 			project: project.optional(),
+			epic: epic.optional(),
 			actor: z.string().min(1).optional().describe('Only entries by this actor'),
 			who: z.enum(ACTIVITY_WHO).default('all').describe('all, people or agents'),
 			limit: z.coerce
@@ -197,17 +207,6 @@ export const operations: Operation[] = [
 		}),
 		run: (app, { limit = ACTIVITY_LIST_DEFAULT, offset = 0, ...filter }) =>
 			listedPage(app.activity.list({ ...filter, limit, offset }), { limit, offset })
-	}),
-	defineOperation({
-		name: 'get_project_activity',
-		method: 'GET',
-		path: '/projects/{project}/activity',
-		tag: 'Activity',
-		summary: 'Recent activity in a project',
-		description: ACTIVITY_PAGING,
-		input: z.object({ project, limit: pageLimit, offset }),
-		run: (app, { project, limit, offset }) =>
-			pagedResult(app.activity.forProject(project, { limit, offset }), { limit, offset })
 	}),
 	defineOperation({
 		name: 'list_agents',
@@ -394,17 +393,6 @@ export const operations: Operation[] = [
 			return { deleted: true };
 		}
 	}),
-	defineOperation({
-		name: 'get_epic_activity',
-		method: 'GET',
-		path: '/epics/{epic}/activity',
-		tag: 'Activity',
-		summary: 'Recent activity in an epic',
-		description: ACTIVITY_PAGING,
-		input: z.object({ epic, limit: pageLimit, offset }),
-		run: (app, { epic, limit, offset }) =>
-			pagedResult(app.activity.forEpic(epic, { limit, offset }), { limit, offset })
-	}),
 
 	// Tasks
 	defineOperation({
@@ -442,9 +430,30 @@ export const operations: Operation[] = [
 		method: 'PATCH',
 		path: '/tasks/{task}',
 		tag: 'Tasks',
-		summary: 'Update a task',
-		input: updateTaskSchema.extend({ task }),
-		run: (app, input, { actor }) => app.tasks.update(input.task, pick(input, 'task'), actor)
+		summary: 'Update a task, or cancel and restore it',
+		description:
+			'cancelled: true drops a task that will not be done: it stays on the board but leaves epic and project progress, and its stage statuses are kept. cancelled: false restores it. A restore is applied before the other changes; stage changes on a cancelled task are refused.',
+		input: updateTaskSchema.extend({
+			task,
+			cancelled: z.boolean().optional(),
+			cancelReason: cancelTaskSchema.shape.reason.describe(
+				'Why the task was dropped; recorded in the activity log and ticket comment. Only with cancelled: true'
+			)
+		}),
+		run: (app, { task, cancelled, cancelReason, ...fields }, { actor }) => {
+			if (cancelReason !== undefined && cancelled !== true)
+				throw new InvalidInputError('cancelReason needs cancelled: true');
+			if (cancelled === undefined) return app.tasks.update(task, fields, actor);
+			if (cancelled === false) app.tasks.restore(task, actor);
+			else if (fields.stages) {
+				const current = app.tasks.get(task);
+				throw new InvalidInputError(`Task ${current.key} is cancelled; restore it first`);
+			}
+			if (Object.keys(fields).length) app.tasks.update(task, fields, actor);
+			return cancelled
+				? app.tasks.cancel(task, { reason: cancelReason }, actor)
+				: app.tasks.get(task);
+		}
 	}),
 	defineOperation({
 		name: 'set_task_stage_status',
@@ -625,44 +634,34 @@ export const operations: Operation[] = [
 			app.questions.reply(input.question, pick(input, 'question'), actor)
 	}),
 	defineOperation({
-		name: 'answer_question',
-		method: 'POST',
-		path: '/questions/{question}/answer',
-		tag: 'Questions',
-		summary: 'Answer a question',
-		description:
-			'Resolves the thread with a final answer. Use reply_to_question to add details without resolving it.',
-		input: answerQuestionSchema.extend({ question }),
-		run: (app, input, { actor }) =>
-			app.questions.answer(input.question, pick(input, 'question'), actor)
-	}),
-	defineOperation({
-		name: 'ignore_question',
-		method: 'POST',
-		path: '/questions/{question}/ignore',
-		tag: 'Questions',
-		summary: 'Ignore a question: the agent uses its own judgement',
-		input: z.object({ question }),
-		run: (app, { question }, { actor }) => app.questions.ignore(question, actor)
-	}),
-	defineOperation({
-		name: 'reopen_question',
-		method: 'POST',
-		path: '/questions/{question}/reopen',
-		tag: 'Questions',
-		summary: 'Reopen an answered or ignored question and clear its answer',
-		input: z.object({ question }),
-		run: (app, { question }, { actor }) => app.questions.reopen(question, actor)
-	}),
-	defineOperation({
 		name: 'update_question',
 		method: 'PATCH',
 		path: '/questions/{question}',
 		tag: 'Questions',
-		summary: 'Edit the text, context or suggested answers of a question',
-		input: updateQuestionSchema.extend({ question }),
-		run: (app, input, { actor }) =>
-			app.questions.update(input.question, pick(input, 'question'), actor)
+		summary: 'Edit a question, and answer, ignore or reopen it',
+		description:
+			'status answered resolves the thread with a final answer (send answer; answer alone implies answered), ignored means the agent uses its own judgement, open reopens it and clears the answer. Edits to the text, context or options and a status change can be sent together. Use reply_to_question to add details without resolving the thread.',
+		input: updateQuestionSchema.extend({
+			question,
+			status: questionStatusSchema.optional(),
+			answer: z.string().optional().describe('Final answer, with status answered')
+		}),
+		run: (app, { question, status, answer, ...fields }, { actor }) => {
+			const target = status ?? (answer === undefined ? undefined : 'answered');
+			if (target === 'answered' && answer === undefined)
+				throw new InvalidInputError('Send answer with status answered');
+			if (target !== undefined && target !== 'answered' && answer !== undefined)
+				throw new InvalidInputError('answer only goes with status answered');
+			let result =
+				target === undefined || Object.keys(fields).length
+					? app.questions.update(question, fields, actor)
+					: undefined;
+			if (target === 'answered')
+				result = app.questions.answer(question, { answer: answer! }, actor);
+			else if (target === 'ignored') result = app.questions.ignore(question, actor);
+			else if (target === 'open') result = app.questions.reopen(question, actor);
+			return result;
+		}
 	}),
 	defineOperation({
 		name: 'delete_question',
@@ -679,70 +678,47 @@ export const operations: Operation[] = [
 
 	// Specs
 	defineOperation({
-		name: 'list_project_specs',
+		name: 'list_specs',
 		method: 'GET',
-		path: '/projects/{project}/specs',
+		path: '/specs',
 		tag: 'Specs',
-		summary: 'List the specs of a project (without content)',
+		summary: 'List the specs of a project, epic or task (without content)',
 		description:
-			'Project specs hold context that applies to every epic: architecture, conventions, product goals.',
-		input: z.object({ project }),
-		run: (app, { project }) => app.specs.listForProject(project)
+			"Send exactly one of project, epic or task. Project specs hold context that applies to every epic: architecture, conventions, product goals. includeTaskSpecs adds the specs of the epic's tasks.",
+		input: z.object({
+			project: project.optional(),
+			epic: epic.optional(),
+			task: task.optional(),
+			includeTaskSpecs: z.stringbool().optional()
+		}),
+		run: (app, input) => {
+			const owner = specOwner(input);
+			if (owner.type === 'project') return app.specs.listForProject(owner.id);
+			if (owner.type === 'epic') return app.specs.listForEpic(owner.id, input.includeTaskSpecs);
+			return app.specs.listForTask(owner.id);
+		}
 	}),
 	defineOperation({
-		name: 'add_project_spec',
+		name: 'add_spec',
 		method: 'POST',
-		path: '/projects/{project}/specs',
+		path: '/specs',
 		tag: 'Specs',
-		summary: 'Attach a markdown spec to a project',
-		description: BRIEF_GUIDANCE,
-		input: createSpecSchema.extend({ project }),
+		summary: 'Attach a markdown spec to a project, epic or task',
+		description: `Send exactly one of project, epic or task. ${BRIEF_GUIDANCE}`,
+		input: createSpecSchema.extend({
+			project: project.optional(),
+			epic: epic.optional(),
+			task: task.optional()
+		}),
 		mcp: { required: ['brief'], check: briefCheck },
 		successStatus: 201,
-		run: (app, input, { actor }) =>
-			app.specs.createForProject(input.project, pick(input, 'project'), actor)
-	}),
-	defineOperation({
-		name: 'list_epic_specs',
-		method: 'GET',
-		path: '/epics/{epic}/specs',
-		tag: 'Specs',
-		summary: 'List the specs of an epic (without content)',
-		input: z.object({ epic, includeTaskSpecs: z.stringbool().optional() }),
-		run: (app, { epic, includeTaskSpecs }) => app.specs.listForEpic(epic, includeTaskSpecs)
-	}),
-	defineOperation({
-		name: 'add_epic_spec',
-		method: 'POST',
-		path: '/epics/{epic}/specs',
-		tag: 'Specs',
-		summary: 'Attach a markdown spec to an epic',
-		description: BRIEF_GUIDANCE,
-		input: createSpecSchema.extend({ epic }),
-		mcp: { required: ['brief'], check: briefCheck },
-		successStatus: 201,
-		run: (app, input, { actor }) => app.specs.createForEpic(input.epic, pick(input, 'epic'), actor)
-	}),
-	defineOperation({
-		name: 'list_task_specs',
-		method: 'GET',
-		path: '/tasks/{task}/specs',
-		tag: 'Specs',
-		summary: 'List the specs of a task (without content)',
-		input: z.object({ task }),
-		run: (app, { task }) => app.specs.listForTask(task)
-	}),
-	defineOperation({
-		name: 'add_task_spec',
-		method: 'POST',
-		path: '/tasks/{task}/specs',
-		tag: 'Specs',
-		summary: 'Attach a markdown spec to a task',
-		description: BRIEF_GUIDANCE,
-		input: createSpecSchema.extend({ task }),
-		mcp: { required: ['brief'], check: briefCheck },
-		successStatus: 201,
-		run: (app, input, { actor }) => app.specs.createForTask(input.task, pick(input, 'task'), actor)
+		run: (app, input, { actor }) => {
+			const owner = specOwner(input);
+			const data = pick(input, 'project', 'epic', 'task');
+			if (owner.type === 'project') return app.specs.createForProject(owner.id, data, actor);
+			if (owner.type === 'epic') return app.specs.createForEpic(owner.id, data, actor);
+			return app.specs.createForTask(owner.id, data, actor);
+		}
 	}),
 	defineOperation({
 		name: 'get_spec',
@@ -815,6 +791,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'update_user_profile',
+		mcp: { hidden: true },
 		method: 'PUT',
 		path: '/profile',
 		tag: 'Profile',
@@ -828,6 +805,7 @@ export const operations: Operation[] = [
 	// Ticketing
 	defineOperation({
 		name: 'list_ticket_providers',
+		mcp: { hidden: true },
 		method: 'GET',
 		path: '/ticketing/providers',
 		tag: 'Ticketing',
@@ -837,6 +815,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_ticketing_connections',
+		mcp: { hidden: true },
 		method: 'GET',
 		path: '/ticketing/connections',
 		tag: 'Ticketing',
@@ -848,6 +827,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'get_ticketing_connection',
+		mcp: { hidden: true },
 		method: 'GET',
 		path: '/ticketing/connections/{connection}',
 		tag: 'Ticketing',
@@ -857,6 +837,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'create_ticketing_connection',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/ticketing/connections',
 		tag: 'Ticketing',
@@ -869,6 +850,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'update_ticketing_connection',
+		mcp: { hidden: true },
 		method: 'PATCH',
 		path: '/ticketing/connections/{connection}',
 		tag: 'Ticketing',
@@ -880,6 +862,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'delete_ticketing_connection',
+		mcp: { hidden: true },
 		method: 'DELETE',
 		path: '/ticketing/connections/{connection}',
 		tag: 'Ticketing',
@@ -893,6 +876,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'test_ticketing_connection',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/ticketing/connections/{connection}/test',
 		tag: 'Ticketing',
@@ -904,6 +888,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_ticketing_states',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/projects/{project}/ticketing/states',
 		tag: 'Ticketing',
@@ -921,6 +906,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_ticketing_projects',
+		mcp: { hidden: true },
 		method: 'GET',
 		path: '/ticketing/connections/{connection}/projects',
 		tag: 'Ticketing',
@@ -933,6 +919,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'set_project_ticketing',
+		mcp: { hidden: true },
 		method: 'PUT',
 		path: '/projects/{project}/ticketing',
 		tag: 'Ticketing',
@@ -954,6 +941,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_sync_jobs',
+		mcp: { hidden: true },
 		method: 'GET',
 		path: '/projects/{project}/sync-jobs',
 		tag: 'Ticketing',
@@ -974,6 +962,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'retry_sync_job',
+		mcp: { hidden: true },
 		method: 'POST',
 		path: '/sync-jobs/{job}/retry',
 		tag: 'Ticketing',

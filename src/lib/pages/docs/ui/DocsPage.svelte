@@ -139,7 +139,7 @@ ${fence(
 Header:   X-Actor: <your-agent-name>${tokenRequired ? '\nHeader:   Authorization: Bearer <token>' : ''}`
 )}
 
-The server speaks JSON-RPC over \`POST /mcp\` and returns an \`Mcp-Session-Id\` header from \`initialize\`; clients that send it back get their changes grouped into a session. Check the client's docs for where it takes a URL and custom headers.
+The server speaks JSON-RPC over \`POST /mcp\` and returns an \`Mcp-Session-Id\` header from \`initialize\`; clients that send it back get their changes grouped into a session. Check the client's docs for where it takes a URL and custom headers. Setup tools (projects, ticketing connections, profile) are hidden from the tool list by default; use \`${url}?tools=all\` to list them too.
 
 - Instructions: put the rules in the client's global instructions file, and name the project in the repository's \`AGENTS.md\`.
 - Verify: list the client's MCP tools. They match the operations below.`
@@ -166,7 +166,7 @@ ${fence(
 When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) name a Briefline project, track the work there through the \`briefline\` MCP server:
 - Before planning, read the project with \`get_project\` and the current epic with \`get_epic\`.
 - At the start of a session, call \`get_last_session\` (with the project when known) to read what the previous session did, and \`get_activity_changes\` to see what changed since your last pull.
-- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`list_project_specs\` before planning, and add new ones with \`add_project_spec\`.
+- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`list_specs\` (\`project\`) before planning, and add new ones with \`add_spec\`.
 - Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`list_epic_questions\` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single \`create_epic\` call.
 - Every spec includes a plain-language \`brief\` for non-engineers.

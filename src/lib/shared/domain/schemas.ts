@@ -153,6 +153,12 @@ export const setStageStatusSchema = z.object({
 		.describe('Optional note recorded in the activity log and ticket comment')
 });
 
+export const cancelTaskSchema = z.object({
+	reason: text(2000)
+		.optional()
+		.describe('Why the task was dropped; recorded in the activity log and ticket comment')
+});
+
 export const briefSchema = z.object({
 	summary: z.string().describe('Two sentences a product manager understands, no jargon'),
 	whyItMatters: z.string().describe('The user or business reason for this work'),
@@ -306,6 +312,7 @@ export type CreateEpicInput = z.input<typeof createEpicSchema>;
 export type UpdateEpicInput = z.input<typeof updateEpicSchema>;
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
+export type CancelTaskInput = z.input<typeof cancelTaskSchema>;
 export type SetStageStatusInput = z.input<typeof setStageStatusSchema>;
 export type MoveProjectInput = z.input<typeof moveProjectSchema>;
 export type MoveTaskInput = z.input<typeof moveTaskSchema>;

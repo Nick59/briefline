@@ -17,6 +17,7 @@ interface TaskRow {
 	external_ref: string | null;
 	position: number;
 	comment_count: number;
+	cancelled_at: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -38,6 +39,7 @@ const toTask = (row: TaskRow): Task => ({
 	externalRef: fromJson<ExternalRef | null>(row.external_ref, null),
 	position: row.position,
 	commentCount: row.comment_count,
+	cancelledAt: row.cancelled_at,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -125,9 +127,9 @@ export class TaskRepository {
 		run(
 			this.db,
 			`INSERT INTO tasks (id, epic_id, key, title, description, summary, priority, assignee, dev_status,
-			 test_status, deploy_status, external_ref, position, created_at, updated_at)
+			 test_status, deploy_status, external_ref, position, cancelled_at, created_at, updated_at)
 			 VALUES (:id, :epicId, :key, :title, :description, :summary, :priority, :assignee, :dev, :test,
-			 :deploy, :externalRef, :position, :createdAt, :updatedAt)`,
+			 :deploy, :externalRef, :position, :cancelledAt, :createdAt, :updatedAt)`,
 			{ ...this.#params(task), epicId: task.epicId, key: task.key, createdAt: task.createdAt }
 		);
 	}
@@ -137,7 +139,7 @@ export class TaskRepository {
 			this.db,
 			`UPDATE tasks SET epic_id = :epicId, title = :title, description = :description, summary = :summary,
 			 priority = :priority, assignee = :assignee, dev_status = :dev, test_status = :test, deploy_status = :deploy,
-			 external_ref = :externalRef, position = :position, updated_at = :updatedAt WHERE id = :id`,
+			 external_ref = :externalRef, position = :position, cancelled_at = :cancelledAt, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(task)
 		);
 	}
@@ -164,6 +166,7 @@ export class TaskRepository {
 			deploy: task.stages.deploy,
 			externalRef: toJson(task.externalRef),
 			position: task.position,
+			cancelledAt: task.cancelledAt,
 			updatedAt: task.updatedAt
 		};
 	}

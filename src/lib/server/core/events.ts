@@ -24,6 +24,11 @@ export type DomainEvent = Scope &
 				data: { key: string; title: string; fields?: string[] };
 		  }
 		| {
+				type: 'task.cancelled';
+				data: { key: string; title: string; reason?: string };
+		  }
+		| { type: 'task.restored'; data: { key: string; title: string } }
+		| {
 				type: 'task.commented' | 'task.comment_updated' | 'task.comment_deleted';
 				data: { key: string; title: string; commentId: string; body: string };
 		  }

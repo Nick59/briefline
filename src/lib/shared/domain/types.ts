@@ -109,6 +109,8 @@ export interface Task {
 	position: number;
 	/** Number of comments on the task. */
 	commentCount: number;
+	/** Cancelled tasks stay visible but are left out of progress. */
+	cancelledAt: ISODate | null;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }

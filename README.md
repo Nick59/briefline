@@ -128,11 +128,13 @@ Point any client that supports streamable HTTP at `http://localhost:5173/mcp` wi
 
 ### Protocol notes
 
+By default `tools/list` omits the setup and admin tools (projects, ticketing connections, profile, sync jobs) to keep the list small; connect to `/mcp?tools=all` to list them too. They stay callable either way.
+
 The MCP server speaks JSON-RPC over HTTP (`POST /mcp`) with no server-initiated stream (`GET` returns 405). Its `initialize` result carries instructions that
 explain the model and the expected workflow to the agent, and the response carries an `Mcp-Session-Id` header (see Sessions).
 
 Over MCP, agents must send a `brief` (the plain-language summary for non-engineers) whenever they create a spec or change its
-content (`add_project_spec`, `add_epic_spec`, `add_task_spec`, `update_spec` with `content`, `create_epic` specs). `set_spec_brief` rewrites the
+content (`add_spec`, `update_spec` with `content`, `create_epic` specs). `set_spec_brief` rewrites the
 brief alone. The REST API and the dashboard keep the brief optional.
 
 ### Agent rules
@@ -148,7 +150,7 @@ When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) na
 
 - Before planning, read the project with `get_project` and the current epic with `get_epic`.
 - At the start of a session, call `get_last_session` (with the project when known) to read what the previous session did, and `get_activity_changes` to see what changed since your last pull.
-- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with `list_project_specs` before planning, and add new ones with `add_project_spec`.
+- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with `list_specs` (`project`) before planning, and add new ones with `add_spec`.
 - Ask anything unclear with `add_epic_questions` before starting an epic. Questions are threads: people can open them too, and anyone adds details with `reply_to_question`. Tasks can't start while questions are open; read the answers and the replies (`messages`) with `list_epic_questions` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single `create_epic` call.
 - Every spec includes a plain-language `brief` for non-engineers.
@@ -183,6 +185,8 @@ curl -X POST localhost:5173/api/v1/projects/SHOP/epics -H 'content-type: applica
 curl -X PUT localhost:5173/api/v1/tasks/SHOP-7/stages/dev -H 'content-type: application/json' -d '{"status":"done","note":"Merged #128"}'
 ```
 
+Cancelling: `update_task` with `cancelled: true` (`PATCH /api/v1/tasks/{task}`, optional `cancelReason`) keeps a task on the board but leaves it out of epic, project and ticket progress; its stage statuses are kept and stage changes are refused until `cancelled: false` restores it.
+
 Task comments: `get_task` returns `comments` (markdown, oldest first) and task lists carry a `commentCount`. `add_task_comment` (`POST /api/v1/tasks/{task}/comments`) and `list_task_comments` work for anyone; `update_task_comment` and `delete_task_comment` (`/api/v1/task-comments/{comment}`) only for the comment's author (403 otherwise).
 
 ### Image uploads
@@ -203,7 +207,7 @@ Projects keep a user-defined order (drag them in the sidebar or on the projects 
 
 Conventions: ids and keys are interchangeable (`SHOP`, `SHOP-E1`, `SHOP-12`); `X-Actor` names who made a change in
 the activity log and ticket comments; errors are `{ "error": { "code", "message", "issues" } }`.
-Activity (`get_project_activity`, `get_epic_activity`) is paginated, newest first: pass `limit` (default 10, max 100) and
+Activity (`list_activity`, filtered by `project` or `epic`) is paginated, newest first: pass `limit` (default 50, max 200) and
 `offset`, and read `{ items, total, limit, offset, hasMore, nextOffset }` to fetch older entries.
 
 To see only what changed since your last pull, call `get_activity_changes` (`GET /api/v1/activity/changes`). It

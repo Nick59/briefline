@@ -44,7 +44,10 @@ export function epicDisplayStage(
 		: null;
 }
 
-export function computeProgress(items: { stages: StageStatuses }[]): Progress {
+export function computeProgress(
+	all: { stages: StageStatuses; cancelledAt?: string | null }[]
+): Progress {
+	const items = all.filter((item) => !item.cancelledAt);
 	const stages = Object.fromEntries(STAGES.map((s) => [s, emptyCounts()])) as Record<
 		Stage,
 		StatusCounts

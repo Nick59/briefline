@@ -147,16 +147,16 @@ describe('get_activity_changes', () => {
 		await changes();
 
 		const task = app.tasks.list(epic.key)[0];
-		await run('answer_question', { question: question.id, answer: 'This' });
-		await run('ignore_question', { question: question.id });
-		await run('reopen_question', { question: question.id });
-		await run('answer_question', { question: question.id, answer: 'Again' });
+		await run('update_question', { question: question.id, answer: 'This' });
+		await run('update_question', { question: question.id, status: 'ignored' });
+		await run('update_question', { question: question.id, status: 'open' });
+		await run('update_question', { question: question.id, answer: 'Again' });
 		await run('reply_to_question', { question: question.id, body: 'Detail' });
 		await run('create_task', { epic: epic.key, title: 'Another' });
 		await run('update_task', { task: task.key, title: 'Renamed', description: 'Text' });
 		await run('set_task_stage_status', { task: task.key, stage: 'dev', status: 'in_progress' });
 		await run('add_epic_questions', { epic: epic.key, questions: [{ question: 'More?' }] });
-		await run('add_epic_spec', { epic: epic.key, title: 'Second', content: 'x' });
+		await run('add_spec', { epic: epic.key, title: 'Second', content: 'x' });
 		await run('update_spec', { spec: spec.id, content: 'two' });
 		await run('set_spec_brief', {
 			spec: spec.id,
