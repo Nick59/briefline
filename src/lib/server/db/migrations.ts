@@ -259,6 +259,15 @@ export const MIGRATIONS: Migration[] = [
 	BEGIN
 		UPDATE epics SET specs_approved_at = NULL, specs_approved_by = NULL WHERE id IN (OLD.epic_id, NEW.epic_id);
 	END;
+	`,
+	`
+	CREATE TABLE ticket_comments (
+		comment_id TEXT NOT NULL,
+		connection_id TEXT NOT NULL REFERENCES ticketing_connections(id) ON DELETE CASCADE,
+		ticket_key TEXT NOT NULL,
+		remote_id TEXT NOT NULL,
+		PRIMARY KEY (comment_id, connection_id, ticket_key)
+	);
 	`
 ];
 

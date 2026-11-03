@@ -32,5 +32,8 @@ export const dryRunProvider: TicketProvider = {
 			{ id: 'done', name: 'Done', group: 'completed' }
 		];
 	},
+	async syncComment(_ctx, comment) {
+		return comment.body === null ? null : comment.id;
+	},
 	async push() {}
 };

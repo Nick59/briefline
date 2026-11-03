@@ -138,6 +138,27 @@ export const planeProvider: TicketProvider = {
 	},
 	listStates: fetchStates,
 	listProjects: fetchProjects,
+	async syncComment(ctx, comment) {
+		const projectId = await resolveProjectId(ctx);
+		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);
+		await expectOk(lookup, 'Plane find work item', ctx);
+		const { id } = (await lookup.json()) as { id: string };
+		const path = `/projects/${projectId}/issues/${id}/comments/${comment.remoteId ? `${encodeURIComponent(comment.remoteId)}/` : ''}`;
+		const response = await request(ctx, path, {
+			method: comment.body === null ? 'DELETE' : comment.remoteId ? 'PATCH' : 'POST',
+			body:
+				comment.body === null
+					? undefined
+					: JSON.stringify({
+							comment_html: `<p>${escapeHtml(comment.body).replace(/\n/g, '<br>')}</p>`
+						})
+		});
+		if (comment.body === null && response.status === 404) return null;
+		await expectOk(response, 'Plane comment sync', ctx);
+		if (comment.body === null) return null;
+		const data = (await response.json()) as { id: string };
+		return data.id;
+	},
 	async push(ctx, update) {
 		const projectId = await resolveProjectId(ctx);
 		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);

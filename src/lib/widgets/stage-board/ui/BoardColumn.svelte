@@ -10,6 +10,7 @@
 	import { StageStatusMenu } from '#lib/features/change-task-status/index.ts';
 
 	interface Props {
+		locked?: boolean;
 		stage: Stage;
 		status: WorkStatus;
 		tasks: Task[];
@@ -18,7 +19,7 @@
 		sortable: Sortable;
 	}
 
-	let { stage, status, tasks, projectKey, epicKey, sortable }: Props = $props();
+	let { stage, status, tasks, projectKey, epicKey, sortable, locked = false }: Props = $props();
 
 	const counted = $derived(tasks.filter((t) => !t.cancelledAt).length);
 	const zone = $derived(`${stage}:${status}`);
@@ -36,7 +37,7 @@
 		isTarget && 'border-brand/40 bg-brand/5'
 	)}
 	aria-label="{STATUS_LABELS[status]}: {counted} tasks"
-	{@attach sortable.zone(zone)}
+	{@attach locked ? undefined : sortable.zone(zone)}
 >
 	<header class="flex items-center gap-2 px-1.5 pt-1 text-xs font-medium">
 		<StatusIcon {status} tone={status === 'todo' ? undefined : stageTone[stage]} size={13} />
@@ -53,11 +54,13 @@
 				task: task.key
 			})}
 			class={cn(
-				!task.cancelledAt &&
+				!locked &&
+					!task.cancelledAt &&
 					'cursor-grab touch-manipulation select-none [-webkit-touch-callout:none]',
+				locked && 'opacity-50 grayscale',
 				sortable.active?.id === task.id && 'opacity-40'
 			)}
-			{@attach task.cancelledAt ? undefined : sortable.item(task.id, zone)}
+			{@attach locked || task.cancelledAt ? undefined : sortable.item(task.id, zone)}
 		>
 			{#snippet actions()}
 				{#if !task.cancelledAt}<StageStatusMenu {task} {stage} />{/if}
@@ -70,7 +73,7 @@
 				isTarget && 'border-brand/50 text-brand'
 			)}
 		>
-			Drop tasks here
+			{locked ? 'No tasks' : 'Drop tasks here'}
 		</p>
 	{/each}
 	{#if tasks.length > 0 && dropBefore === null}{@render dropLine()}{/if}

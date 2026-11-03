@@ -131,7 +131,7 @@ describe('task comments', () => {
 		expect(app.activity.forProject('SHOP').items[0].target).toMatchObject({ taskKey: 'SHOP-1' });
 	});
 
-	it('does not trigger ticket sync', async () => {
+	it('does not mirror task comments onto an epic ticket', async () => {
 		const { app, calls } = setup();
 		connectProject(app, 'SHOP', 'github', { repo: 'acme/shop' });
 		const epic = app.epics.get('SHOP-E1');

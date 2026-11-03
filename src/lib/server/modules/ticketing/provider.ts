@@ -44,11 +44,19 @@ export interface PushResult {
 	note?: string;
 }
 
+export interface TicketCommentUpdate {
+	id: string;
+	/** Null means delete the mirrored comment. */
+	body: string | null;
+	remoteId: string | null;
+}
+
 export interface TicketProvider extends Omit<TicketProviderInfo, 'supportsProjects'> {
 	/** Lower-case names of the authentication headers this provider sets itself. */
 	reservedHeaders: string[];
 	ticketUrl(ref: ExternalRef, settings: Record<string, string>): string | null;
 	push(ctx: TicketContext, update: TicketUpdate): Promise<PushResult | void>;
+	syncComment?(ctx: TicketContext, comment: TicketCommentUpdate): Promise<string | null>;
 	/** States an issue can be moved to. Group values: backlog, unstarted, started, completed. */
 	listStates(ctx: ProviderContext): Promise<ProviderState[]>;
 	/** Cheap authenticated request; throws TicketProviderError when the connection does not work. */

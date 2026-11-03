@@ -36,6 +36,14 @@
 	}
 
 	let { project, epic, selectedSpec, activity, syncJobs, ticketUrl }: Props = $props();
+	const boardLocked = $derived(!epic.specsApprovedAt || epic.openQuestions > 0);
+	const boardLockReason = $derived(
+		!epic.specsApprovedAt && epic.openQuestions > 0
+			? 'Approve specs and resolve open threads before starting tasks.'
+			: !epic.specsApprovedAt
+				? 'Approve specs before starting tasks.'
+				: 'Resolve open threads before starting tasks.'
+	);
 	let questionsOpen = $state(false);
 	let focusQuestion = $state<string | null>(null);
 
@@ -104,6 +112,22 @@
 	{/if}
 
 	<Section title="Board">
+		{#snippet actions()}
+			{#if boardLocked}
+				<span
+					role="status"
+					title={boardLockReason}
+					class="inline-flex items-center gap-1.5 rounded-md border bg-muted/50 px-2 py-1 text-xs font-medium text-muted-foreground"
+				>
+					<LockKeyholeIcon class="size-3.5" aria-hidden="true" />Tasks locked
+				</span>
+			{/if}
+		{/snippet}
+		{#if boardLocked}
+			<p class="text-xs text-muted-foreground">
+				{boardLockReason} Work already in progress can continue.
+			</p>
+		{/if}
 		{#key epic.id}
 			<StageBoard {epic} />
 		{/key}

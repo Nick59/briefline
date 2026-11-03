@@ -374,3 +374,11 @@ Requests with an `Origin` header from another site are refused on `/api` and `/m
 ## License
 
 Copyright (C) 2026 BinariesWorld. Briefline is free software under the [GNU Affero General Public License v3.0](LICENSE). You can use, modify, self-host and share it, including at work. If you distribute a modified version, or run one as a network service, you must publish its full source under the same license.
+
+### Task comment syncing
+
+With automatic ticket sync and comments enabled in project ticketing settings, comments on a task with a linked ticket are mirrored to that ticket. New comments include the full text and author attribution; edits update the same remote comment, and explicit deletions remove it. Comments on tasks without their own linked ticket stay in Briefline. Task title and description edits are not synced.
+
+Comment pushes are recorded in the sync log and failed jobs can be retried. Retries use the current local comment, so an old failed edit cannot overwrite a newer edit or recreate a deleted comment. Existing comments are synced when edited; enabling sync does not backfill them automatically.
+
+The generic webhook emits `ticket.comment` with `ticket` and `comment: { id, remoteId, body, action }`; `action` is `create`, `update`, or `delete`. Consumers should use the stable local `id` to upsert comments and avoid duplicates on delivery retries. A delete carries `body: null`.

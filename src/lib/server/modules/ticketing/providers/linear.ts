@@ -99,6 +99,41 @@ export const linearProvider: TicketProvider = {
 		if (!team) throw new TicketProviderError(`Linear team '${key}' was not found`);
 		return toStates(team.states.nodes);
 	},
+	async syncComment(ctx, comment) {
+		if (comment.body === null) {
+			const result = await graphql<{ commentDelete: { success: boolean } }>(
+				ctx,
+				'mutation($id: String!) { commentDelete(id: $id) { success } }',
+				{ id: comment.remoteId }
+			);
+			if (!result.commentDelete.success)
+				throw new TicketProviderError('Linear comment deletion failed');
+			return null;
+		}
+		if (comment.remoteId) {
+			const result = await graphql<{ commentUpdate: { success: boolean } }>(
+				ctx,
+				'mutation($id: String!, $body: String!) { commentUpdate(id: $id, input: { body: $body }) { success } }',
+				{ id: comment.remoteId, body: comment.body }
+			);
+			if (!result.commentUpdate.success)
+				throw new TicketProviderError('Linear comment update failed');
+			return comment.remoteId;
+		}
+		const { issue } = await graphql<{ issue: { id: string } }>(
+			ctx,
+			'query($id: String!) { issue(id: $id) { id } }',
+			{ id: ctx.ref.key }
+		);
+		const result = await graphql<{ commentCreate: { success: boolean; comment: { id: string } } }>(
+			ctx,
+			'mutation($issueId: String!, $body: String!) { commentCreate(input: { issueId: $issueId, body: $body }) { success comment { id } } }',
+			{ issueId: issue.id, body: comment.body }
+		);
+		if (!result.commentCreate.success)
+			throw new TicketProviderError('Linear comment creation failed');
+		return result.commentCreate.comment.id;
+	},
 	async push(ctx, update) {
 		const { issue } = await graphql<IssueLookup>(
 			ctx,

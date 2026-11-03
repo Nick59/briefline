@@ -122,6 +122,18 @@ export const jiraProvider: TicketProvider = {
 					});
 		return [...seen.values()];
 	},
+	async syncComment(ctx, comment) {
+		const path = `/rest/api/2/issue/${encodeURIComponent(ctx.ref.key)}/comment${comment.remoteId ? `/${encodeURIComponent(comment.remoteId)}` : ''}`;
+		const response = await request(ctx, path, {
+			method: comment.body === null ? 'DELETE' : comment.remoteId ? 'PUT' : 'POST',
+			body: comment.body === null ? undefined : JSON.stringify({ body: comment.body })
+		});
+		if (comment.body === null && response.status === 404) return null;
+		await expectOk(response, 'Jira comment sync', ctx);
+		if (comment.body === null) return null;
+		const data = (await response.json()) as { id: string };
+		return data.id;
+	},
 	async push(ctx, update) {
 		const key = encodeURIComponent(ctx.ref.key);
 		let note: string | undefined;

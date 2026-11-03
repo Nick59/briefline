@@ -15,12 +15,15 @@ import { InvalidInputError, NotFoundError } from '../../core/errors.ts';
 import type { DomainEvent } from '../../core/events.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
-import type { TicketingConnectionService } from './connections.ts';
+import type { ResolvedConnection, TicketingConnectionService } from './connections.ts';
 import type { TicketProviderInfo, TicketUpdate } from './provider.ts';
 import type { TicketProviderRegistry } from './registry.ts';
 import type { SyncJobFilter } from './repository.ts';
 
 export const SYNC_TRIGGERS = new Set<DomainEvent['type']>([
+	'task.commented',
+	'task.comment_updated',
+	'task.comment_deleted',
 	'task.stage_changed',
 	'task.cancelled',
 	'task.restored',
@@ -84,13 +87,13 @@ export class TicketSyncService {
 			epic.externalRef,
 			this.#epicUpdate(epic, `Manual sync requested by ${actor}.`)
 		);
-		return this.#process(job);
+		return this.#background(job);
 	}
 
 	async retry(jobId: string): Promise<SyncJob> {
 		const job = this.deps.repos.syncJobs.find(jobId);
 		if (!job) throw new NotFoundError('Sync job', jobId);
-		return this.#process(job);
+		return this.#background(job);
 	}
 
 	/** Resolves once every background push has finished. */
@@ -105,6 +108,39 @@ export class TicketSyncService {
 		const epic = this.deps.repos.epics.find(event.epicId);
 		if (!epic) return;
 		if (event.type === 'epic.updated' && !event.data.fields?.includes('externalRef')) return;
+
+		if (
+			event.type === 'task.commented' ||
+			event.type === 'task.comment_updated' ||
+			event.type === 'task.comment_deleted'
+		) {
+			if (!project.ticketing.postComments || !event.taskId) return;
+			const task = this.deps.repos.tasks.find(event.taskId);
+			if (!task?.externalRef || task.externalRef.provider !== project.ticketing.provider) return;
+			const timestamp = now();
+			const job: SyncJob = {
+				id: newId(),
+				projectId: project.id,
+				epicId: epic.id,
+				taskId: task.id,
+				provider: task.externalRef.provider,
+				operation: 'sync_comment',
+				payload: {
+					ref: task.externalRef,
+					commentId: event.data.commentId,
+					connectionId: project.ticketing.connectionId
+				},
+				status: 'pending',
+				attempts: 0,
+				lastError: null,
+				message: null,
+				createdAt: timestamp,
+				updatedAt: timestamp
+			};
+			this.deps.repos.syncJobs.insert(job);
+			this.#background(job);
+			return;
+		}
 
 		const comment = project.ticketing.postComments ? this.#comment(event) : null;
 		if (epic.externalRef?.provider === project.ticketing.provider) {
@@ -205,19 +241,82 @@ export class TicketSyncService {
 
 	#background(job: SyncJob) {
 		const { ref } = job.payload as { ref: ExternalRef };
-		const queueKey = `${ref.provider}:${ref.key}`;
+		const queueKey = `${job.projectId}:${ref.provider}:${ref.key}`;
 		const previous = this.#queues.get(queueKey) ?? Promise.resolve();
-		const promise = previous.then(() => this.#process(job));
+		const promise = previous.catch(() => undefined).then(() => this.#process(job));
 		this.#queues.set(queueKey, promise);
 		this.#inflight.add(promise);
-		void promise.finally(() => {
+		const cleanup = () => {
 			this.#inflight.delete(promise);
 			if (this.#queues.get(queueKey) === promise) this.#queues.delete(queueKey);
-		});
+		};
+		void promise.then(cleanup, cleanup);
+		return promise;
+	}
+
+	async #syncComment(
+		job: SyncJob,
+		project: Project,
+		resolved: ResolvedConnection,
+		ref: ExternalRef,
+		result: SyncJob
+	) {
+		const { commentId, connectionId } = job.payload as {
+			commentId: string;
+			connectionId: string;
+		};
+		if (
+			connectionId !== project.ticketing.connectionId ||
+			!project.ticketing.postComments ||
+			!project.ticketing.autoSync
+		) {
+			result.status = 'skipped';
+			result.lastError = 'Comment sync is disabled or the connection changed';
+			return;
+		}
+		const { provider, context } = resolved;
+		if (!provider.syncComment)
+			throw new InvalidInputError('Provider does not support comment sync');
+		const mapping = this.deps.db
+			.prepare(
+				'SELECT remote_id FROM ticket_comments WHERE comment_id = ? AND connection_id = ? AND ticket_key = ?'
+			)
+			.get(commentId, connectionId, ref.key) as { remote_id: string } | undefined;
+		// Read the current comment at execution time: queued edits and retries must never
+		// recreate deleted comments or replace a newer body with an old event snapshot.
+		const comment = this.deps.repos.comments.find(commentId);
+		if (comment || mapping) {
+			const remoteId = await provider.syncComment(
+				{ ...context, ref, mapped: null },
+				{
+					id: commentId,
+					remoteId: mapping?.remote_id ?? null,
+					body: comment ? `${comment.body}\n\n_Comment by ${comment.author} from Briefline._` : null
+				}
+			);
+			if (comment && !remoteId) throw new InvalidInputError('Provider did not return a comment ID');
+			if (remoteId) {
+				this.deps.db
+					.prepare(
+						'INSERT OR REPLACE INTO ticket_comments (comment_id, connection_id, ticket_key, remote_id) VALUES (?, ?, ?, ?)'
+					)
+					.run(commentId, connectionId, ref.key, remoteId);
+			} else {
+				this.deps.db
+					.prepare(
+						'DELETE FROM ticket_comments WHERE comment_id = ? AND connection_id = ? AND ticket_key = ?'
+					)
+					.run(commentId, connectionId, ref.key);
+			}
+		}
+		result.status = 'succeeded';
+		result.lastError = null;
 	}
 
 	async #process(job: SyncJob): Promise<SyncJob> {
 		const { repos, events } = this.deps;
+		job = repos.syncJobs.find(job.id) ?? job;
+		if (job.status === 'succeeded') return job;
 		const { ref, update } = job.payload as { ref: ExternalRef; update: TicketUpdate };
 		const provider = this.registry.get(job.provider);
 		const project = repos.projects.find(job.projectId);
@@ -235,18 +334,22 @@ export class TicketSyncService {
 					result.status = 'skipped';
 					result.lastError = 'Project has no ticketing connection for this provider';
 				} else {
-					const key = update.mappingKey ?? mappingKeyFor(update.status, update.stage);
-					const outcome = await provider.push(
-						{
-							...resolved.context,
-							ref,
-							mapped: project.ticketing.statusMapping[key] ?? null
-						},
-						update
-					);
-					result.status = 'succeeded';
-					result.lastError = null;
-					result.message = outcome?.note ?? null;
+					if (job.operation === 'sync_comment') {
+						await this.#syncComment(job, project, resolved, ref, result);
+					} else {
+						const key = update.mappingKey ?? mappingKeyFor(update.status, update.stage);
+						const outcome = await provider.push(
+							{
+								...resolved.context,
+								ref,
+								mapped: project.ticketing.statusMapping[key] ?? null
+							},
+							update
+						);
+						result.status = 'succeeded';
+						result.lastError = null;
+						result.message = outcome?.note ?? null;
+					}
 				}
 			} catch (error) {
 				result.status = 'failed';

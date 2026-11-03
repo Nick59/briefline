@@ -248,13 +248,13 @@
 				<div class="flex items-center gap-3">
 					<Switch id="ticketing-auto" bind:checked={autoSync} />
 					<Label for="ticketing-auto" class="font-normal"
-						>Update tickets automatically when tasks move</Label
+						>Sync task progress and comments automatically</Label
 					>
 				</div>
 				<div class="flex items-center gap-3">
 					<Switch id="ticketing-comments" bind:checked={postComments} />
 					<Label for="ticketing-comments" class="font-normal"
-						>Post a comment for each status change</Label
+						>Sync task comments and post status updates</Label
 					>
 				</div>
 			</div>

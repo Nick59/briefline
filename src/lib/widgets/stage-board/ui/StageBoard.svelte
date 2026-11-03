@@ -24,6 +24,8 @@
 		stage = $bindable(untrack(() => initialStage(epic.progress)))
 	}: { epic: EpicDetail; stage?: Stage } = $props();
 
+	const locked = $derived(!epic.specsApprovedAt || epic.openQuestions > 0);
+
 	/** The last drop, shown right away and replaced by server data once it is saved. */
 	let pending = $state<{ taskId: string; stage: Stage; plan: DropPlan } | null>(null);
 
@@ -37,6 +39,7 @@
 		WORK_STATUSES.map((status) => ({ status, tasks: tasks.filter((t) => t.stages[s] === status) }));
 
 	async function drop({ id, zone, beforeId }: DropEvent) {
+		if (locked) return;
 		const [s, status] = zone.split(':') as [Stage, WorkStatus];
 		const plan = planDrop(tasks, id, s, status, beforeId);
 		if (!plan) return;
@@ -76,6 +79,7 @@
 			<div class="grid gap-3 lg:grid-cols-3">
 				{#each columns(s) as column (column.status)}
 					<BoardColumn
+						{locked}
 						stage={s}
 						status={column.status}
 						tasks={column.tasks}
@@ -89,5 +93,9 @@
 	{/each}
 </Tabs.Root>
 <p class="mt-2 text-xs text-muted-foreground">
-	Drag cards to move or reorder them (long-press on touch screens), or use the ··· menu on a card.
+	{#if locked}
+		Dragging is disabled until specs are approved and open threads are resolved.
+	{:else}
+		Drag cards to move or reorder them (long-press on touch screens), or use the ··· menu on a card.
+	{/if}
 </p>
