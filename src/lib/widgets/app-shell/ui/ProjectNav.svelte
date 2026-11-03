@@ -1,4 +1,5 @@
 <script lang="ts">
+	import LockKeyholeIcon from '@lucide/svelte/icons/lock-keyhole';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
 	import { resolve } from '$app/paths';
@@ -117,11 +118,26 @@
 									size={12}
 								/>
 								<span class="truncate">{epic.title}</span>
-								<ReadinessBadge
-									compact
-									openQuestions={epic.openQuestions}
-									questionCount={epic.questionCount}
-								/>
+								<div class="ml-auto flex shrink-0 items-center gap-1.5">
+									{#if !epic.specsApprovedAt}
+										<span
+											role="img"
+											aria-label="Specs not approved"
+											title="Specs not approved — tasks can't start"
+										>
+											<LockKeyholeIcon
+												class="size-3.5 text-muted-foreground/60"
+												aria-hidden="true"
+											/>
+										</span>
+									{/if}
+									<ReadinessBadge
+										compact
+										openQuestions={epic.openQuestions}
+										questionCount={epic.questionCount}
+										specsApproved={!!epic.specsApprovedAt}
+									/>
+								</div>
 							</a>
 						</li>
 					{:else}

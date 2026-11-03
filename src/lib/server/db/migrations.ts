@@ -241,6 +241,24 @@ export const MIGRATIONS: Migration[] = [
 	);
 	DROP INDEX epics_project;
 	CREATE INDEX epics_project ON epics(project_id, position);
+	`,
+	`
+	ALTER TABLE epics ADD COLUMN specs_approved_at TEXT;
+	ALTER TABLE epics ADD COLUMN specs_approved_by TEXT;
+	CREATE TRIGGER specs_approval_insert AFTER INSERT ON specs WHEN NEW.epic_id IS NOT NULL
+	BEGIN
+		UPDATE epics SET specs_approved_at = NULL, specs_approved_by = NULL WHERE id = NEW.epic_id;
+	END;
+	CREATE TRIGGER specs_approval_delete AFTER DELETE ON specs WHEN OLD.epic_id IS NOT NULL
+	BEGIN
+		UPDATE epics SET specs_approved_at = NULL, specs_approved_by = NULL WHERE id = OLD.epic_id;
+	END;
+	CREATE TRIGGER specs_approval_update AFTER UPDATE OF content, title, kind, epic_id, task_id ON specs
+	WHEN OLD.content IS NOT NEW.content OR OLD.title IS NOT NEW.title OR OLD.kind IS NOT NEW.kind
+		OR OLD.epic_id IS NOT NEW.epic_id OR OLD.task_id IS NOT NEW.task_id
+	BEGIN
+		UPDATE epics SET specs_approved_at = NULL, specs_approved_by = NULL WHERE id IN (OLD.epic_id, NEW.epic_id);
+	END;
 	`
 ];
 

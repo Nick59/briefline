@@ -82,6 +82,8 @@ export interface Project {
 }
 
 export interface Epic {
+	specsApprovedAt: ISODate | null;
+	specsApprovedBy: string | null;
 	id: string;
 	projectId: string;
 	key: string;
@@ -305,7 +307,10 @@ export interface ProjectSummary extends Project {
 }
 
 export interface TaskDetail extends Task {
-	epic: Pick<Epic, 'id' | 'key' | 'title' | 'projectId' | 'externalRef'>;
+	epic: Pick<
+		Epic,
+		'id' | 'key' | 'title' | 'projectId' | 'externalRef' | 'specsApprovedAt' | 'specsApprovedBy'
+	>;
 	project: Pick<Project, 'id' | 'key' | 'name'>;
 	specs: SpecSummary[];
 	comments: TaskComment[];

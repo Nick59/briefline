@@ -41,3 +41,13 @@ export class OpenQuestionsError extends DomainError {
 		);
 	}
 }
+
+export class SpecsNotApprovedError extends DomainError {
+	constructor(epicKey: string) {
+		super(
+			`Epic ${epicKey} specs are not approved. Have a person review and approve specs in the epic's Specs header before starting a task.`,
+			409,
+			'specs_not_approved'
+		);
+	}
+}

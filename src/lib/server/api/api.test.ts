@@ -470,6 +470,7 @@ describe('epic questions', () => {
 			{ title: 'Checkout', tasks: [{ title: 'One' }, { title: 'Two' }] },
 			'test'
 		);
+		app.epics.approveSpecs('SHOP-E1', 'dashboard');
 		return app;
 	};
 	type App = ReturnType<typeof setup>;
@@ -953,6 +954,7 @@ describe('cancelling tasks', () => {
 			{ title: 'Checkout', tasks: [{ title: 'One' }, { title: 'Two' }] },
 			'test'
 		);
+		app.epics.approveSpecs('SHOP-E1', 'dashboard');
 		return app;
 	};
 	type App = ReturnType<typeof setup>;

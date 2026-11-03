@@ -167,7 +167,7 @@ When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) na
 - Before planning, read the project with \`get_project\` and the current epic with \`get_epic\`.
 - At the start of a session, call \`get_last_session\` (with the project when known) to read what the previous session did, and \`get_activity_changes\` to see what changed since your last pull.
 - Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`list_specs\` (\`project\`) before planning, and add new ones with \`add_spec\`.
-- Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`list_epic_questions\` and follow them.
+- Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. Tasks also cannot start until a person reviews and approves specs in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved). Adding, editing or deleting epic or task specs clears approval. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`list_epic_questions\` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single \`create_epic\` call.
 - Every spec includes a plain-language \`brief\` for non-engineers.
 - Move each task as you work with \`set_task_stage_status\`: dev, then test, then deploy; in_progress when you start, done when you finish.

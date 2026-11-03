@@ -44,6 +44,8 @@ export function describeEvent(event: DomainEvent): string {
 		case 'epic.created':
 			return `Created epic ${event.data.key} "${event.data.title}"`;
 		case 'epic.updated':
+			if (event.data.fields?.includes('specsApprovedAt'))
+				return `Approved specs of epic ${event.data.key}`;
 			return `Updated ${event.data.fields?.join(', ') || 'details'} of epic ${event.data.key}`;
 		case 'epic.deleted':
 			return `Deleted epic ${event.data.key} "${event.data.title}"`;

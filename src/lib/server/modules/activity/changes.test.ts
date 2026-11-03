@@ -139,6 +139,7 @@ describe('get_activity_changes', () => {
 		const { app, run, changes } = setup();
 		const epic = app.epics.create('AA', { title: 'Epic', tasks: [{ title: 'Task' }] }, 'seed');
 		const spec = app.specs.createForEpic(epic.key, { title: 'Plan', content: 'one' }, 'seed');
+		app.epics.approveSpecs(epic.key, 'dashboard');
 		const [question] = await run(
 			'add_epic_questions',
 			{ epic: epic.key, questions: [{ question: 'Which?' }] },

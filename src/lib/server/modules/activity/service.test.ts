@@ -19,6 +19,7 @@ function seeded() {
 		},
 		't'
 	);
+	app.epics.approveSpecs('SHOP-E1', 'dashboard');
 	return app;
 }
 

@@ -15,6 +15,7 @@ function withEpic() {
 		},
 		'agent'
 	);
+	ctx.app.epics.approveSpecs(epic.id, 'dashboard');
 	return { ...ctx, epic };
 }
 

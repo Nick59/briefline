@@ -77,6 +77,8 @@ export class EpicService {
 			const timestamp = now();
 			const epic: Epic = {
 				id: newId(),
+				specsApprovedAt: null,
+				specsApprovedBy: null,
 				projectId: project.id,
 				key: `${project.key}-E${repos.projects.nextSequence(project.id, 'epic')}`,
 				title: data.title,
@@ -128,6 +130,22 @@ export class EpicService {
 			taskId: null,
 			actor,
 			data: { key: epic.key, title: epic.title, fields: Object.keys(data) }
+		});
+		return epic;
+	}
+
+	approveSpecs(idOrKey: string, actor: string): Epic {
+		const current = this.get(idOrKey);
+		if (current.specsApprovedAt) return current;
+		const epic = { ...current, specsApprovedAt: now(), specsApprovedBy: actor, updatedAt: now() };
+		this.deps.repos.epics.update(epic);
+		this.deps.events.emit({
+			type: 'epic.updated',
+			projectId: epic.projectId,
+			epicId: epic.id,
+			taskId: null,
+			actor,
+			data: { key: epic.key, title: epic.title, fields: ['specsApprovedAt', 'specsApprovedBy'] }
 		});
 		return epic;
 	}

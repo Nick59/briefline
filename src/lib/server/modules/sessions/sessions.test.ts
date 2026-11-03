@@ -111,6 +111,7 @@ describe('session service', () => {
 				{ title: 'Checkout', tasks: [{ title: 'A' }, { title: 'B' }] },
 				'claude'
 			);
+			app.epics.approveSpecs('SH-E1', 'dashboard');
 			app.tasks.create('SH-E1', { title: 'C' }, 'claude');
 			app.tasks.setStage('SH-1', { stage: 'dev', status: 'done' }, 'claude');
 			app.tasks.setStage('SH-1', { stage: 'deploy', status: 'done' }, 'claude');
@@ -132,7 +133,7 @@ describe('session service', () => {
 			specsUpdated: 0,
 			threadsOpened: 0
 		});
-		expect(session.activityCount).toBe(5);
+		expect(session.activityCount).toBe(6);
 	});
 
 	it('counts opened threads, replies and answers', () => {
@@ -184,7 +185,7 @@ describe('session service', () => {
 		const { app, id } = work();
 		const detail = app.sessions.get(id, { limit: 2 });
 		expect(detail.session.id).toBe(id);
-		expect(detail.activity.total).toBe(5);
+		expect(detail.activity.total).toBe(6);
 		expect(detail.activity.items).toHaveLength(2);
 		expect(detail.activity.items.every((a) => a.sessionId === id)).toBe(true);
 		expect(() => app.sessions.get('missing')).toThrow(/Session 'missing' was not found/);
@@ -228,7 +229,7 @@ describe('session service', () => {
 			execute(app, operationsByName.get(name)!, input, { actor: 'dashboard' }) as Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 		expect(await call('list_sessions')).toMatchObject({ total: 1, limit: 10, hasMore: false });
 		const detail = await call('get_session', { session: id, limit: 3 });
-		expect(detail.activity).toMatchObject({ total: 5, hasMore: true, nextOffset: 3 });
+		expect(detail.activity).toMatchObject({ total: 6, hasMore: true, nextOffset: 3 });
 		expect(detail.activity.items[0].sessionId).toBe(id);
 		const all = await call('list_activity');
 		expect(all.items.some((a: { sessionId: string | null }) => a.sessionId === null)).toBe(true);

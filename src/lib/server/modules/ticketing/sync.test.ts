@@ -30,6 +30,7 @@ function setup(
 	ctx.app.projects.create({ key: 'PMA', name: 'PM' }, 'test');
 	connectProject(ctx.app, 'PMA', provider, settings, { statusMapping });
 	const epic = ctx.app.epics.create('PMA', { title: 'Launch', tasks: [{ title: 'API' }] }, 'test');
+	ctx.app.epics.approveSpecs(epic.id, 'dashboard');
 	return { ...ctx, epic };
 }
 

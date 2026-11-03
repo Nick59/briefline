@@ -51,7 +51,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -84,7 +84,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 	});
 });
 
@@ -112,7 +112,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -131,7 +131,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -184,7 +184,7 @@ describe('activity cursor and profile migrations', () => {
 		expect(tables).toEqual(
 			expect.arrayContaining(['activity_counter', 'activity_cursors', 'user_profile'])
 		);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 	});
 });
 
@@ -242,7 +242,7 @@ describe('agent sessions migration', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 	});
 });
 
@@ -270,7 +270,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 17 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 18 });
 	});
 });
 
@@ -324,5 +324,30 @@ describe('epic order migration', () => {
 			{ key: 'AAA-E3', position: 2 },
 			{ key: 'BBB-E1', position: 0 }
 		]);
+	});
+});
+
+describe('spec approval migration', () => {
+	it('keeps existing epics and tasks and requires approval for further starts', () => {
+		const db = new DatabaseSync(':memory:');
+		migrate(db, 17);
+		db.exec(`
+			INSERT INTO projects (id, key, name, created_at, updated_at) VALUES ('p', 'SHOP', 'Shop', 't', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e', 'p', 'SHOP-E1', 'Epic', 't', 't');
+			INSERT INTO tasks (id, epic_id, key, title, position, dev_status, created_at, updated_at) VALUES ('t', 'e', 'SHOP-1', 'Task', 0, 'in_progress', 't', 't');
+		`);
+		migrate(db);
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
+		expect(app.epics.get('SHOP-E1')).toMatchObject({
+			specsApprovedAt: null,
+			specsApprovedBy: null
+		});
+		expect(app.tasks.get('SHOP-1').stages.dev).toBe('in_progress');
+		expect(() =>
+			app.tasks.setStage('SHOP-1', { stage: 'test', status: 'in_progress' }, 'test')
+		).toThrow('specs are not approved');
+		expect(() =>
+			app.tasks.setStage('SHOP-1', { stage: 'dev', status: 'done' }, 'test')
+		).not.toThrow();
 	});
 });

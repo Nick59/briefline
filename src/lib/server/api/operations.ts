@@ -369,7 +369,7 @@ export const operations: Operation[] = [
 		tag: 'Epics',
 		summary: 'Get an epic with its tasks, specs, questions and progress',
 		description:
-			'questions lists every question thread of the epic with its replies in messages; openQuestions counts the open ones. Tasks cannot be started while any is open.',
+			'questions lists every question thread of the epic with its replies in messages; openQuestions counts the open ones. Tasks cannot be started while any is open or specsApprovedAt is null. specsApprovedBy identifies who approved. Spec additions, edits and deletions clear approval.',
 		input: z.object({ epic }),
 		run: (app, { epic }) => app.epics.detail(epic)
 	}),
@@ -382,6 +382,18 @@ export const operations: Operation[] = [
 		input: updateEpicSchema.extend({ epic }),
 		run: (app, input, { actor }) => app.epics.update(input.epic, pick(input, 'epic'), actor)
 	}),
+	defineOperation({
+		name: 'approve_epic_specs',
+		method: 'POST',
+		path: '/epics/{epic}/specs/approve',
+		tag: 'Epics',
+		summary: 'Approve the specs of an epic',
+		description:
+			'Record approval after a person reviews the epic and task specs. Tasks cannot start until specsApprovedAt is set (409 specs_not_approved). Open questions still block starts. Adding, changing or deleting specs clears approval.',
+		input: z.object({ epic }),
+		run: (app, { epic }, { actor }) => app.epics.approveSpecs(epic, actor)
+	}),
+
 	defineOperation({
 		name: 'move_epic',
 		method: 'POST',

@@ -203,6 +203,23 @@ The endpoint must return the same intent when called twice with the same \`cartI
 export function seedDemo(app: Container) {
 	if (app.projects.list().length > 0) return;
 	const actor = 'seed';
+	const createDemoEpic: typeof app.epics.create = (project, input, actor) => {
+		const epic = app.epics.create(
+			project,
+			{
+				...input,
+				tasks: input.tasks?.map((task) => ({ ...task, stages: undefined }))
+			},
+			actor
+		);
+		if (input.tasks?.some((task) => task.stages)) {
+			app.epics.approveSpecs(epic.id, actor);
+			input.tasks.forEach((task, index) => {
+				if (task.stages) app.tasks.update(epic.tasks[index].id, { stages: task.stages }, actor);
+			});
+		}
+		return app.epics.detail(epic.id);
+	};
 
 	const project = app.projects.create(
 		{
@@ -219,9 +236,9 @@ export function seedDemo(app: Container) {
 	});
 	app.connections.setProjectTicketing(project.key, { connectionId: connection.id }, actor);
 
-	app.epics.create(project.key, STOREFRONT_FOUNDATION_DEMO, actor);
+	createDemoEpic(project.key, STOREFRONT_FOUNDATION_DEMO, actor);
 
-	const epic = app.epics.create(
+	const epic = createDemoEpic(
 		project.key,
 		{
 			title: 'Checkout v2',
@@ -266,9 +283,9 @@ export function seedDemo(app: Container) {
 	const spec = epic.specs.find((s) => s.taskId === null);
 	if (spec) void app.specs.translate(spec.id, actor, 'heuristic');
 
-	app.epics.create(project.key, ORDER_TRACKING_DEMO, actor);
+	createDemoEpic(project.key, ORDER_TRACKING_DEMO, actor);
 
-	const discovery = app.epics.create(project.key, PRODUCT_DISCOVERY_DEMO, actor);
+	const discovery = createDemoEpic(project.key, PRODUCT_DISCOVERY_DEMO, actor);
 	const discoverySpec = discovery.specs.find((s) => s.taskId === null);
 	if (discoverySpec) void app.specs.translate(discoverySpec.id, actor, 'heuristic');
 }

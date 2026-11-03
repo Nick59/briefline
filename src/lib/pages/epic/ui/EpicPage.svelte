@@ -1,4 +1,8 @@
 <script lang="ts">
+	import LockKeyholeIcon from '@lucide/svelte/icons/lock-keyhole';
+	import { toneClasses } from '#lib/shared/config/tokens/index.ts';
+	import { cn } from '#lib/shared/lib/utils.ts';
+	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -72,7 +76,32 @@
 		</Section>
 	{/if}
 
-	<OpenThreadsAlert openThreads={epic.openQuestions} onopen={() => (questionsOpen = true)} />
+	{#if epic.openQuestions > 0 || !epic.specsApprovedAt}
+		<div class="space-y-3">
+			<OpenThreadsAlert openThreads={epic.openQuestions} onopen={() => (questionsOpen = true)} />
+
+			{#if !epic.specsApprovedAt}
+				<div
+					role="status"
+					aria-label="Specs awaiting approval"
+					class={cn(
+						'flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center',
+						toneClasses.danger.soft,
+						toneClasses.danger.border
+					)}
+				>
+					<LockKeyholeIcon class="size-5 shrink-0" aria-hidden="true" />
+					<div class="min-w-0 flex-1 space-y-0.5">
+						<p class="font-semibold">Specs need approval — tasks can't start</p>
+						<p class="text-sm text-foreground/80">
+							Review and approve the specs before starting tasks in this epic.
+						</p>
+					</div>
+					<Button href="#epic-specs" size="sm" class="shrink-0">Review specs</Button>
+				</div>
+			{/if}
+		</div>
+	{/if}
 
 	<Section title="Board">
 		{#key epic.id}
@@ -81,12 +110,15 @@
 	</Section>
 
 	<div class="space-y-10">
-		<SpecPanel
-			specs={epic.specs}
-			selected={selectedSpec}
-			owner={{ type: 'epic', id: epic.id }}
-			{ownerLabel}
-		/>
+		<div id="epic-specs" class="scroll-mt-6">
+			<SpecPanel
+				specs={epic.specs}
+				approval={{ approvedAt: epic.specsApprovedAt, approvedBy: epic.specsApprovedBy }}
+				selected={selectedSpec}
+				owner={{ type: 'epic', id: epic.id }}
+				{ownerLabel}
+			/>
+		</div>
 		<div class="grid gap-10 lg:grid-cols-2">
 			<ActivityFeed
 				items={activity.items}

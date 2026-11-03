@@ -13,7 +13,7 @@ import {
 } from '#lib/shared/domain/schemas.ts';
 import type { Epic, Task, TaskDetail } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
-import { InvalidInputError, OpenQuestionsError } from '../../core/errors.ts';
+import { InvalidInputError, OpenQuestionsError, SpecsNotApprovedError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
 import { transaction } from '../../db/connection.ts';
 import { requireEpic, requireProject, requireTask } from '../../core/lookup.ts';
@@ -44,7 +44,9 @@ export class TaskService {
 				key: epic.key,
 				title: epic.title,
 				projectId: epic.projectId,
-				externalRef: epic.externalRef
+				externalRef: epic.externalRef,
+				specsApprovedAt: epic.specsApprovedAt,
+				specsApprovedBy: epic.specsApprovedBy
 			},
 			project: { id: project.id, key: project.key, name: project.name },
 			specs: repos.specs.listByEpic(epic.id, task.id).map(toSpecSummary),
@@ -55,6 +57,7 @@ export class TaskService {
 	/** Inserts without emitting an event; callers emit their own. */
 	insert(epic: Epic, input: CreateTaskInput): Task {
 		const data = createTaskSchema.parse(input);
+		for (const stage of STAGES) this.#assertCanChange(epic, 'todo', data.stages?.[stage] ?? 'todo');
 		const { repos } = this.deps;
 		const project = requireProject(repos, epic.projectId);
 		const timestamp = now();
@@ -270,11 +273,12 @@ export class TaskService {
 		}
 	}
 
-	/** Work that already started may continue; only starting a stage waits for open questions. */
+	/** Work that already started may continue; only starting a stage waits for questions and spec approval. */
 	#assertCanChange(epic: Epic, from: WorkStatus, to: WorkStatus) {
 		if (from !== 'todo' || to === 'todo') return;
 		const open = this.deps.repos.questions.countOpen(epic.id);
 		if (open > 0) throw new OpenQuestionsError(epic.key, open);
+		if (!epic.specsApprovedAt) throw new SpecsNotApprovedError(epic.key);
 	}
 
 	#emit(

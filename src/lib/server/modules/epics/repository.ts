@@ -2,6 +2,8 @@ import type { Epic, ExternalRef } from '#lib/shared/domain/types.ts';
 import { all, fromJson, one, run, toJson, type Db } from '../../db/connection.ts';
 
 interface EpicRow {
+	specs_approved_at: string | null;
+	specs_approved_by: string | null;
 	id: string;
 	project_id: string;
 	key: string;
@@ -16,6 +18,8 @@ interface EpicRow {
 
 const toEpic = (row: EpicRow): Epic => ({
 	id: row.id,
+	specsApprovedAt: row.specs_approved_at,
+	specsApprovedBy: row.specs_approved_by,
 	projectId: row.project_id,
 	key: row.key,
 	title: row.title,
@@ -71,8 +75,8 @@ export class EpicRepository {
 	insert(epic: Epic) {
 		run(
 			this.db,
-			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, position, created_at, updated_at)
-			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :position, :createdAt, :updatedAt)`,
+			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, position, created_at, updated_at, specs_approved_at, specs_approved_by)
+			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :position, :createdAt, :updatedAt, :specsApprovedAt, :specsApprovedBy)`,
 			{
 				...this.#params(epic),
 				projectId: epic.projectId,
@@ -87,7 +91,7 @@ export class EpicRepository {
 		run(
 			this.db,
 			`UPDATE epics SET title = :title, summary = :summary, external_ref = :externalRef, target_date = :targetDate,
-			 updated_at = :updatedAt WHERE id = :id`,
+			 specs_approved_at = :specsApprovedAt, specs_approved_by = :specsApprovedBy, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(epic)
 		);
 	}
@@ -99,6 +103,8 @@ export class EpicRepository {
 	#params(epic: Epic) {
 		return {
 			id: epic.id,
+			specsApprovedAt: epic.specsApprovedAt,
+			specsApprovedBy: epic.specsApprovedBy,
 			title: epic.title,
 			summary: epic.summary,
 			externalRef: toJson(epic.externalRef),
