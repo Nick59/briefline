@@ -377,7 +377,7 @@ Copyright (C) 2026 BinariesWorld. Briefline is free software under the [GNU Affe
 
 ### Task comment syncing
 
-With automatic ticket sync and comments enabled in project ticketing settings, comments on a task with a linked ticket are mirrored to that ticket. New comments include the full text and author attribution; edits update the same remote comment, and explicit deletions remove it. Comments on tasks without their own linked ticket stay in Briefline. Task title and description edits are not synced.
+With automatic ticket sync and comments enabled in project ticketing settings, comments on a task with a linked ticket are mirrored to that ticket. New comments include the full text and author attribution; edits update the same remote comment, and explicit deletions remove it. Comments on tasks without their own linked ticket stay in Briefline. Task descriptions are mirrored as a separate technical-description comment. Each change updates that comment; if the provider reports that it is missing or cannot be edited, a new comment is posted. Clearing the description removes its mirrored comment. The provider ticket’s own title and description are preserved.
 
 Comment pushes are recorded in the sync log and failed jobs can be retried. Retries use the current local comment, so an old failed edit cannot overwrite a newer edit or recreate a deleted comment. Existing comments are synced when edited; enabling sync does not backfill them automatically.
 

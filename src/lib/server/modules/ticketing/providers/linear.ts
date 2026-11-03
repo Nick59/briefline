@@ -18,6 +18,8 @@ const STATE_TYPE: Record<WorkStatus, string> = {
 	done: 'completed'
 };
 
+class MissingLinearCommentError extends TicketProviderError {}
+
 async function graphql<T>(
 	ctx: ProviderContext,
 	query: string,
@@ -34,8 +36,18 @@ async function graphql<T>(
 		signal: AbortSignal.timeout(TIMEOUT_MS)
 	});
 	await expectOk(response, 'Linear request', ctx);
-	const result = (await response.json()) as { data?: T; errors?: { message: string }[] };
-	if (result.errors?.length) throw new TicketProviderError(`Linear: ${result.errors[0].message}`);
+	const result = (await response.json()) as {
+		data?: T;
+		errors?: { message: string; extensions?: { code?: string } }[];
+	};
+	if (result.errors?.length) {
+		if (
+			/commentUpdate|commentDelete/.test(query) &&
+			result.errors.some((error) => error.extensions?.code === 'ENTITY_NOT_FOUND')
+		)
+			throw new MissingLinearCommentError('Linear comment no longer exists');
+		throw new TicketProviderError(`Linear: ${result.errors[0].message}`);
+	}
 	return result.data as T;
 }
 
@@ -101,24 +113,32 @@ export const linearProvider: TicketProvider = {
 	},
 	async syncComment(ctx, comment) {
 		if (comment.body === null) {
-			const result = await graphql<{ commentDelete: { success: boolean } }>(
-				ctx,
-				'mutation($id: String!) { commentDelete(id: $id) { success } }',
-				{ id: comment.remoteId }
-			);
-			if (!result.commentDelete.success)
-				throw new TicketProviderError('Linear comment deletion failed');
+			try {
+				const result = await graphql<{ commentDelete: { success: boolean } }>(
+					ctx,
+					'mutation($id: String!) { commentDelete(id: $id) { success } }',
+					{ id: comment.remoteId }
+				);
+				if (!result.commentDelete.success)
+					throw new TicketProviderError('Linear comment deletion failed');
+			} catch (error) {
+				if (!(error instanceof MissingLinearCommentError)) throw error;
+			}
 			return null;
 		}
 		if (comment.remoteId) {
-			const result = await graphql<{ commentUpdate: { success: boolean } }>(
-				ctx,
-				'mutation($id: String!, $body: String!) { commentUpdate(id: $id, input: { body: $body }) { success } }',
-				{ id: comment.remoteId, body: comment.body }
-			);
-			if (!result.commentUpdate.success)
-				throw new TicketProviderError('Linear comment update failed');
-			return comment.remoteId;
+			try {
+				const result = await graphql<{ commentUpdate: { success: boolean } }>(
+					ctx,
+					'mutation($id: String!, $body: String!) { commentUpdate(id: $id, input: { body: $body }) { success } }',
+					{ id: comment.remoteId, body: comment.body }
+				);
+				if (!result.commentUpdate.success)
+					throw new TicketProviderError('Linear comment update failed');
+				return comment.remoteId;
+			} catch (error) {
+				if (!(error instanceof MissingLinearCommentError)) throw error;
+			}
 		}
 		const { issue } = await graphql<{ issue: { id: string } }>(
 			ctx,

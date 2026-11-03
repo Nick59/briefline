@@ -49,7 +49,13 @@ async function call(ctx: ProviderContext, path: string, method: string, body?: u
 		},
 		{ json: false }
 	);
-	if (method === 'DELETE' && response.status === 404) return response;
+	if (
+		(method === 'DELETE' && response.status === 404) ||
+		(method === 'PATCH' &&
+			path.includes('/issues/comments/') &&
+			[404, 405, 501].includes(response.status))
+	)
+		return response;
 	await expectOk(response, `GitHub ${method} ${path}`, ctx);
 	return response;
 }
@@ -99,6 +105,8 @@ export const githubProvider: TicketProvider = {
 		const response = await call(ctx, path, comment.remoteId ? 'PATCH' : 'POST', {
 			body: comment.body
 		});
+		if (comment.remoteId && [404, 405, 501].includes(response.status))
+			return githubProvider.syncComment!(ctx, { ...comment, remoteId: null });
 		const data = (await response.json()) as { id: number };
 		return data.id ? String(data.id) : null;
 	},

@@ -154,6 +154,8 @@ export const planeProvider: TicketProvider = {
 						})
 		});
 		if (comment.body === null && response.status === 404) return null;
+		if (comment.body !== null && comment.remoteId && [404, 405, 501].includes(response.status))
+			return planeProvider.syncComment!(ctx, { ...comment, remoteId: null });
 		await expectOk(response, 'Plane comment sync', ctx);
 		if (comment.body === null) return null;
 		const data = (await response.json()) as { id: string };

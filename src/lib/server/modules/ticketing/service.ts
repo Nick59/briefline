@@ -28,6 +28,7 @@ export const SYNC_TRIGGERS = new Set<DomainEvent['type']>([
 	'task.cancelled',
 	'task.restored',
 	'task.created',
+	'task.updated',
 	'task.deleted',
 	'epic.created',
 	'epic.updated'
@@ -107,39 +108,38 @@ export class TicketSyncService {
 		if (!project?.ticketing.connectionId || !project.ticketing.autoSync) return;
 		const epic = this.deps.repos.epics.find(event.epicId);
 		if (!epic) return;
+		if (event.type === 'epic.created') {
+			for (const task of this.deps.repos.tasks.listByEpic(epic.id)) {
+				if (task.externalRef && task.description.trim())
+					this.#enqueueComment(
+						{
+							...event,
+							type: 'task.created',
+							taskId: task.id,
+							data: { key: task.key, title: task.title }
+						},
+						project,
+						epic,
+						true
+					);
+			}
+		}
 		if (event.type === 'epic.updated' && !event.data.fields?.includes('externalRef')) return;
 
+		const descriptionSync =
+			event.type === 'task.created' ||
+			(event.type === 'task.updated' &&
+				(event.data.fields?.includes('description') || event.data.fields?.includes('externalRef')));
+		if (event.type === 'task.updated' && !descriptionSync) return;
+
 		if (
+			descriptionSync ||
 			event.type === 'task.commented' ||
 			event.type === 'task.comment_updated' ||
 			event.type === 'task.comment_deleted'
 		) {
-			if (!project.ticketing.postComments || !event.taskId) return;
-			const task = this.deps.repos.tasks.find(event.taskId);
-			if (!task?.externalRef || task.externalRef.provider !== project.ticketing.provider) return;
-			const timestamp = now();
-			const job: SyncJob = {
-				id: newId(),
-				projectId: project.id,
-				epicId: epic.id,
-				taskId: task.id,
-				provider: task.externalRef.provider,
-				operation: 'sync_comment',
-				payload: {
-					ref: task.externalRef,
-					commentId: event.data.commentId,
-					connectionId: project.ticketing.connectionId
-				},
-				status: 'pending',
-				attempts: 0,
-				lastError: null,
-				message: null,
-				createdAt: timestamp,
-				updatedAt: timestamp
-			};
-			this.deps.repos.syncJobs.insert(job);
-			this.#background(job);
-			return;
+			this.#enqueueComment(event, project, epic, !!descriptionSync);
+			if (event.type !== 'task.created') return;
 		}
 
 		const comment = project.ticketing.postComments ? this.#comment(event) : null;
@@ -166,6 +166,46 @@ export class TicketSyncService {
 				);
 			}
 		}
+	}
+
+	#enqueueComment(event: DomainEvent, project: Project, epic: Epic, descriptionSync: boolean) {
+		if (!project.ticketing.postComments || !event.taskId) return;
+		const task = this.deps.repos.tasks.find(event.taskId);
+		if (!task?.externalRef || task.externalRef.provider !== project.ticketing.provider) return;
+		if (
+			descriptionSync &&
+			!task.description.trim() &&
+			(event.type === 'task.created' ||
+				(event.type === 'task.updated' && !event.data.fields?.includes('description')))
+		)
+			return;
+		const timestamp = now();
+		const job: SyncJob = {
+			id: newId(),
+			projectId: project.id,
+			epicId: epic.id,
+			taskId: task.id,
+			provider: task.externalRef.provider,
+			operation: 'sync_comment',
+			payload: {
+				ref: task.externalRef,
+				commentId: descriptionSync
+					? `task-description:${task.id}`
+					: 'commentId' in event.data
+						? event.data.commentId
+						: '',
+				description: descriptionSync,
+				connectionId: project.ticketing.connectionId
+			},
+			status: 'pending',
+			attempts: 0,
+			lastError: null,
+			message: null,
+			createdAt: timestamp,
+			updatedAt: timestamp
+		};
+		this.deps.repos.syncJobs.insert(job);
+		this.#background(job);
 	}
 
 	#comment(event: DomainEvent): string | null {
@@ -261,7 +301,8 @@ export class TicketSyncService {
 		ref: ExternalRef,
 		result: SyncJob
 	) {
-		const { commentId, connectionId } = job.payload as {
+		const { commentId, connectionId, description } = job.payload as {
+			description?: boolean;
 			commentId: string;
 			connectionId: string;
 		};
@@ -274,6 +315,15 @@ export class TicketSyncService {
 			result.lastError = 'Comment sync is disabled or the connection changed';
 			return;
 		}
+		const task = job.taskId ? this.deps.repos.tasks.find(job.taskId) : undefined;
+		if (
+			description &&
+			(!task || task.externalRef?.provider !== ref.provider || task.externalRef.key !== ref.key)
+		) {
+			result.status = 'skipped';
+			result.lastError = 'Task no longer exists or its linked ticket changed';
+			return;
+		}
 		const { provider, context } = resolved;
 		if (!provider.syncComment)
 			throw new InvalidInputError('Provider does not support comment sync');
@@ -284,14 +334,25 @@ export class TicketSyncService {
 			.get(commentId, connectionId, ref.key) as { remote_id: string } | undefined;
 		// Read the current comment at execution time: queued edits and retries must never
 		// recreate deleted comments or replace a newer body with an old event snapshot.
-		const comment = this.deps.repos.comments.find(commentId);
+		const comment = description
+			? task?.description.trim()
+				? {
+						body: `**Briefline task description (${task.key})**\n\n${task.description}`,
+						author: null
+					}
+				: undefined
+			: this.deps.repos.comments.find(commentId);
 		if (comment || mapping) {
 			const remoteId = await provider.syncComment(
 				{ ...context, ref, mapped: null },
 				{
 					id: commentId,
 					remoteId: mapping?.remote_id ?? null,
-					body: comment ? `${comment.body}\n\n_Comment by ${comment.author} from Briefline._` : null
+					body: comment
+						? description
+							? comment.body
+							: `${comment.body}\n\n_Comment by ${comment.author} from Briefline._`
+						: null
 				}
 			);
 			if (comment && !remoteId) throw new InvalidInputError('Provider did not return a comment ID');

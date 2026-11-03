@@ -129,6 +129,8 @@ export const jiraProvider: TicketProvider = {
 			body: comment.body === null ? undefined : JSON.stringify({ body: comment.body })
 		});
 		if (comment.body === null && response.status === 404) return null;
+		if (comment.body !== null && comment.remoteId && [404, 405, 501].includes(response.status))
+			return jiraProvider.syncComment!(ctx, { ...comment, remoteId: null });
 		await expectOk(response, 'Jira comment sync', ctx);
 		if (comment.body === null) return null;
 		const data = (await response.json()) as { id: string };

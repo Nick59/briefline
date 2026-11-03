@@ -106,9 +106,132 @@ describe('task comment sync', () => {
 		expect(app.ticketing.jobs({ status: 'failed' })[0].attempts).toBe(3);
 	});
 
+	it('manages the full task description as a separate comment and removes it when cleared', async () => {
+		const { app, calls } = setup();
+		const body = 'Technical details\n'.repeat(100);
+		app.tasks.update('SHOP-1', { description: body }, 'test');
+		await app.ticketing.idle();
+		expect(JSON.parse(String(calls[0].init.body)).body).toContain(body.trim());
+		app.tasks.update('SHOP-1', { description: 'Latest' }, 'test');
+		await app.ticketing.idle();
+		app.tasks.update('SHOP-1', { description: '' }, 'test');
+		await app.ticketing.idle();
+		expect(calls.map((call) => call.init.method)).toEqual(['POST', 'PATCH', 'DELETE']);
+		expect(calls.every((call) => call.url.includes('/comments'))).toBe(true);
+		expect(app.db.prepare('SELECT * FROM ticket_comments').all()).toEqual([]);
+	});
+
+	it.each([404, 405, 501, 401, 403, 503])(
+		'only falls back for missing or unsupported editing (%s)',
+		async (status) => {
+			const { app, calls } = setup((call) =>
+				call.init.method === 'PATCH' ? new Response('error', { status }) : Response.json({ id: 42 })
+			);
+			app.tasks.update('SHOP-1', { description: 'First' }, 'test');
+			await app.ticketing.idle();
+			app.tasks.update('SHOP-1', { description: 'Second' }, 'test');
+			await app.ticketing.idle();
+			expect(calls.map((call) => call.init.method)).toEqual(
+				[404, 405, 501].includes(status) ? ['POST', 'PATCH', 'POST'] : ['POST', 'PATCH']
+			);
+		}
+	);
+
+	it.each(['autoSync', 'postComments'] as const)(
+		'does not publish descriptions when %s is disabled',
+		async (flag) => {
+			const { app, calls } = setup();
+			app.connections.setProjectTicketing(
+				'SHOP',
+				{ connectionId: app.projects.get('SHOP').ticketing.connectionId, [flag]: false },
+				'test'
+			);
+			app.tasks.update('SHOP-1', { description: 'Private' }, 'test');
+			await app.ticketing.idle();
+			expect(calls).toEqual([]);
+		}
+	);
+
+	it('syncs existing descriptions on first linking and ignores retries after relinking', async () => {
+		let failing = true;
+		const { app, calls } = setup(() =>
+			failing ? new Response('error', { status: 503 }) : Response.json({ id: 42 })
+		);
+		app.tasks.update('SHOP-1', { externalRef: null, description: 'Existing' }, 'test');
+		app.tasks.update('SHOP-1', { externalRef: { provider: 'github', key: '#8' } }, 'test');
+		await app.ticketing.idle();
+		const failed = app.ticketing.jobs({ status: 'failed' })[0];
+		failing = false;
+		app.tasks.update(
+			'SHOP-1',
+			{ description: 'Latest', externalRef: { provider: 'github', key: '#9' } },
+			'test'
+		);
+		await app.ticketing.idle();
+		const count = calls.length;
+		await app.ticketing.retry(failed.id);
+		expect(calls).toHaveLength(count);
+		expect(JSON.parse(String(calls.at(-1)!.init.body)).body).toContain('Latest');
+	});
+
+	it('initializes descriptions for tasks created with an epic', async () => {
+		const { app, calls } = setup();
+		app.epics.create(
+			'SHOP',
+			{
+				title: 'Second',
+				tasks: [
+					{
+						title: 'Nested',
+						description: 'Initial details',
+						externalRef: { provider: 'github', key: '#11' }
+					}
+				]
+			},
+			'test'
+		);
+		await app.ticketing.idle();
+		expect(calls).toHaveLength(1);
+		expect(calls[0].url).toContain('/issues/11/comments');
+		expect(JSON.parse(String(calls[0].init.body)).body).toContain('Initial details');
+	});
+
+	it('retries descriptions with current content and does not recreate cleared descriptions', async () => {
+		let failing = true;
+		const { app, calls } = setup(() =>
+			failing ? new Response('error', { status: 503 }) : Response.json({ id: 42 })
+		);
+		app.tasks.update('SHOP-1', { description: 'Original' }, 'test');
+		await app.ticketing.idle();
+		const failed = app.ticketing.jobs({ status: 'failed' })[0];
+		app.tasks.update('SHOP-1', { description: 'Latest' }, 'test');
+		await app.ticketing.idle();
+		failing = false;
+		await app.ticketing.retry(failed.id);
+		expect(JSON.parse(String(calls.at(-1)!.init.body)).body).toContain('Latest');
+		app.tasks.update('SHOP-1', { description: '' }, 'test');
+		await app.ticketing.idle();
+		const count = calls.length;
+		await app.ticketing.retry(app.ticketing.jobs({ status: 'failed' })[0].id);
+		expect(calls).toHaveLength(count);
+	});
+
+	it('does not create a replacement after an edit network error', async () => {
+		const { app, calls } = setup((call) => {
+			if (call.init.method === 'PATCH') throw new Error('network unavailable');
+			return Response.json({ id: 42 });
+		});
+		app.tasks.update('SHOP-1', { description: 'First' }, 'test');
+		await app.ticketing.idle();
+		app.tasks.update('SHOP-1', { description: 'Latest' }, 'test');
+		await app.ticketing.idle();
+		expect(calls.map((call) => call.init.method)).toEqual(['POST', 'PATCH']);
+		expect(app.ticketing.jobs({ status: 'failed' })).toHaveLength(1);
+	});
+
 	it('does not sync ordinary task edits', async () => {
 		const { app, calls } = setup();
-		app.tasks.update('SHOP-1', { title: 'New title', description: 'New content' }, 'claude');
+		app.tasks.update('SHOP-1', { title: 'New title' }, 'claude');
 		await app.ticketing.idle();
 		expect(calls).toEqual([]);
 	});
