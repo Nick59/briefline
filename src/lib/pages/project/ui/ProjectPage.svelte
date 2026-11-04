@@ -19,6 +19,8 @@
 	import { Section } from '#lib/shared/ui/section/index.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
+	import type { PullStatus } from '#lib/shared/domain/pull-status.ts';
+	import { TicketPullStatus } from '#lib/features/pull-tickets/index.ts';
 	import { EpicFormDialog } from '#lib/features/epic-form/index.ts';
 	import { ActivityFeed } from '#lib/widgets/activity-feed/index.ts';
 	import { SyncLog } from '#lib/widgets/sync-log/index.ts';
@@ -32,9 +34,10 @@
 		selectedSpec: Spec | null;
 		activity: PageView<Activity>;
 		syncJobs: SyncJob[];
+		pullStatus: PullStatus | null;
 	}
 
-	let { project, epics, specs, selectedSpec, activity, syncJobs }: Props = $props();
+	let { project, epics, specs, selectedSpec, activity, syncJobs, pullStatus }: Props = $props();
 </script>
 
 {#snippet newEpic()}
@@ -45,6 +48,9 @@
 
 <div class="space-y-8">
 	<PageHeader title={project.name}>
+		{#snippet titleAddon()}
+			{#if pullStatus}<TicketPullStatus projectId={project.id} initial={pullStatus} />{/if}
+		{/snippet}
 		{#snippet eyebrow()}
 			<KeyChip value={project.key} />
 			{#if project.ticketing.provider}<ToneBadge tone="neutral" variant="dot"

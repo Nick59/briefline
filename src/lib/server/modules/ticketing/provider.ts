@@ -51,12 +51,31 @@ export interface TicketCommentUpdate {
 	remoteId: string | null;
 }
 
-export interface TicketProvider extends Omit<TicketProviderInfo, 'supportsProjects'> {
+export interface RemoteComment {
+	id: string;
+	body: string;
+	author: string | null;
+	createdAt: string;
+}
+
+export interface RemoteTicket {
+	title: string;
+	description: string | null;
+	state: { id: string; group?: string } | null;
+	comments: RemoteComment[];
+}
+
+export interface TicketProvider extends Omit<
+	TicketProviderInfo,
+	'supportsProjects' | 'supportsPull'
+> {
 	/** Lower-case names of the authentication headers this provider sets itself. */
 	reservedHeaders: string[];
 	ticketUrl(ref: ExternalRef, settings: Record<string, string>): string | null;
 	push(ctx: TicketContext, update: TicketUpdate): Promise<PushResult | void>;
 	syncComment?(ctx: TicketContext, comment: TicketCommentUpdate): Promise<string | null>;
+	/** The current title, description, state and comments of the linked ticket. */
+	fetchTicket?(ctx: TicketContext): Promise<RemoteTicket>;
 	/** States an issue can be moved to. Group values: backlog, unstarted, started, completed. */
 	listStates(ctx: ProviderContext): Promise<ProviderState[]>;
 	/** Cheap authenticated request; throws TicketProviderError when the connection does not work. */

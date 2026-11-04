@@ -201,6 +201,8 @@ export class TicketingConnectionService {
 		const current = requireProject(repos, projectIdOrKey);
 		const autoSync = data.autoSync ?? current.ticketing.autoSync;
 		const postComments = data.postComments ?? current.ticketing.postComments;
+		const autoPull = data.autoPull ?? current.ticketing.autoPull;
+		const pullMinutes = data.pullMinutes ?? current.ticketing.pullMinutes;
 		let next: Project['ticketing'];
 
 		if (data.connectionId === null) {
@@ -210,7 +212,9 @@ export class TicketingConnectionService {
 				target: {},
 				statusMapping: {},
 				autoSync,
-				postComments
+				postComments,
+				autoPull,
+				pullMinutes
 			};
 		} else {
 			const connection = this.#require(data.connectionId);
@@ -230,7 +234,9 @@ export class TicketingConnectionService {
 				),
 				statusMapping,
 				autoSync,
-				postComments
+				postComments,
+				autoPull,
+				pullMinutes
 			};
 		}
 

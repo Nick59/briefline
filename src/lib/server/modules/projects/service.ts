@@ -50,7 +50,9 @@ export class ProjectService {
 				target: {},
 				statusMapping: {},
 				autoSync: true,
-				postComments: true
+				postComments: true,
+				autoPull: false,
+				pullMinutes: 10
 			},
 			position: repos.projects.nextPosition(),
 			createdAt: timestamp,

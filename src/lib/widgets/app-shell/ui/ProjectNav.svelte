@@ -119,7 +119,7 @@
 								/>
 								<span class="truncate">{epic.title}</span>
 								<div class="ml-auto flex shrink-0 items-center gap-1.5">
-									{#if !epic.specsApprovedAt}
+									{#if epic.specsRequired && !epic.specsApprovedAt}
 										<span
 											role="img"
 											aria-label="Specs not approved"
@@ -135,7 +135,7 @@
 										compact
 										openQuestions={epic.openQuestions}
 										questionCount={epic.questionCount}
-										specsApproved={!!epic.specsApprovedAt}
+										specsApproved={!epic.specsRequired || !!epic.specsApprovedAt}
 									/>
 								</div>
 							</a>

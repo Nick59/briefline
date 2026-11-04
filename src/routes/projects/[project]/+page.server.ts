@@ -20,6 +20,9 @@ export const load: PageServerLoad = ({ params, url }) => {
 			.list(project.id)
 			.map((epic) => ({ ...epic, tasks: services.epics.detail(epic.id).tasks })),
 		activity: firstPage((paging) => services.activity.forProject(project.id, paging)),
+		pullStatus: services.ticketPull.canPull(project.id)
+			? services.ticketPull.status(project.id)
+			: null,
 		syncJobs: services.ticketing.jobs({ projectId: project.id, limit: 8 })
 	};
 };

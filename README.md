@@ -289,7 +289,7 @@ Mappable states come from the system: Plane states, Linear team workflow states,
 the transition whose target is the mapped status; an issue already in it is left alone), GitHub `open`/`closed`. The
 webhook provider has no states. Operations: `list_ticketing_connections`, `get_ticketing_connection`,
 `create_ticketing_connection`, `update_ticketing_connection`, `delete_ticketing_connection` (refused while projects use
-it), `test_ticketing_connection`, `list_ticketing_states` and `set_project_ticketing`. Secrets are write-only: responses
+it), `test_ticketing_connection`, `list_ticketing_states` and `set_project_ticketing` (REST and dashboard only, not an MCP tool). Secrets are write-only: responses
 carry `hasSecret` and `secretSource` (`stored`, `env` or `none`). Pushes to the same ticket run in order.
 Add a provider by implementing `TicketProvider` (`src/lib/server/modules/ticketing/provider.ts`) and registering it
 in `registry.ts`.

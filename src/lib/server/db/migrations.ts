@@ -268,6 +268,10 @@ export const MIGRATIONS: Migration[] = [
 		remote_id TEXT NOT NULL,
 		PRIMARY KEY (comment_id, connection_id, ticket_key)
 	);
+	`,
+	`
+	ALTER TABLE projects ADD COLUMN ticketing_auto_pull INTEGER NOT NULL DEFAULT 0;
+	ALTER TABLE projects ADD COLUMN ticketing_pull_minutes INTEGER NOT NULL DEFAULT 10;
 	`
 ];
 

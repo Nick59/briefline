@@ -36,11 +36,12 @@
 	}
 
 	let { project, epic, selectedSpec, activity, syncJobs, ticketUrl }: Props = $props();
-	const boardLocked = $derived(!epic.specsApprovedAt || epic.openQuestions > 0);
+	const needsApproval = $derived(epic.specsRequired && !epic.specsApprovedAt);
+	const boardLocked = $derived(needsApproval || epic.openQuestions > 0);
 	const boardLockReason = $derived(
-		!epic.specsApprovedAt && epic.openQuestions > 0
+		needsApproval && epic.openQuestions > 0
 			? 'Approve specs and resolve open threads before starting tasks.'
-			: !epic.specsApprovedAt
+			: needsApproval
 				? 'Approve specs before starting tasks.'
 				: 'Resolve open threads before starting tasks.'
 	);
@@ -84,11 +85,11 @@
 		</Section>
 	{/if}
 
-	{#if epic.openQuestions > 0 || !epic.specsApprovedAt}
+	{#if epic.openQuestions > 0 || needsApproval}
 		<div class="space-y-3">
 			<OpenThreadsAlert openThreads={epic.openQuestions} onopen={() => (questionsOpen = true)} />
 
-			{#if !epic.specsApprovedAt}
+			{#if needsApproval}
 				<div
 					role="status"
 					aria-label="Specs awaiting approval"

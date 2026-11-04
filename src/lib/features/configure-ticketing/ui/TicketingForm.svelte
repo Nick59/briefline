@@ -31,11 +31,17 @@
 	let { project, providers, connections }: Props = $props();
 
 	const NONE = 'none';
+	const PULL_OPTIONS = [
+		{ value: '5', label: '5 minutes' },
+		{ value: '10', label: '10 minutes' }
+	];
 	let connectionId = $state(NONE);
 	let target = $state<Record<string, string>>({});
 	let selection = $state<Partial<Record<MappingKey, string>>>({});
 	let autoSync = $state(true);
 	let postComments = $state(true);
+	let autoPull = $state(false);
+	let pullMinutes = $state('10');
 	let busy = $state(false);
 	let states = $state<TicketingState[]>([]);
 	let loadingStates = $state(false);
@@ -54,6 +60,8 @@
 		);
 		autoSync = ticketing.autoSync;
 		postComments = ticketing.postComments;
+		autoPull = ticketing.autoPull;
+		pullMinutes = String(ticketing.pullMinutes);
 	});
 
 	const connection = $derived(connections.find((c) => c.id === connectionId));
@@ -161,7 +169,9 @@
 						target: cleanTarget(),
 						statusMapping: provider?.supportsStates ? buildMapping() : {},
 						autoSync,
-						postComments
+						postComments,
+						autoPull: provider?.supportsPull ? autoPull : false,
+						pullMinutes: Number(pullMinutes)
 					}
 				: { project: project.id, connectionId: null },
 			{ success: 'Ticketing saved' }
@@ -257,6 +267,23 @@
 						>Post task descriptions, comments and status updates as comments</Label
 					>
 				</div>
+				{#if provider.supportsPull}
+					<div class="flex items-center gap-3">
+						<Switch id="ticketing-pull" bind:checked={autoPull} />
+						<Label for="ticketing-pull" class="font-normal">Pull ticket changes automatically</Label
+						>
+					</div>
+					{#if autoPull}
+						<Field label="Pull every" for="ticketing-pull-minutes">
+							<ChoiceSelect
+								id="ticketing-pull-minutes"
+								bind:value={pullMinutes}
+								options={PULL_OPTIONS}
+								class="sm:w-40"
+							/>
+						</Field>
+					{/if}
+				{/if}
 			</div>
 		{/if}
 

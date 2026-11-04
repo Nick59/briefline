@@ -92,6 +92,13 @@ async function fetchStates(ctx: ProviderContext): Promise<ProviderState[]> {
 	return pageResults(body).map(({ id, name, group }) => ({ id, name, group }));
 }
 
+interface PlaneComment {
+	id: string;
+	comment_stripped: string;
+	actor_detail?: { display_name: string };
+	created_at: string;
+}
+
 export const planeProvider: TicketProvider = {
 	reservedHeaders: ['x-api-key'],
 	id: 'plane',
@@ -138,6 +145,50 @@ export const planeProvider: TicketProvider = {
 	},
 	listStates: fetchStates,
 	listProjects: fetchProjects,
+	async fetchTicket(ctx) {
+		const projectId = await resolveProjectId(ctx);
+		const response = await request(
+			ctx,
+			`/work-items/${encodeURIComponent(ctx.ref.key)}/?expand=state`
+		);
+		await expectOk(response, 'Plane find work item', ctx);
+		const item = (await response.json()) as {
+			id: string;
+			name: string;
+			description_stripped?: string | null;
+			state?: string | { id: string; group?: string } | null;
+		};
+		let state: { id: string; group?: string } | null = null;
+		if (typeof item.state === 'string') {
+			const found = (await fetchStates(ctx)).find((s) => s.id === item.state);
+			state = { id: item.state, group: found?.group };
+		} else if (item.state) {
+			state = { id: item.state.id, group: item.state.group };
+		}
+		const commentsResponse = await request(
+			ctx,
+			`/projects/${projectId}/issues/${item.id}/comments/`
+		);
+		await expectOk(commentsResponse, 'Plane list comments', ctx);
+		const comments = pageResults(
+			(await commentsResponse.json()) as
+				| PlaneComment[]
+				| {
+						results: PlaneComment[];
+				  }
+		);
+		return {
+			title: item.name,
+			description: item.description_stripped ?? null,
+			state,
+			comments: comments.map((c) => ({
+				id: c.id,
+				body: c.comment_stripped,
+				author: c.actor_detail?.display_name ?? null,
+				createdAt: c.created_at
+			}))
+		};
+	},
 	async syncComment(ctx, comment) {
 		const projectId = await resolveProjectId(ctx);
 		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);

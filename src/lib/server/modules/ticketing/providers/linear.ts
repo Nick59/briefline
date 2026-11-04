@@ -111,6 +111,33 @@ export const linearProvider: TicketProvider = {
 		if (!team) throw new TicketProviderError(`Linear team '${key}' was not found`);
 		return toStates(team.states.nodes);
 	},
+	async fetchTicket(ctx) {
+		const { issue } = await graphql<{
+			issue: {
+				title: string;
+				description: string | null;
+				state: { id: string; type: string } | null;
+				comments: {
+					nodes: { id: string; body: string; createdAt: string; user: { name: string } | null }[];
+				};
+			};
+		}>(
+			ctx,
+			'query($id: String!) { issue(id: $id) { title description state { id type } comments(first: 100) { nodes { id body createdAt user { name } } } } }',
+			{ id: ctx.ref.key }
+		);
+		return {
+			title: issue.title,
+			description: issue.description,
+			state: issue.state ? { id: issue.state.id, group: issue.state.type } : null,
+			comments: issue.comments.nodes.map((c) => ({
+				id: c.id,
+				body: c.body,
+				author: c.user?.name ?? null,
+				createdAt: c.createdAt
+			}))
+		};
+	},
 	async syncComment(ctx, comment) {
 		if (comment.body === null) {
 			try {

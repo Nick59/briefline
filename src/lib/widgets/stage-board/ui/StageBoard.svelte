@@ -24,7 +24,7 @@
 		stage = $bindable(untrack(() => initialStage(epic.progress)))
 	}: { epic: EpicDetail; stage?: Stage } = $props();
 
-	const locked = $derived(!epic.specsApprovedAt || epic.openQuestions > 0);
+	const locked = $derived((epic.specsRequired && !epic.specsApprovedAt) || epic.openQuestions > 0);
 
 	/** The last drop, shown right away and replaced by server data once it is saved. */
 	let pending = $state<{ taskId: string; stage: Stage; plan: DropPlan } | null>(null);

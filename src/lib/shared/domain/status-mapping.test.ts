@@ -4,6 +4,8 @@ import {
 	defaultState,
 	mappingKeyForEpic,
 	mappingKeyForTask,
+	mappingKeyFromState,
+	stagesFor,
 	suggestMapping
 } from './status-mapping.ts';
 import type { StageStatuses, TicketingState } from './types.ts';
@@ -87,5 +89,47 @@ describe('defaultState', () => {
 		];
 		expect(defaultState('not_started', states)?.id).toBe('u');
 		expect(defaultState('done', states)).toBeUndefined();
+	});
+});
+
+describe('mappingKeyFromState', () => {
+	const mapping = {
+		not_started: { id: 'u', name: 'Todo' },
+		dev: { id: 's', name: 'Doing' },
+		test: { id: 's', name: 'Doing' },
+		done: { id: 'c', name: 'Done' }
+	};
+
+	it('uses the explicit mapping match', () => {
+		expect(mappingKeyFromState({ id: 'c' }, mapping, 'dev')).toBe('done');
+	});
+
+	it('keeps the current key when several keys share the state, else takes the first', () => {
+		expect(mappingKeyFromState({ id: 's' }, mapping, 'test')).toBe('test');
+		expect(mappingKeyFromState({ id: 's' }, mapping, 'not_started')).toBe('dev');
+	});
+
+	it('falls back to the group when nothing matches', () => {
+		expect(mappingKeyFromState({ id: 'x', group: 'completed' }, {}, 'dev')).toBe('done');
+		expect(mappingKeyFromState({ id: 'x', group: 'backlog' }, {}, 'dev')).toBe('not_started');
+		expect(mappingKeyFromState({ id: 'x', group: 'unstarted' }, {}, 'dev')).toBe('not_started');
+	});
+
+	it('leaves the task alone for a started or unknown group, except when reopening a done task', () => {
+		expect(mappingKeyFromState({ id: 'x', group: 'started' }, {}, 'not_started')).toBeNull();
+		expect(mappingKeyFromState({ id: 'x' }, {}, 'test')).toBeNull();
+		expect(mappingKeyFromState({ id: 'x', group: 'started' }, {}, 'done')).toBe('dev');
+	});
+});
+
+describe('stagesFor', () => {
+	it.each([
+		['not_started', stages('todo', 'todo', 'todo')],
+		['dev', stages('in_progress', 'todo', 'todo')],
+		['test', stages('done', 'in_progress', 'todo')],
+		['deploy', stages('done', 'done', 'in_progress')],
+		['done', stages('done', 'done', 'done')]
+	] as const)('%s', (key, expected) => {
+		expect(stagesFor(key)).toEqual(expected);
 	});
 });

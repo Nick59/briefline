@@ -389,7 +389,7 @@ export const operations: Operation[] = [
 		tag: 'Epics',
 		summary: 'Approve the specs of an epic',
 		description:
-			'Record approval after a person reviews the epic and task specs. Tasks cannot start until specsApprovedAt is set (409 specs_not_approved). Open questions still block starts. Adding, changing or deleting specs clears approval.',
+			'Record approval after a person reviews the epic and task specs. When the epic has specs, tasks cannot start until specsApprovedAt is set (409 specs_not_approved); creating tasks is not blocked. Open questions still block starts. Adding, changing or deleting specs clears approval.',
 		input: z.object({ epic }),
 		run: (app, { epic }, { actor }) => app.epics.approveSpecs(epic, actor)
 	}),
@@ -943,7 +943,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'set_project_ticketing',
-		mcp: { hidden: true },
+		mcp: { excluded: true },
 		method: 'PUT',
 		path: '/projects/{project}/ticketing',
 		tag: 'Ticketing',
@@ -953,6 +953,18 @@ export const operations: Operation[] = [
 		input: setProjectTicketingSchema.extend({ project }),
 		run: (app, input, { actor }) =>
 			app.connections.setProjectTicketing(input.project, pick(input, 'project'), actor)
+	}),
+	defineOperation({
+		name: 'pull_project_tickets',
+		mcp: { hidden: true },
+		method: 'POST',
+		path: '/projects/{project}/pull',
+		tag: 'Ticketing',
+		summary: 'Pull the linked tickets of a project now',
+		description:
+			'Starts a pull of status, title, description and new comments from the linked tickets at once, even when autoPull is off, and returns without waiting. The result is { running, lastPulledAt, updated, error }; when a pull already runs, that one continues and its status is returned. Fails with 409 when the project has no connection whose provider supports pulling.',
+		input: z.object({ project }),
+		run: (app, { project }) => app.ticketPull.pullNow(project)
 	}),
 	defineOperation({
 		name: 'sync_epic_ticket',

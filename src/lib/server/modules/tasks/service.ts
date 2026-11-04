@@ -57,7 +57,6 @@ export class TaskService {
 	/** Inserts without emitting an event; callers emit their own. */
 	insert(epic: Epic, input: CreateTaskInput): Task {
 		const data = createTaskSchema.parse(input);
-		for (const stage of STAGES) this.#assertCanChange(epic, 'todo', data.stages?.[stage] ?? 'todo');
 		const { repos } = this.deps;
 		const project = requireProject(repos, epic.projectId);
 		const timestamp = now();
@@ -98,7 +97,7 @@ export class TaskService {
 		if (data.stages) this.#assertNotCancelled(current);
 		for (const stage of STAGES) {
 			const to = data.stages?.[stage];
-			if (to) this.#assertCanChange(epic, current.stages[stage], to);
+			if (to) this.#assertCanChange(epic, current.stages[stage], to, actor);
 		}
 		const task: Task = {
 			...current,
@@ -145,7 +144,7 @@ export class TaskService {
 		this.#assertNotCancelled(current);
 		if (current.stages[stage] === status) return current;
 		const epic = requireEpic(this.deps.repos, current.epicId);
-		this.#assertCanChange(epic, current.stages[stage], status);
+		this.#assertCanChange(epic, current.stages[stage], status, actor);
 		const task: Task = {
 			...current,
 			stages: { ...current.stages, [stage]: status },
@@ -273,12 +272,14 @@ export class TaskService {
 		}
 	}
 
-	/** Work that already started may continue; only starting a stage waits for questions and spec approval. */
-	#assertCanChange(epic: Epic, from: WorkStatus, to: WorkStatus) {
-		if (from !== 'todo' || to === 'todo') return;
+	/** Work that already started may continue; only starting a stage waits for questions and, when the epic has specs, their approval. */
+	#assertCanChange(epic: Epic, from: WorkStatus, to: WorkStatus, actor: string) {
+		// A pulled ticket state wins over the guard: the work already started in the ticket.
+		if (actor === 'ticket-sync' || from !== 'todo' || to === 'todo') return;
 		const open = this.deps.repos.questions.countOpen(epic.id);
 		if (open > 0) throw new OpenQuestionsError(epic.key, open);
-		if (!epic.specsApprovedAt) throw new SpecsNotApprovedError(epic.key);
+		if (!epic.specsApprovedAt && this.deps.repos.specs.countByEpic(epic.id) > 0)
+			throw new SpecsNotApprovedError(epic.key);
 	}
 
 	#emit(

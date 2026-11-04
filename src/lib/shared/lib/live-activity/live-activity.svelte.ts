@@ -2,6 +2,7 @@ import { getContext, setContext } from 'svelte';
 import { SvelteMap } from 'svelte/reactivity';
 import { invalidateAll } from '$app/navigation';
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
+import type { PullMessage, PullStatus } from '#lib/shared/domain/pull-status.ts';
 import { isRecentlyChanged, liveStatus, type Connection, type LiveStatus } from './status.ts';
 import type { AgentPresence, PresenceSnapshot } from '#lib/shared/domain/presence.ts';
 import { PRESENCE_TICK_MS, presenceRows } from './presence.ts';
@@ -23,6 +24,8 @@ export class LiveActivity {
 	presenceNow = $state(Date.now());
 	presence = $derived(presenceRows(this.agents, this.presenceNow + this.clockOffset));
 	recentlyChanged = new SvelteMap<string, number>();
+	/** Latest ticket pull status per project id, newer than the page data. */
+	pulls = new SvelteMap<string, PullStatus>();
 	muted = $state(readMuted());
 	/** Pages that must not reload under the reader, such as a later page of a list, set this. */
 	holdRefresh = false;
@@ -62,6 +65,16 @@ export class LiveActivity {
 				console.error('[live] unreadable presence', error);
 			}
 		});
+		source.addEventListener('pull', (message) => {
+			try {
+				const { projectId, status } = JSON.parse(
+					(message as MessageEvent<string>).data
+				) as PullMessage;
+				this.setPull(projectId, status);
+			} catch (error) {
+				console.error('[live] unreadable pull status', error);
+			}
+		});
 		source.onmessage = (message) => {
 			try {
 				this.#handle(JSON.parse(message.data) as LiveEvent);
@@ -69,6 +82,10 @@ export class LiveActivity {
 				console.error('[live] unreadable event', error);
 			}
 		};
+	}
+
+	setPull(projectId: string, status: PullStatus) {
+		this.pulls.set(projectId, status);
 	}
 
 	setPresence(snapshot: PresenceSnapshot | null) {

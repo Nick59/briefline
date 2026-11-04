@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { testConfig } from '../testing/app.ts';
 import { createContainer } from '../container.ts';
 import { migrate } from './connection.ts';
+import { MIGRATIONS } from './migrations.ts';
 
 describe('migration that removes phases', () => {
 	function legacyDb() {
@@ -51,7 +52,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -84,7 +85,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 });
 
@@ -112,7 +113,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -131,7 +132,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -184,7 +185,7 @@ describe('activity cursor and profile migrations', () => {
 		expect(tables).toEqual(
 			expect.arrayContaining(['activity_counter', 'activity_cursors', 'user_profile'])
 		);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 });
 
@@ -242,7 +243,7 @@ describe('agent sessions migration', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 });
 
@@ -270,7 +271,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 });
 
@@ -345,9 +346,26 @@ describe('spec approval migration', () => {
 		expect(app.tasks.get('SHOP-1').stages.dev).toBe('in_progress');
 		expect(() =>
 			app.tasks.setStage('SHOP-1', { stage: 'test', status: 'in_progress' }, 'test')
+		).not.toThrow();
+		app.specs.createForEpic('SHOP-E1', { title: 'Plan' }, 'test');
+		expect(() =>
+			app.tasks.setStage('SHOP-1', { stage: 'deploy', status: 'in_progress' }, 'test')
 		).toThrow('specs are not approved');
 		expect(() =>
 			app.tasks.setStage('SHOP-1', { stage: 'dev', status: 'done' }, 'test')
 		).not.toThrow();
+	});
+});
+
+describe('ticket pull migration', () => {
+	it('reads existing projects with pulling off and a 10 minute interval', () => {
+		const db = new DatabaseSync(':memory:');
+		migrate(db, MIGRATIONS.length - 1);
+		db.exec(
+			"INSERT INTO projects (id, key, name, created_at, updated_at) VALUES ('p', 'SHOP', 'Shop', 't', 't')"
+		);
+		migrate(db);
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
+		expect(app.projects.get('SHOP').ticketing).toMatchObject({ autoPull: false, pullMinutes: 10 });
 	});
 });

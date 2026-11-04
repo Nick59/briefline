@@ -24,6 +24,8 @@ export interface Operation<S extends z.ZodObject = z.ZodObject> {
 	mcp?: {
 		/** Hidden from tools/list unless the client connects with ?tools=all; still callable. */
 		hidden?: boolean;
+		/** Not an MCP tool at all: absent from every list and refused when called. The REST API and dashboard are unaffected. */
+		excluded?: boolean;
 		/** Fields marked required in the tool's input schema. */
 		required?: string[];
 		/** Returns an error message when the call must be refused. */

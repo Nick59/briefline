@@ -1,4 +1,5 @@
 import type { PresenceSnapshot } from '#lib/shared/domain/presence.ts';
+import type { PullMessage } from '#lib/shared/domain/pull-status.ts';
 import { liveState } from '../live.ts';
 import { app } from '../runtime.ts';
 import { formatSse, toLiveEvent } from '../modules/activity/live.ts';
@@ -25,11 +26,17 @@ export function liveEventStream(request: Request, projectId: string | null): Res
 			});
 			const onPresence = (snapshot: PresenceSnapshot) =>
 				send(`event: presence\ndata: ${JSON.stringify(snapshot)}\n\n`);
+			const onPull = (message: PullMessage) => {
+				if (projectId === null || message.projectId === projectId)
+					send(`event: pull\ndata: ${JSON.stringify(message)}\n\n`);
+			};
 			liveState().presence.add(onPresence);
+			liveState().pulls.add(onPull);
 			const ping = setInterval(() => send(': ping\n\n'), PING_MS);
 			cleanup = () => {
 				unsubscribe();
 				liveState().presence.delete(onPresence);
+				liveState().pulls.delete(onPull);
 				clearInterval(ping);
 				try {
 					controller.close();

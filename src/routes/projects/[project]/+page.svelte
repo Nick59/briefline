@@ -13,4 +13,5 @@
 	selectedSpec={data.selectedSpec}
 	activity={data.activity}
 	syncJobs={data.syncJobs}
+	pullStatus={data.pullStatus}
 />

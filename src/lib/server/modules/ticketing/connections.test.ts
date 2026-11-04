@@ -256,7 +256,7 @@ describe('migration to ticketing connections', () => {
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
 		expect(byKey.THR.ticketing_post_comments).toBe(0);
 		expect(byKey.FOU.ticketing_connection_id).toBeNull();
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 19 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 20 });
 	});
 
 	it('keeps migrated projects working: connection resolves and falls back to the environment', async () => {
@@ -480,5 +480,26 @@ describe('unreadable stored secrets', () => {
 			app.connections.update(id, { headers: [{ name: 'CF-Access-Client-Id' }] })
 		).toThrow("CF-Access-Client-Id needs a value, the saved one can't be read");
 		expect(app.connections.get(id).headersUnreadable).toBe(true);
+	});
+});
+
+describe('ticket pull settings', () => {
+	it('saves autoPull and pullMinutes and rejects other intervals', () => {
+		const { app } = setup();
+		const connection = connectProject(app, 'PMA', 'plane', planeSettings, { secret: SECRET });
+		const saved = app.connections.setProjectTicketing(
+			'PMA',
+			{ connectionId: connection.id, autoPull: true, pullMinutes: 5 },
+			'test'
+		);
+		expect(saved.ticketing).toMatchObject({ autoPull: true, pullMinutes: 5 });
+		expect(app.projects.get('PMA').ticketing).toMatchObject({ autoPull: true, pullMinutes: 5 });
+		expect(() =>
+			app.connections.setProjectTicketing(
+				'PMA',
+				{ connectionId: connection.id, pullMinutes: 7 as 5 },
+				'test'
+			)
+		).toThrow();
 	});
 });

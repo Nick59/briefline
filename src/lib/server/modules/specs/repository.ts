@@ -52,6 +52,15 @@ export class SpecRepository {
 		).map(toSpec);
 	}
 
+	/** Counts epic-level and task-level specs. */
+	countByEpic(epicId: string): number {
+		return (
+			one<{ n: number }>(this.db, 'SELECT COUNT(*) AS n FROM specs WHERE epic_id = :epicId', {
+				epicId
+			})?.n ?? 0
+		);
+	}
+
 	listByProject(projectId: string): Spec[] {
 		return all<SpecRow>(
 			this.db,

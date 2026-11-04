@@ -13,6 +13,8 @@ interface ProjectRow {
 	position: number;
 	ticketing_auto_sync: number;
 	ticketing_post_comments: number;
+	ticketing_auto_pull: number;
+	ticketing_pull_minutes: number;
 	created_at: string;
 	updated_at: string;
 }
@@ -28,7 +30,9 @@ const toProject = (row: ProjectRow): Project => ({
 		target: fromJson<Record<string, string>>(row.ticketing_target, {}),
 		statusMapping: fromJson<StatusMapping>(row.status_mapping, {}),
 		autoSync: row.ticketing_auto_sync !== 0,
-		postComments: row.ticketing_post_comments !== 0
+		postComments: row.ticketing_post_comments !== 0,
+		autoPull: row.ticketing_auto_pull !== 0,
+		pullMinutes: row.ticketing_pull_minutes === 5 ? 5 : 10
 	},
 	position: row.position,
 	createdAt: row.created_at,
@@ -71,8 +75,8 @@ export class ProjectRepository {
 		run(
 			this.db,
 			`INSERT INTO projects (id, key, name, description, ticketing_connection_id, ticketing_target, status_mapping,
-			 ticketing_auto_sync, ticketing_post_comments, position, created_at, updated_at)
-			 VALUES (:id, :key, :name, :description, :connectionId, :target, :statusMapping, :autoSync, :postComments,
+			 ticketing_auto_sync, ticketing_post_comments, ticketing_auto_pull, ticketing_pull_minutes, position, created_at, updated_at)
+			 VALUES (:id, :key, :name, :description, :connectionId, :target, :statusMapping, :autoSync, :postComments, :autoPull, :pullMinutes,
 			 :position, :createdAt, :updatedAt)`,
 			{
 				...this.#params(project),
@@ -88,7 +92,8 @@ export class ProjectRepository {
 			this.db,
 			`UPDATE projects SET name = :name, description = :description, ticketing_connection_id = :connectionId,
 			 ticketing_target = :target, status_mapping = :statusMapping, ticketing_auto_sync = :autoSync,
-			 ticketing_post_comments = :postComments, updated_at = :updatedAt WHERE id = :id`,
+			 ticketing_post_comments = :postComments, ticketing_auto_pull = :autoPull,
+			 ticketing_pull_minutes = :pullMinutes, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(project)
 		);
 	}
@@ -117,6 +122,8 @@ export class ProjectRepository {
 			statusMapping: toJson(project.ticketing.statusMapping) ?? '{}',
 			autoSync: project.ticketing.autoSync ? 1 : 0,
 			postComments: project.ticketing.postComments ? 1 : 0,
+			autoPull: project.ticketing.autoPull ? 1 : 0,
+			pullMinutes: project.ticketing.pullMinutes,
 			updatedAt: project.updatedAt
 		};
 	}

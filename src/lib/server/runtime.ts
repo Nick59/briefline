@@ -16,6 +16,7 @@ export function app(): Container {
 			createContainer(openDatabase(config.databasePath), { config, env })
 		);
 		container.attachments.sweepOrphans();
+		container.ticketPull.start();
 		if (config.seedDemo) seedDemo(container);
 	}
 	return container;

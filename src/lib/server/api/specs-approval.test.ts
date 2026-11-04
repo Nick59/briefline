@@ -25,6 +25,17 @@ function setup() {
 const blocked = { status: 409, body: { error: { code: 'specs_not_approved' } } };
 
 describe('epic spec approval', () => {
+	it('reports specsRequired only when the epic has specs', () => {
+		const { app } = testApp();
+		app.projects.create({ key: 'SHOP', name: 'Shop' }, 'test');
+		const epic = app.epics.create('SHOP', { title: 'Empty' }, 'test');
+		expect(app.epics.detail(epic.id).specsRequired).toBe(false);
+		expect(app.epics.list('SHOP')[0].specsRequired).toBe(false);
+		app.specs.createForEpic(epic.id, { title: 'Plan', content: 'x' }, 'test');
+		expect(app.epics.detail(epic.id).specsRequired).toBe(true);
+		expect(app.epics.list('SHOP')[0].specsRequired).toBe(true);
+	});
+
 	it('blocks all start paths and records approval in epic and task responses', async () => {
 		const { app, run } = setup();
 		expect(app.epics.list('SHOP')[0].specsApprovedAt).toBeNull();
@@ -32,21 +43,11 @@ describe('epic spec approval', () => {
 			['set_task_stage_status', { task: 'SHOP-1', stage: 'dev', status: 'in_progress' }],
 			['set_task_stage_status', { task: 'SHOP-1', stage: 'test', status: 'done' }],
 			['update_task', { task: 'SHOP-1', stages: { deploy: 'in_progress' } }],
-			['move_task', { task: 'SHOP-1', stage: 'dev', status: 'done' }],
-			['create_task', { epic: 'SHOP-E1', title: 'Bypass', stages: { dev: 'done' } }],
-			[
-				'create_epic',
-				{
-					project: 'SHOP',
-					title: 'Bypass',
-					tasks: [{ title: 'X', stages: { dev: 'in_progress' } }]
-				}
-			]
+			['move_task', { task: 'SHOP-1', stage: 'dev', status: 'done' }]
 		] as const)
 			await expect(run(name, input)).rejects.toMatchObject(blocked);
 		expect(app.tasks.get('SHOP-1').stages).toEqual({ dev: 'todo', test: 'todo', deploy: 'todo' });
 		expect(app.tasks.list('SHOP-E1')).toHaveLength(2);
-		expect(app.epics.list('SHOP')).toHaveLength(1);
 		const approved = await run('approve_epic_specs', { epic: 'shop-e1' });
 		expect(approved).toMatchObject({
 			specsApprovedAt: expect.any(String),
@@ -76,6 +77,39 @@ describe('epic spec approval', () => {
 		expect(matchRoute('POST', '/epics/SHOP-E1/specs/approve')).toMatchObject({
 			op: { name: 'approve_epic_specs' }
 		});
+	});
+
+	it('creates tasks and epics with started stages without approval', async () => {
+		const { app, run } = setup();
+		await expect(
+			run('create_task', { epic: 'SHOP-E1', title: 'Imported', stages: { dev: 'in_progress' } })
+		).resolves.toMatchObject({ stages: { dev: 'in_progress' } });
+		await expect(
+			run('create_epic', {
+				project: 'SHOP',
+				title: 'Imported epic',
+				tasks: [{ title: 'X', stages: { dev: 'in_progress' } }]
+			})
+		).resolves.toBeDefined();
+		expect(app.epics.list('SHOP')).toHaveLength(2);
+	});
+
+	it('requires approval only when the epic has epic or task specs', async () => {
+		const { app, run } = setup();
+		const start = (task: string) =>
+			run('set_task_stage_status', { task, stage: 'dev', status: 'in_progress' });
+		const bare = app.epics.create('SHOP', { title: 'Bare', tasks: [{ title: 'T' }] }, 'test');
+		const [bareTask] = app.tasks.list(bare.id);
+		await expect(start(bareTask.id)).resolves.toMatchObject({ stages: { dev: 'in_progress' } });
+		const other = app.epics.create('SHOP', { title: 'Task spec', tasks: [{ title: 'U' }] }, 'test');
+		const [otherTask] = app.tasks.list(other.id);
+		app.specs.createForTask(otherTask.id, { title: 'Detail' }, 'test');
+		await expect(start(otherTask.id)).rejects.toMatchObject(blocked);
+		const [q] = app.questions.add(bare.id, { questions: [{ question: 'Which?' }] }, 'test');
+		await expect(
+			run('set_task_stage_status', { task: bareTask.id, stage: 'test', status: 'in_progress' })
+		).rejects.toMatchObject({ status: 409, body: { error: { code: 'open_questions' } } });
+		app.questions.ignore(q.id, 'Nick');
 	});
 
 	it('requires approval again after epic or task specs change, while started work can finish', async () => {

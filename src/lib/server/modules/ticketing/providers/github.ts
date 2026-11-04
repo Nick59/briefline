@@ -93,6 +93,29 @@ export const githubProvider: TicketProvider = {
 	async listStates() {
 		return STATES;
 	},
+	async fetchTicket(ctx) {
+		const { repo, number } = parseGithubRef(ctx.ref.key, ctx.settings.repo);
+		const issue = (await (await call(ctx, `/repos/${repo}/issues/${number}`, 'GET')).json()) as {
+			title: string;
+			body: string | null;
+			state: string;
+		};
+		const comments = (await (
+			await call(ctx, `/repos/${repo}/issues/${number}/comments?per_page=100`, 'GET')
+		).json()) as { id: number; body: string; user: { login: string } | null; created_at: string }[];
+		const state = STATES.find((s) => s.id === issue.state);
+		return {
+			title: issue.title,
+			description: issue.body,
+			state: state ? { id: state.id, group: state.group } : null,
+			comments: comments.map((c) => ({
+				id: String(c.id),
+				body: c.body,
+				author: c.user?.login ?? null,
+				createdAt: c.created_at
+			}))
+		};
+	},
 	async syncComment(ctx, comment) {
 		const { repo, number } = parseGithubRef(ctx.ref.key, ctx.settings.repo);
 		const path = comment.remoteId

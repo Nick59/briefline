@@ -35,6 +35,8 @@ export interface ProjectTicketing {
 	statusMapping: StatusMapping;
 	autoSync: boolean;
 	postComments: boolean;
+	autoPull: boolean;
+	pullMinutes: 5 | 10;
 }
 
 export type SecretSource = 'stored' | 'env' | 'none';
@@ -289,6 +291,8 @@ export interface EpicSummary extends Epic {
 	taskCount: number;
 	openQuestions: number;
 	questionCount: number;
+	/** True when the epic has specs, so its tasks need an approval to start. */
+	specsRequired: boolean;
 }
 
 export interface EpicDetail extends Epic {
@@ -299,6 +303,8 @@ export interface EpicDetail extends Epic {
 	questions: EpicQuestion[];
 	openQuestions: number;
 	questionCount: number;
+	/** True when the epic has specs, so its tasks need an approval to start. */
+	specsRequired: boolean;
 }
 
 export interface ProjectSummary extends Project {
@@ -349,6 +355,8 @@ export interface TicketProviderInfo {
 	supportsStates: boolean;
 	/** True when the provider can list its projects for the project target field. */
 	supportsProjects: boolean;
+	/** True when the provider can read a ticket back, so changes can be pulled. */
+	supportsPull: boolean;
 }
 
 export interface UserProfile {

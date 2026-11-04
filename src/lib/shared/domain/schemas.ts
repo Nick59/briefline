@@ -96,7 +96,9 @@ export const setProjectTicketingSchema = z.object({
 	target: settingsRecord.optional().describe('Project-level provider fields'),
 	statusMapping: statusMappingSchema.optional(),
 	autoSync: z.boolean().optional(),
-	postComments: z.boolean().optional()
+	postComments: z.boolean().optional(),
+	autoPull: z.boolean().optional(),
+	pullMinutes: z.union([z.literal(5), z.literal(10)]).optional()
 });
 
 const projectKey = z

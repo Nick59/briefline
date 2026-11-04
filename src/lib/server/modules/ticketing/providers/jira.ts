@@ -122,6 +122,45 @@ export const jiraProvider: TicketProvider = {
 					});
 		return [...seen.values()];
 	},
+	async fetchTicket(ctx) {
+		const key = encodeURIComponent(ctx.ref.key);
+		const response = await request(
+			ctx,
+			`/rest/api/2/issue/${key}?fields=summary,description,status,comment`
+		);
+		await expectOk(response, 'Jira get issue', ctx);
+		const { fields } = (await response.json()) as {
+			fields: {
+				summary: string;
+				description?: string | null;
+				status?: { id: string; statusCategory?: { key: string } };
+				comment?: {
+					comments: {
+						id: string;
+						body: string;
+						author?: { displayName: string };
+						created: string;
+					}[];
+				};
+			};
+		};
+		return {
+			title: fields.summary,
+			description: fields.description ?? null,
+			state: fields.status
+				? {
+						id: fields.status.id,
+						group: CATEGORY_GROUP[fields.status.statusCategory?.key ?? '']
+					}
+				: null,
+			comments: (fields.comment?.comments ?? []).map((c) => ({
+				id: c.id,
+				body: c.body,
+				author: c.author?.displayName ?? null,
+				createdAt: c.created
+			}))
+		};
+	},
 	async syncComment(ctx, comment) {
 		const path = `/rest/api/2/issue/${encodeURIComponent(ctx.ref.key)}/comment${comment.remoteId ? `/${encodeURIComponent(comment.remoteId)}` : ''}`;
 		const response = await request(ctx, path, {

@@ -24,7 +24,7 @@ Typical flow for an agent:
 2. When you plan new work, call create_epic with tasks and specs in one call.
    Before starting work on an epic, ask anything unclear with add_epic_questions (one call, several questions; add context and suggested options).
    Questions are threads: a person can open one too, and anyone can add replies over time. Read the replies in each question's \`messages\` (list_epic_questions or get_epic), reply or act on threads a person opened, and add details or findings with reply_to_question.
-   Tasks also cannot start until a person reviews and approves specs in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved). Adding, editing or deleting epic or task specs clears approval. Tasks cannot be started while an epic has open questions, whoever opened them. Read the answers and follow them; an ignored question means use your judgement.
+   When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Adding, editing or deleting epic or task specs clears approval. Tasks cannot be started while an epic has open questions, whoever opened them. Read the answers and follow them; an ignored question means use your judgement.
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
    A task that will not be done: update_task { cancelled: true, cancelReason }; it stays visible but leaves the progress. cancelled: false restores it.
    Read a task's comments in get_task; people comment too, so act on their comments, and use add_task_comment to record findings, decisions or blockers on the task as you work.
@@ -84,7 +84,7 @@ function toolInputSchema(op: Operation) {
 
 function tools(options: McpOptions) {
 	return operations
-		.filter((op) => options.allTools || !op.mcp?.hidden)
+		.filter((op) => !op.mcp?.excluded && (options.allTools || !op.mcp?.hidden))
 		.map((op) => ({
 			name: op.name,
 			description: [op.summary, op.description].filter(Boolean).join('\n'),
@@ -99,7 +99,8 @@ function tools(options: McpOptions) {
 
 async function callTool(app: Container, params: Record<string, unknown>, actor: string) {
 	const op = operationsByName.get(String(params.name));
-	if (!op) return { error: { code: -32602, message: `Unknown tool '${String(params.name)}'` } };
+	if (!op || op.mcp?.excluded)
+		return { error: { code: -32602, message: `Unknown tool '${String(params.name)}'` } };
 	try {
 		const value = await execute(app, op, params.arguments ?? {}, { actor, transport: 'mcp' });
 		const structured =

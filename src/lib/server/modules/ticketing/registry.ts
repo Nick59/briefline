@@ -29,7 +29,8 @@ export class TicketProviderRegistry {
 				secretLabel,
 				secretEnvVar,
 				supportsStates,
-				listProjects
+				listProjects,
+				fetchTicket
 			}) => ({
 				id,
 				label,
@@ -39,7 +40,8 @@ export class TicketProviderRegistry {
 				secretLabel,
 				secretEnvVar,
 				supportsStates,
-				supportsProjects: Boolean(listProjects)
+				supportsProjects: Boolean(listProjects),
+				supportsPull: Boolean(fetchTicket)
 			})
 		);
 	}

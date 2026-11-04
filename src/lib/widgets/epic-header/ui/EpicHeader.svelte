@@ -56,9 +56,10 @@
 			<ReadinessBadge
 				openQuestions={epic.openQuestions}
 				questionCount={epic.questionCount}
-				specsApproved={!!epic.specsApprovedAt}
+				specsApproved={!epic.specsRequired || !!epic.specsApprovedAt}
 				onclick={() => {
-					if (epic.openQuestions > 0 || epic.specsApprovedAt) questionsOpen = true;
+					if (epic.openQuestions > 0 || !epic.specsRequired || epic.specsApprovedAt)
+						questionsOpen = true;
 					else document.getElementById('epic-specs')?.scrollIntoView({ behavior: 'smooth' });
 				}}
 			/>

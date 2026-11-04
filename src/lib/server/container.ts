@@ -36,6 +36,7 @@ import { ConnectionRepository } from './modules/ticketing/connection-repository.
 import { TicketingConnectionService } from './modules/ticketing/connections.ts';
 import { createSecretBox, SECRET_KEY_ENV } from './crypto/secrets.ts';
 import { SyncJobRepository } from './modules/ticketing/repository.ts';
+import { TicketPullService } from './modules/ticketing/pull.ts';
 import { TicketSyncService } from './modules/ticketing/service.ts';
 
 export interface ContainerOptions {
@@ -90,6 +91,8 @@ export function createContainer(
 		clock,
 		isIgnored: isPresenceIgnored(() => profile.get()?.name ?? null, ANONYMOUS_ACTORS)
 	});
+	const comments = new CommentService(deps);
+	const epics = new EpicService(deps, tasks, specs);
 	const connections = new TicketingConnectionService(
 		deps,
 		registry,
@@ -102,9 +105,9 @@ export function createContainer(
 		events: deps.events,
 		attachments,
 		projects: new ProjectService(deps, () => attachments.sweepOrphans()),
-		epics: new EpicService(deps, tasks, specs),
+		epics,
 		tasks,
-		comments: new CommentService(deps),
+		comments,
 		search: new TicketSearchService(deps),
 		specs,
 		questions: new QuestionService(deps),
@@ -114,6 +117,7 @@ export function createContainer(
 		profile,
 		presence,
 		connections,
+		ticketPull: new TicketPullService(deps, connections, { tasks, epics, comments }, clock),
 		ticketing: new TicketSyncService(deps, registry, connections, {
 			env,
 			fetch: fetchImpl,

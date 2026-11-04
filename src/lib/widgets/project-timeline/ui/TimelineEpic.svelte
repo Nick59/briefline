@@ -53,7 +53,7 @@
 			<ReadinessBadge
 				openQuestions={epic.openQuestions}
 				questionCount={epic.questionCount}
-				specsApproved={!!epic.specsApprovedAt}
+				specsApproved={!epic.specsRequired || !!epic.specsApprovedAt}
 			/>
 		</div>
 		<p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">

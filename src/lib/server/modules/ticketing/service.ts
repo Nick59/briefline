@@ -94,6 +94,8 @@ export class TicketSyncService {
 	async retry(jobId: string): Promise<SyncJob> {
 		const job = this.deps.repos.syncJobs.find(jobId);
 		if (!job) throw new NotFoundError('Sync job', jobId);
+		if (job.operation === 'pull_ticket')
+			throw new InvalidInputError('Pull failures retry on the next pull');
 		return this.#background(job);
 	}
 

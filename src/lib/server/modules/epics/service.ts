@@ -40,7 +40,8 @@ export class EpicService {
 				progress: computeProgress(tasks),
 				taskCount: tasks.filter((task) => !task.cancelledAt).length,
 				openQuestions: questionCounts.get(epic.id)?.open ?? 0,
-				questionCount: questionCounts.get(epic.id)?.total ?? 0
+				questionCount: questionCounts.get(epic.id)?.total ?? 0,
+				specsRequired: repos.specs.countByEpic(epic.id) > 0
 			};
 		});
 	}
@@ -63,7 +64,8 @@ export class EpicService {
 			specs: repos.specs.listByEpic(epic.id).map(toSpecSummary),
 			questions,
 			openQuestions: repos.questions.countOpen(epic.id),
-			questionCount: questions.length
+			questionCount: questions.length,
+			specsRequired: repos.specs.countByEpic(epic.id) > 0
 		};
 	}
 

@@ -48,7 +48,7 @@ describe('mcp', () => {
 		expect(init.result.protocolVersion).toBe('2025-06-18');
 		expect(init.result.instructions).toContain('set_task_stage_status');
 		const list = await call(app, 'tools/list', undefined, 1, { allTools: true });
-		expect(list.result.tools).toHaveLength(operations.length);
+		expect(list.result.tools).toHaveLength(operations.filter((op) => !op.mcp?.excluded).length);
 		expect(
 			list.result.tools.find((t: { name: string }) => t.name === 'create_epic').inputSchema
 				.properties.tasks
@@ -68,7 +68,19 @@ describe('mcp', () => {
 			expect(names).not.toContain('create_ticketing_connection');
 			const all = (await list(true)).map((t) => t.name);
 			expect(all).toContain('create_ticketing_connection');
-			expect(all).toHaveLength(operations.length);
+			expect(all).toHaveLength(operations.filter((op) => !op.mcp?.excluded).length);
+		});
+
+		it('lists set_project_ticketing nowhere and refuses to call it', async () => {
+			const { app } = testApp();
+			for (const allTools of [false, true])
+				expect((await list(allTools)).map((t) => t.name)).not.toContain('set_project_ticketing');
+			const result = await call(app, 'tools/call', {
+				name: 'set_project_ticketing',
+				arguments: { project: 'X' }
+			});
+			expect(result.error).toBeDefined();
+			expect(operationsByName.has('set_project_ticketing')).toBe(true);
 		});
 
 		it('keeps hidden tools callable', async () => {

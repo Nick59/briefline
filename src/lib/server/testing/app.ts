@@ -19,7 +19,8 @@ export interface FetchCall {
 export function testApp(
 	env: Record<string, string | undefined> = {},
 	respond: (call: FetchCall) => Response = () => Response.json({}),
-	config: Partial<ServerConfig> = {}
+	config: Partial<ServerConfig> = {},
+	clock?: () => number
 ) {
 	const calls: FetchCall[] = [];
 	const fetchImpl = (async (url: string | URL, init: RequestInit = {}) => {
@@ -30,7 +31,8 @@ export function testApp(
 	const app = createContainer(openDatabase(':memory:'), {
 		config: { ...testConfig(), ...config },
 		env,
-		fetch: fetchImpl
+		fetch: fetchImpl,
+		clock
 	});
 	return { app, calls };
 }
