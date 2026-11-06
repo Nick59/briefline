@@ -112,34 +112,29 @@ describe('epic spec approval', () => {
 		app.questions.ignore(q.id, 'Nick');
 	});
 
-	it('requires approval again after epic or task specs change, while started work can finish', async () => {
+	it('keeps approval after epic or task specs are added, changed or deleted', async () => {
 		const { app, epic, run } = setup();
 		await run('approve_epic_specs', { epic: epic.id });
-		await run('set_task_stage_status', { task: 'SHOP-1', stage: 'dev', status: 'in_progress' });
-		const spec = epic.specs[0];
-		app.specs.markViewed(spec.id);
-		app.specs.update(spec.id, { content: 'Original', position: 2 }, 'test');
-		expect(app.epics.get(epic.id).specsApprovedAt).not.toBeNull();
-		app.specs.update(spec.id, { content: 'Changed' }, 'test');
-		expect(app.epics.get(epic.id)).toMatchObject({ specsApprovedAt: null, specsApprovedBy: null });
+		const approved = app.epics.get(epic.id);
+		expect(approved.specsApprovedAt).not.toBeNull();
+		const kept = () =>
+			expect(app.epics.get(epic.id)).toMatchObject({
+				specsApprovedAt: approved.specsApprovedAt,
+				specsApprovedBy: 'Nick'
+			});
+		app.specs.update(epic.specs[0].id, { content: 'Changed' }, 'test');
+		kept();
+		const taskSpec = app.specs.createForTask('SHOP-1', { title: 'Detail' }, 'test');
+		kept();
+		app.specs.update(taskSpec.id, { title: 'New detail' }, 'test');
+		kept();
+		app.specs.delete(taskSpec.id, 'test');
+		kept();
+		app.specs.delete(epic.specs[0].id, 'test');
+		kept();
 		await expect(
 			run('set_task_stage_status', { task: 'SHOP-2', stage: 'dev', status: 'in_progress' })
-		).rejects.toMatchObject(blocked);
-		await expect(
-			run('set_task_stage_status', { task: 'SHOP-1', stage: 'dev', status: 'done' })
 		).resolves.toBeDefined();
-		await run('approve_epic_specs', { epic: epic.id });
-		const taskSpec = app.specs.createForTask('SHOP-1', { title: 'Detail' }, 'test');
-		expect(app.epics.get(epic.id).specsApprovedAt).toBeNull();
-		await run('approve_epic_specs', { epic: epic.id });
-		app.specs.update(taskSpec.id, { title: 'New detail' }, 'test');
-		expect(app.epics.get(epic.id).specsApprovedAt).toBeNull();
-		await run('approve_epic_specs', { epic: epic.id });
-		app.specs.delete(taskSpec.id, 'test');
-		expect(app.epics.get(epic.id).specsApprovedAt).toBeNull();
-		await run('approve_epic_specs', { epic: epic.id });
-		app.specs.createForProject('SHOP', { title: 'Project context' }, 'test');
-		expect(app.epics.get(epic.id).specsApprovedAt).not.toBeNull();
 	});
 
 	it('returns a useful MCP tool error and exposes approval status and instructions', async () => {

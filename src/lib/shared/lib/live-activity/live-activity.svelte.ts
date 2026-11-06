@@ -3,7 +3,13 @@ import { SvelteMap } from 'svelte/reactivity';
 import { invalidateAll } from '$app/navigation';
 import type { LiveEvent } from '#lib/shared/domain/live.ts';
 import type { PullMessage, PullStatus } from '#lib/shared/domain/pull-status.ts';
-import { isRecentlyChanged, liveStatus, type Connection, type LiveStatus } from './status.ts';
+import {
+	isRecentlyChanged,
+	liveStatus,
+	reconnectDelay,
+	type Connection,
+	type LiveStatus
+} from './status.ts';
 import type { AgentPresence, PresenceSnapshot } from '#lib/shared/domain/presence.ts';
 import { PRESENCE_TICK_MS, presenceRows } from './presence.ts';
 import { isBriefOfPrevious } from './label.ts';
@@ -38,25 +44,58 @@ export class LiveActivity {
 	#refresh: ReturnType<typeof setTimeout> | null = null;
 	#presenceTick: ReturnType<typeof setInterval> | null = null;
 	#hadOpen = false;
+	#projectKey: string | null = null;
+	#attempts = 0;
+	#retry: ReturnType<typeof setTimeout> | null = null;
+	#listeningOnline = false;
 
 	/** Streams one project's events, or every project's when `projectKey` is null. */
 	connect(projectKey: string | null) {
 		this.disconnect();
+		this.#projectKey = projectKey;
+		this.#hadOpen = false;
+		this.#attempts = 0;
+		if (typeof window !== 'undefined' && !this.#listeningOnline) {
+			this.#listeningOnline = true;
+			window.addEventListener('online', () => {
+				if (this.connected !== 'closed' || !this.#retry) return;
+				clearTimeout(this.#retry);
+				this.#retry = null;
+				this.#attempts = 0;
+				this.#open();
+			});
+		}
+		this.#open();
+	}
+
+	#open() {
 		this.connected = 'connecting';
+		const projectKey = this.#projectKey;
 		const source = new EventSource(
 			projectKey ? `/projects/${encodeURIComponent(projectKey)}/events` : '/activity/events'
 		);
 		this.#source = source;
-		this.#hadOpen = false;
 		source.onopen = () => {
 			this.connected = 'open';
+			this.#attempts = 0;
 			this.#startTick();
 			// EventSource auto-reconnects after an error, so events may have been missed.
 			if (this.#hadOpen) this.#scheduleRefresh();
 			this.#hadOpen = true;
 		};
 		source.onerror = () => {
-			this.connected = source.readyState === EventSource.CLOSED ? 'closed' : 'connecting';
+			if (source.readyState !== EventSource.CLOSED) {
+				this.connected = 'connecting';
+				return;
+			}
+			// The browser gives up on a closed source, so reconnect with backoff.
+			source.close();
+			this.connected = 'closed';
+			if (this.#retry || this.#source !== source) return;
+			this.#retry = setTimeout(() => {
+				this.#retry = null;
+				this.#open();
+			}, reconnectDelay(this.#attempts++));
 		};
 		source.addEventListener('presence', (message) => {
 			try {
@@ -109,6 +148,8 @@ export class LiveActivity {
 	disconnect() {
 		this.#source?.close();
 		this.#source = null;
+		if (this.#retry) clearTimeout(this.#retry);
+		this.#retry = null;
 		if (this.#tick) clearInterval(this.#tick);
 		if (this.#refresh) clearTimeout(this.#refresh);
 		this.#tick = this.#refresh = null;

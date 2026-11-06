@@ -74,6 +74,14 @@ export class SpecRepository {
 		return row && toSpec(row);
 	}
 
+	listVersions(specId: string): { title: string; content: string; createdAt: string }[] {
+		return all<{ title: string; content: string; created_at: string }>(
+			this.db,
+			'SELECT title, content, created_at FROM spec_versions WHERE spec_id = :specId ORDER BY id',
+			{ specId }
+		).map((row) => ({ title: row.title, content: row.content, createdAt: row.created_at }));
+	}
+
 	nextPosition(owner: { epicId: string; taskId: string | null } | { projectId: string }): number {
 		const row =
 			'projectId' in owner

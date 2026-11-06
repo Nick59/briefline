@@ -193,6 +193,14 @@ export interface EpicQuestion {
 	messages: QuestionMessage[];
 }
 
+export interface SpecVersion {
+	version: number;
+	title: string;
+	content: string;
+	createdAt: ISODate;
+	current: boolean;
+}
+
 export type SpecSummary = Omit<Spec, 'content' | 'brief'> & { hasBrief: boolean };
 
 export interface Page<T> {

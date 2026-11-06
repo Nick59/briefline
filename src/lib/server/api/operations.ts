@@ -369,7 +369,7 @@ export const operations: Operation[] = [
 		tag: 'Epics',
 		summary: 'Get an epic with its tasks, specs, questions and progress',
 		description:
-			'questions lists every question thread of the epic with its replies in messages; openQuestions counts the open ones. Tasks cannot be started while any is open or specsApprovedAt is null. specsApprovedBy identifies who approved. Spec additions, edits and deletions clear approval.',
+			'questions lists every question thread of the epic with its replies in messages; openQuestions counts the open ones. Tasks cannot be started while any is open or specsApprovedAt is null. specsApprovedBy identifies who approved. Approval is a one-time gate: later spec changes keep the epic approved.',
 		input: z.object({ epic }),
 		run: (app, { epic }) => app.epics.detail(epic)
 	}),
@@ -389,7 +389,7 @@ export const operations: Operation[] = [
 		tag: 'Epics',
 		summary: 'Approve the specs of an epic',
 		description:
-			'Record approval after a person reviews the epic and task specs. When the epic has specs, tasks cannot start until specsApprovedAt is set (409 specs_not_approved); creating tasks is not blocked. Open questions still block starts. Adding, changing or deleting specs clears approval.',
+			'Record approval after a person reviews the epic and task specs. When the epic has specs, tasks cannot start until specsApprovedAt is set (409 specs_not_approved); creating tasks is not blocked. Open questions still block starts. Approval is a one-time gate: later spec changes keep the epic approved.',
 		input: z.object({ epic }),
 		run: (app, { epic }, { actor }) => app.epics.approveSpecs(epic, actor)
 	}),
@@ -752,6 +752,15 @@ export const operations: Operation[] = [
 		summary: 'Get a spec with its markdown content and human brief',
 		input: z.object({ spec }),
 		run: (app, { spec }) => app.specs.get(spec)
+	}),
+	defineOperation({
+		name: 'list_spec_versions',
+		method: 'GET',
+		path: '/specs/{spec}/versions',
+		tag: 'Specs',
+		summary: 'List the versions of a spec, newest first, the current one included',
+		input: z.object({ spec }),
+		run: (app, { spec }) => app.specs.versions(spec)
 	}),
 	defineOperation({
 		name: 'update_spec',

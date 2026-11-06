@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRecentlyChanged, liveStatus } from './status.ts';
+import { isRecentlyChanged, liveStatus, reconnectDelay } from './status.ts';
 
 describe('liveStatus', () => {
 	it('is offline when the stream is closed', () => {
@@ -21,5 +21,13 @@ describe('isRecentlyChanged', () => {
 		expect(isRecentlyChanged(0, 1_999)).toBe(true);
 		expect(isRecentlyChanged(0, 2_000)).toBe(false);
 		expect(isRecentlyChanged(undefined, 0)).toBe(false);
+	});
+});
+
+describe('reconnectDelay', () => {
+	it('doubles from 1 second up to 30 seconds', () => {
+		expect(reconnectDelay(0)).toBe(1000);
+		expect(reconnectDelay(3)).toBe(8000);
+		expect(reconnectDelay(10)).toBe(30_000);
 	});
 });

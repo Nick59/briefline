@@ -20,3 +20,5 @@ export function liveStatus(
 
 export const isRecentlyChanged = (changedAt: number | undefined, now: number) =>
 	changedAt !== undefined && now - changedAt < HIGHLIGHT_MS;
+
+export const reconnectDelay = (attempt: number) => Math.min(1000 * 2 ** attempt, 30_000);

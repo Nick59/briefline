@@ -272,6 +272,25 @@ export const MIGRATIONS: Migration[] = [
 	`
 	ALTER TABLE projects ADD COLUMN ticketing_auto_pull INTEGER NOT NULL DEFAULT 0;
 	ALTER TABLE projects ADD COLUMN ticketing_pull_minutes INTEGER NOT NULL DEFAULT 10;
+	`,
+	`
+	CREATE TABLE spec_versions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		spec_id TEXT NOT NULL REFERENCES specs(id) ON DELETE CASCADE,
+		title TEXT NOT NULL,
+		content TEXT NOT NULL,
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX spec_versions_spec ON spec_versions(spec_id, id);
+	CREATE TRIGGER spec_versions_capture AFTER UPDATE OF content ON specs WHEN OLD.content IS NOT NEW.content
+	BEGIN
+		INSERT INTO spec_versions (spec_id, title, content, created_at) VALUES (OLD.id, OLD.title, OLD.content, OLD.updated_at);
+	END;
+	`,
+	`
+	DROP TRIGGER IF EXISTS specs_approval_insert;
+	DROP TRIGGER IF EXISTS specs_approval_delete;
+	DROP TRIGGER IF EXISTS specs_approval_update;
 	`
 ];
 

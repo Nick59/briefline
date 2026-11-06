@@ -8,7 +8,7 @@ import {
 	type UpdateSpecInput
 } from '#lib/shared/domain/schemas.ts';
 import { profileGuidance } from '#lib/shared/domain/profile-guidance.ts';
-import type { HumanBrief, Spec, SpecSummary } from '#lib/shared/domain/types.ts';
+import type { HumanBrief, Spec, SpecSummary, SpecVersion } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { NotFoundError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
@@ -49,6 +49,22 @@ export class SpecService {
 		const spec = this.deps.repos.specs.find(id);
 		if (!spec) throw new NotFoundError('Spec', id);
 		return spec;
+	}
+
+	/** Newest first; the current content is the last version. */
+	versions(id: string): SpecVersion[] {
+		const spec = this.get(id);
+		const stored = this.deps.repos.specs.listVersions(id);
+		return [
+			...stored.map((v, i) => ({ ...v, version: i + 1, current: false })),
+			{
+				version: stored.length + 1,
+				title: spec.title,
+				content: spec.content,
+				createdAt: spec.updatedAt,
+				current: true
+			}
+		].reverse();
 	}
 
 	/** Inserts without emitting an event; callers emit their own. */

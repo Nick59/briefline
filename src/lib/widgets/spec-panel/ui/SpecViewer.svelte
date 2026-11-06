@@ -5,13 +5,14 @@
 	import FileCodeIcon from '@lucide/svelte/icons/file-code-2';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
-	import { MarkdownViewer, type MarkdownExtension } from '#lib/shared/ui/markdown/index.ts';
+	import type { MarkdownExtension } from '#lib/shared/ui/markdown/index.ts';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
 	import type { Spec } from '#lib/shared/domain/types.ts';
 	import { markSpecViewed } from '#lib/shared/lib/mark-spec-viewed.ts';
 	import { SpecBrief, SpecKindBadge } from '#lib/entities/spec/index.ts';
 	import { SpecEditorDialog } from '#lib/features/spec-editor/index.ts';
+	import { SpecHistory } from '#lib/features/spec-history/index.ts';
 	import { SpecReadModeButton } from '#lib/features/spec-read-mode/index.ts';
 	import { TranslateSpecButton } from '#lib/features/translate-spec/index.ts';
 	import { DeleteButton } from '#lib/features/delete-entity/index.ts';
@@ -86,7 +87,7 @@
 			</SpecBrief>
 		</Tabs.Content>
 		<Tabs.Content value="source" class="pt-3">
-			<MarkdownViewer source={spec.content} {extensions} />
+			<SpecHistory {spec} {extensions} />
 		</Tabs.Content>
 	</Tabs.Root>
 </article>

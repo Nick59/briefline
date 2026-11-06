@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
 import { ConflictError, InvalidInputError, NotFoundError } from '../core/errors.ts';
-import { testApp } from '../testing/app.ts';
+import { createContainer } from '../container.ts';
+import { openDatabase } from '../db/connection.ts';
+import { testApp, testConfig } from '../testing/app.ts';
 
 function withEpic() {
 	const ctx = testApp();
@@ -244,5 +246,44 @@ describe('moving tasks between epics', () => {
 			InvalidInputError
 		);
 		expect(app.tasks.get('PMA-1')).toMatchObject({ epicId: epic.id });
+	});
+});
+
+describe('spec versions', () => {
+	it('keeps the previous content on each content change, newest first', () => {
+		const { app, epic } = withEpic();
+		const spec = app.specs.listForEpic(epic.id)[0];
+		app.specs.update(spec.id, { content: 'Two' }, 'test');
+		app.specs.update(spec.id, { content: 'Three' }, 'test');
+		const versions = app.specs.versions(spec.id);
+		expect(versions.map((v) => [v.version, v.content, v.current])).toEqual([
+			[3, 'Three', true],
+			[2, 'Two', false],
+			[1, 'Hello', false]
+		]);
+	});
+
+	it('does not add a version for a title-only update', () => {
+		const { app, epic } = withEpic();
+		const spec = app.specs.listForEpic(epic.id)[0];
+		app.specs.update(spec.id, { title: 'Renamed' }, 'test');
+		expect(app.specs.versions(spec.id)).toHaveLength(1);
+	});
+
+	it('is removed with the spec', () => {
+		const db = openDatabase(':memory:');
+		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
+		app.projects.create({ key: 'pma', name: 'PM' }, 'test');
+		const epic = app.epics.create(
+			'PMA',
+			{ title: 'L', specs: [{ title: 'S', content: 'One' }] },
+			'a'
+		);
+		const spec = app.specs.listForEpic(epic.id)[0];
+		app.specs.update(spec.id, { content: 'Two' }, 'test');
+		expect(db.prepare('SELECT COUNT(*) AS n FROM spec_versions').get()).toEqual({ n: 1 });
+		app.specs.delete(spec.id, 'test');
+		expect(db.prepare('SELECT COUNT(*) AS n FROM spec_versions').get()).toEqual({ n: 0 });
+		expect(() => app.specs.versions(spec.id)).toThrow(NotFoundError);
 	});
 });
