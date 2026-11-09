@@ -46,6 +46,16 @@ export class EpicService {
 		});
 	}
 
+	/** Epics an agent can work on now, in the user's order. */
+	workToDo(projectIdOrKey: string): EpicSummary[] {
+		return this.list(projectIdOrKey).filter(
+			(epic) =>
+				epic.openQuestions === 0 &&
+				(!epic.specsRequired || epic.specsApprovedAt) &&
+				epic.progress.status !== 'done'
+		);
+	}
+
 	get(idOrKey: string): Epic {
 		return requireEpic(this.deps.repos, idOrKey);
 	}

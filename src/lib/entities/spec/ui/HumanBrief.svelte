@@ -20,7 +20,7 @@
 		<p class="text-base leading-relaxed text-pretty">{brief.summary}</p>
 		{#if brief.whyItMatters}
 			<p class="text-sm leading-relaxed text-muted-foreground">
-				<span class="font-medium text-foreground">Why it matters.</span>{' '}{brief.whyItMatters}
+				<span class="font-medium text-foreground">Why it matters.</span> {brief.whyItMatters}
 			</p>
 		{/if}
 		<div class="flex flex-wrap items-center gap-2">

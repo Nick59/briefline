@@ -938,6 +938,25 @@ describe('epic order', () => {
 		expect(await keys(app, 'BBB')).toEqual(['BBB-E1', 'BBB-E2', 'BBB-E3']);
 	});
 
+	it('lists the epics ready to work on, in the user order', async () => {
+		const app = setup();
+		app.questions.add('AAA-E1', { questions: [{ question: 'Which?' }] }, 'claude');
+		app.epics.create('AAA', { title: 'Unapproved', specs: [{ title: 'S', content: 'x' }] }, 'test');
+		app.epics.create('AAA', { title: 'Approved', specs: [{ title: 'S', content: 'x' }] }, 'test');
+		app.epics.approveSpecs('AAA-E5', 'test');
+		app.epics.create('AAA', { title: 'Finished', tasks: [{ title: 'T' }] }, 'test');
+		for (const stage of ['dev', 'test', 'deploy'])
+			await run(app, 'set_task_stage_status', { task: 'AAA-1', stage, status: 'done' });
+		const todo = async () =>
+			((await run(app, 'get_work_to_do', { project: 'AAA' })) as unknown as { key: string }[]).map(
+				(e) => e.key
+			);
+		// E1 has an open question, E4 an unapproved spec, E6 is done
+		expect(await todo()).toEqual(['AAA-E2', 'AAA-E3', 'AAA-E5']);
+		await run(app, 'move_epic', { epic: 'AAA-E5', beforeEpic: 'AAA-E2' });
+		expect(await todo()).toEqual(['AAA-E5', 'AAA-E2', 'AAA-E3']);
+	});
+
 	it('rejects a target from another project and unknown epics', async () => {
 		const app = setup();
 		await expect(

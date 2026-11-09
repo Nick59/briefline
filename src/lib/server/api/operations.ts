@@ -344,6 +344,17 @@ export const operations: Operation[] = [
 		run: (app, { project }) => app.epics.list(project)
 	}),
 	defineOperation({
+		name: 'get_work_to_do',
+		method: 'GET',
+		path: '/projects/{project}/work-to-do',
+		tag: 'Epics',
+		summary: 'List the epics ready to work on, in the order the user set',
+		description:
+			'Epics with no open questions, approved specs (or no specs), and not done, ordered by their board position (move_epic). Start with the first one.',
+		input: z.object({ project }),
+		run: (app, { project }) => app.epics.workToDo(project)
+	}),
+	defineOperation({
 		name: 'create_epic',
 		method: 'POST',
 		path: '/projects/{project}/epics',

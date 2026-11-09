@@ -35,6 +35,7 @@ export class LiveActivity {
 	muted = $state(readMuted());
 	/** Pages that must not reload under the reader, such as a later page of a list, set this. */
 	holdRefresh = false;
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- internal callback registry, never rendered
 	#heldListeners = new Set<() => void>();
 
 	status = $derived<LiveStatus>(liveStatus(this.connected, this.lastAgentAt, this.now));
