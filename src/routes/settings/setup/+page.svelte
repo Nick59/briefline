@@ -5,5 +5,5 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>API & MCP · Briefline</title></svelte:head>
+<svelte:head><title>Setup · Settings · Briefline</title></svelte:head>
 <DocsPage origin={data.origin} operations={data.operations} tokenRequired={data.tokenRequired} />

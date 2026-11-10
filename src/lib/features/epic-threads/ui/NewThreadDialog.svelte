@@ -43,7 +43,7 @@
 			<Button {...props} variant="outline" size="sm"><MessageSquarePlusIcon />New thread</Button>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="sm:max-w-xl">
+	<Dialog.Content class="sm:max-w-xl" interactOutsideBehavior="ignore">
 		<form class="grid gap-4" onsubmit={submit}>
 			<Dialog.Header>
 				<Dialog.Title>New thread</Dialog.Title>

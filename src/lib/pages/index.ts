@@ -9,3 +9,4 @@ export { default as TicketingPage } from './ticketing/ui/TicketingPage.svelte';
 export { default as ActivityPage } from './activity/ui/ActivityPage.svelte';
 export { default as SessionsPage } from './sessions/ui/SessionsPage.svelte';
 export { default as SessionPage } from './session/ui/SessionPage.svelte';
+export { default as SettingsPage } from './settings/ui/SettingsPage.svelte';

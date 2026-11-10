@@ -187,7 +187,7 @@
 	>
 		{#snippet icon()}<CableIcon />{/snippet}
 		{#snippet action()}
-			<Button href={resolve('/ticketing')} variant="outline">Open Ticketing</Button>
+			<Button href={resolve('/settings/ticketing')} variant="outline">Open Ticketing</Button>
 		{/snippet}
 	</EmptyState>
 {:else}

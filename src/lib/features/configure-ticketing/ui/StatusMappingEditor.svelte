@@ -83,7 +83,7 @@
 	{#if error}
 		<p class="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm" role="alert">
 			{error}
-			<a class="font-medium underline underline-offset-2" href={resolve('/ticketing')}
+			<a class="font-medium underline underline-offset-2" href={resolve('/settings/ticketing')}
 				>Check the connection</a
 			>
 		</p>

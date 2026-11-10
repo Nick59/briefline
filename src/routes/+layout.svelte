@@ -25,7 +25,6 @@
 
 	const LATER_KEY = 'briefline.profile-later';
 	let later = $state(false);
-	let editing = $state(false);
 
 	onMount(() => {
 		live.startPresenceClock();
@@ -76,19 +75,15 @@
 			activeProjectKey={data.activeProjectKey}
 			activeEpics={data.activeEpics}
 			profileName={data.profile?.name ?? null}
-			onprofile={() => (editing = true)}
 		>
 			{@render children()}
 		</AppShell>
 		<QuickJump />
 		<ProfileDialog
-			open={editing || (firstLaunch && !later)}
+			open={firstLaunch && !later}
 			profile={data.profile}
-			onlater={() => {
-				postpone();
-				editing = false;
-			}}
-			onclose={() => (editing = false)}
+			onlater={postpone}
+			onclose={postpone}
 		/>
 	{/if}
 </TooltipProvider>

@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
-	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { Section } from '#lib/shared/ui/section/index.ts';
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import { MarkdownViewer } from '#lib/shared/ui/markdown/index.ts';
@@ -212,14 +211,12 @@ curl -X PUT ${origin}/api/v1/tasks/SHOP-3/stages/dev \\
 </script>
 
 <div class="max-w-5xl space-y-10">
-	<PageHeader title="API & MCP">
-		{#snippet description()}
-			Everything in the dashboard is available to AI agents and scripts.
-			{tokenRequired
-				? 'This server requires a bearer token (PM_API_TOKEN).'
-				: 'No token is required on this server. Set PM_API_TOKEN to require one.'}
-		{/snippet}
-	</PageHeader>
+	<p class="text-sm text-muted-foreground">
+		Everything in the dashboard is available to AI agents and scripts.
+		{tokenRequired
+			? 'This server requires a bearer token (PM_API_TOKEN).'
+			: 'No token is required on this server. Set PM_API_TOKEN to require one.'}
+	</p>
 
 	<div class="space-y-4">
 		<MarkdownViewer source={intro} />

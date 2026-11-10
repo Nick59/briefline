@@ -3,9 +3,8 @@
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import HistoryIcon from '@lucide/svelte/icons/history';
-	import CableIcon from '@lucide/svelte/icons/cable';
 	import UserIcon from '@lucide/svelte/icons/user-round';
-	import PlugIcon from '@lucide/svelte/icons/plug';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { EpicSummary, ProjectSummary } from '#lib/shared/domain/types.ts';
@@ -13,7 +12,6 @@
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { QuickJumpTrigger } from '#lib/features/quick-jump/index.ts';
-	import { ThemeToggle } from '#lib/features/theme-toggle/index.ts';
 	import LiveActivityPanel from './LiveActivityPanel.svelte';
 	import ProjectNav from './ProjectNav.svelte';
 	import Brand from '#lib/shared/ui/brand/Brand.svelte';
@@ -23,12 +21,10 @@
 		activeProjectKey: string | null;
 		activeEpics: EpicSummary[];
 		profileName: string | null;
-		onprofile: () => void;
 		children: Snippet;
 	}
 
-	let { projects, activeProjectKey, activeEpics, profileName, onprofile, children }: Props =
-		$props();
+	let { projects, activeProjectKey, activeEpics, profileName, children }: Props = $props();
 	let mobileOpen = $state(false);
 
 	const links = [
@@ -43,18 +39,6 @@
 			label: 'Sessions',
 			icon: HistoryIcon,
 			match: (p: string) => p.startsWith('/sessions')
-		},
-		{
-			href: resolve('/ticketing'),
-			label: 'Ticketing',
-			icon: CableIcon,
-			match: (p: string) => p.startsWith('/ticketing')
-		},
-		{
-			href: resolve('/docs'),
-			label: 'API & MCP',
-			icon: PlugIcon,
-			match: (p: string) => p.startsWith('/docs')
 		}
 	];
 </script>
@@ -90,18 +74,20 @@
 		</div>
 		<LiveActivityPanel {onnavigate} />
 		<div class="flex items-center justify-between gap-2 border-t pt-3">
-			<button
-				type="button"
-				onclick={() => {
-					onnavigate?.();
-					onprofile();
-				}}
-				class="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-			>
+			<span class="flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
 				<UserIcon class="size-4 shrink-0" />
 				<span class="truncate">{profileName ?? 'Profile'}</span>
-			</button>
-			<ThemeToggle />
+			</span>
+			<Button
+				href={resolve('/settings')}
+				onclick={onnavigate}
+				variant="ghost"
+				size="icon-sm"
+				aria-label="Settings"
+				class={cn(page.url.pathname.startsWith('/settings') && 'bg-sidebar-accent')}
+			>
+				<SettingsIcon />
+			</Button>
 		</div>
 	</div>
 {/snippet}

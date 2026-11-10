@@ -6,7 +6,6 @@
 		TicketProviderInfo
 	} from '#lib/shared/domain/types.ts';
 	import type { Tone } from '#lib/shared/config/tokens/index.ts';
-	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import {
@@ -35,15 +34,13 @@
 </script>
 
 <div class="max-w-3xl space-y-8">
-	<PageHeader title="Ticketing">
-		{#snippet description()}
+	<div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+		<p class="text-sm text-muted-foreground">
 			Connections to GitHub, Jira, Linear, Plane and other systems. Each project selects one in its
 			settings and maps its statuses to the states of the external project.
-		{/snippet}
-		{#snippet actions()}
-			<ConnectionDialog {providers} {secretsAvailable} />
-		{/snippet}
-	</PageHeader>
+		</p>
+		<ConnectionDialog {providers} {secretsAvailable} />
+	</div>
 
 	{#if !secretsAvailable}
 		<p class="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm" role="status">

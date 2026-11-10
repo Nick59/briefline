@@ -5,7 +5,7 @@
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>Ticketing · Briefline</title></svelte:head>
+<svelte:head><title>Ticketing · Settings · Briefline</title></svelte:head>
 <TicketingPage
 	connections={data.connections}
 	providers={data.providers}
