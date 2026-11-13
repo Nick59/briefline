@@ -285,8 +285,6 @@ export const updateQuestionSchema = z
 	})
 	.partial();
 
-export const setSpecBriefSchema = z.object({ brief: briefSchema });
-
 const planTaskSchema = createTaskSchema.extend({
 	specs: z.array(createSpecSchema).max(20).optional()
 });
@@ -313,11 +311,6 @@ export const createEpicSchema = z.object({
 
 export const updateEpicSchema = z.object(epicFields).partial();
 
-export const listTasksQuerySchema = z.object({
-	stage: stageSchema.optional(),
-	status: workStatusSchema.optional()
-});
-
 export type CreateProjectInput = z.input<typeof createProjectSchema>;
 export type UpdateProjectInput = z.input<typeof updateProjectSchema>;
 export type CreateEpicInput = z.input<typeof createEpicSchema>;
@@ -330,7 +323,6 @@ export type MoveProjectInput = z.input<typeof moveProjectSchema>;
 export type MoveEpicInput = z.input<typeof moveEpicSchema>;
 export type MoveTaskInput = z.input<typeof moveTaskSchema>;
 export type BriefInput = z.infer<typeof briefSchema>;
-export type SetSpecBriefInput = z.input<typeof setSpecBriefSchema>;
 export type AddEpicQuestionsInput = z.input<typeof addEpicQuestionsSchema>;
 export type UpdateQuestionInput = z.input<typeof updateQuestionSchema>;
 export type CreateSpecInput = z.input<typeof createSpecSchema>;

@@ -7,6 +7,7 @@ export { default as DocsPage } from './docs/ui/DocsPage.svelte';
 export { default as LoginPage } from './login/ui/LoginPage.svelte';
 export { default as TicketingPage } from './ticketing/ui/TicketingPage.svelte';
 export { default as ActivityPage } from './activity/ui/ActivityPage.svelte';
+export { default as InboxPage } from './inbox/ui/InboxPage.svelte';
 export { default as SessionsPage } from './sessions/ui/SessionsPage.svelte';
 export { default as SessionPage } from './session/ui/SessionPage.svelte';
 export { default as SettingsPage } from './settings/ui/SettingsPage.svelte';

@@ -1,3 +1,4 @@
+import { ANONYMOUS_ACTORS, isHumanActor } from '#lib/shared/domain/actors.ts';
 import { STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	cancelTaskSchema,
@@ -18,15 +19,9 @@ import { newId, now } from '../../core/ids.ts';
 import { transaction } from '../../db/connection.ts';
 import { requireEpic, requireProject, requireTask } from '../../core/lookup.ts';
 import { toSpecSummary } from '../specs/repository.ts';
-import type { TaskFilter } from './repository.ts';
 
 export class TaskService {
 	constructor(private readonly deps: ServiceDeps) {}
-
-	list(epicIdOrKey: string, filter: TaskFilter = {}): Task[] {
-		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		return this.deps.repos.tasks.listByEpic(epic.id, filter);
-	}
 
 	get(idOrKey: string): Task {
 		return requireTask(this.deps.repos, idOrKey);
@@ -167,6 +162,17 @@ export class TaskService {
 			}
 		});
 		return task;
+	}
+
+	/** Soft claim: an agent starting an unassigned task becomes its assignee; another agent's claim is reported, not overridden. */
+	claim(task: Task, actor: string): Task & { claimedBy?: string } {
+		const person = (name: string) =>
+			ANONYMOUS_ACTORS.has(name) || isHumanActor(name, this.deps.repos.profile.get()?.name);
+		if (person(actor)) return task;
+		if (!task.assignee) return this.update(task.id, { assignee: actor }, actor);
+		return task.assignee !== actor && !person(task.assignee)
+			? { ...task, claimedBy: task.assignee }
+			: task;
 	}
 
 	/**

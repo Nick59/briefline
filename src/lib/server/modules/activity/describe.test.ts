@@ -16,11 +16,11 @@ const event = (type: DomainEvent['type'], data: Partial<Data>): DomainEvent =>
 describe('describeEvent for questions', () => {
 	const q = 'Which database should we use?';
 	const cases: [DomainEvent['type'], Partial<Data>, string][] = [
-		['question.added', { question: q }, `Asked “${q}” on SHOP-E1`],
+		['question.added', { question: q }, `Added thread “${q}” on SHOP-E1`],
 		[
 			'question.added',
 			{ question: q, count: 3 },
-			'Asked 3 questions on SHOP-E1: “Which database should we use?” +2 more'
+			'Added 3 threads on SHOP-E1: “Which database should we use?” +2 more'
 		],
 		['question.answered', { question: q, answer: 'Postgres' }, `Answered “${q}”: Postgres`],
 		['question.replied', { question: q, body: 'Use RDS' }, `Replied in thread “${q}”`],
@@ -46,10 +46,10 @@ describe('describeEvent for questions', () => {
 	});
 
 	it('falls back to the title for entries without question text', () => {
-		expect(describeEvent(event('question.added', {}))).toBe('Asked "Which database?" on SHOP-E1');
-		expect(describeEvent(event('question.added', { count: 2 }))).toBe(
-			'Asked 2 questions on SHOP-E1'
+		expect(describeEvent(event('question.added', {}))).toBe(
+			'Added thread "Which database?" on SHOP-E1'
 		);
+		expect(describeEvent(event('question.added', { count: 2 }))).toBe('Added 2 threads on SHOP-E1');
 		expect(describeEvent(event('question.answered', {}))).toBe(
 			'Answered "Which database?" on SHOP-E1'
 		);

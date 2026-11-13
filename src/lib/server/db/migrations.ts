@@ -291,6 +291,32 @@ export const MIGRATIONS: Migration[] = [
 	DROP TRIGGER IF EXISTS specs_approval_insert;
 	DROP TRIGGER IF EXISTS specs_approval_delete;
 	DROP TRIGGER IF EXISTS specs_approval_update;
+	`,
+	`
+	CREATE TABLE inbox (
+		id INTEGER PRIMARY KEY,
+		task_id TEXT UNIQUE REFERENCES tasks(id) ON DELETE CASCADE,
+		epic_id TEXT UNIQUE REFERENCES epics(id) ON DELETE CASCADE,
+		since_seq INTEGER NOT NULL,
+		last_seq INTEGER NOT NULL,
+		flagged_at TEXT NOT NULL,
+		CHECK ((task_id IS NULL) != (epic_id IS NULL))
+	);
+	CREATE TABLE inbox_acks (
+		item_id INTEGER NOT NULL REFERENCES inbox(id) ON DELETE CASCADE,
+		agent TEXT NOT NULL,
+		acked_seq INTEGER NOT NULL,
+		acked_at TEXT NOT NULL,
+		PRIMARY KEY (item_id, agent)
+	);
+	DROP TABLE activity_cursors;
+	ALTER TABLE agent_sessions ADD COLUMN repo TEXT;
+	ALTER TABLE agent_sessions ADD COLUMN name TEXT;
+	ALTER TABLE agent_sessions ADD COLUMN role TEXT;
+	CREATE TABLE session_cursors (
+		session_id TEXT PRIMARY KEY,
+		seq INTEGER NOT NULL
+	);
 	`
 ];
 

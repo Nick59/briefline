@@ -8,7 +8,8 @@ export const load: LayoutServerLoad = ({ params, url }) => {
 			activeProjectKey: null,
 			activeEpics: [],
 			profile: null,
-			presence: null
+			presence: null,
+			inboxCount: 0
 		};
 	const projects = app().projects.list();
 	const projectParam = 'project' in params ? params.project : undefined;
@@ -20,6 +21,7 @@ export const load: LayoutServerLoad = ({ params, url }) => {
 		activeProjectKey: active?.key ?? null,
 		activeEpics: active ? app().epics.list(active.id) : [],
 		profile: app().profile.get(),
-		presence: app().presence.snapshot()
+		presence: app().presence.snapshot(),
+		inboxCount: app().inbox.count()
 	};
 };

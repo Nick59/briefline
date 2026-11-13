@@ -50,7 +50,7 @@ describe('liveLabel', () => {
 	it('shows the question in the label', () => {
 		const data = { question: 'Which database should we use?', answer: 'Postgres' };
 		expect(liveLabel(live({ type: 'question.added', key: 'SHOP-E1', data }))).toBe(
-			'SHOP-E1 · Asked \u201cWhich database should we use?\u201d'
+			'SHOP-E1 · Added thread \u201cWhich database should we use?\u201d'
 		);
 		expect(liveLabel(live({ type: 'question.answered', key: 'SHOP-E1', data }))).toBe(
 			'SHOP-E1 · Answered \u201cWhich database should we use?\u201d: Postgres'

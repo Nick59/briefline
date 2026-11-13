@@ -78,7 +78,7 @@ describe('ticket pull', () => {
 		];
 		await app.ticketPull.pullProject('SHOP');
 		await app.ticketPull.pullProject('SHOP');
-		const comments = app.comments.list('SHOP-1');
+		const comments = app.tasks.detail('SHOP-1').comments;
 		expect(comments).toHaveLength(1);
 		expect(comments[0]).toMatchObject({
 			author: 'ticket-sync',
@@ -93,7 +93,7 @@ describe('ticket pull', () => {
 			{ id: 1, body: 'first', user: { login: 'a' }, created_at: '2026-01-01T00:00:00Z' }
 		];
 		await app.ticketPull.pullProject('SHOP');
-		expect(app.comments.list('SHOP-1').map((c) => c.body.split('\n')[0])).toEqual([
+		expect(app.tasks.detail('SHOP-1').comments.map((c) => c.body.split('\n')[0])).toEqual([
 			'first',
 			'second'
 		]);
@@ -130,7 +130,7 @@ describe('ticket pull', () => {
 			}
 		];
 		await app.ticketPull.pullProject('SHOP');
-		expect(app.comments.list('SHOP-1')).toEqual([]);
+		expect(app.tasks.detail('SHOP-1').comments).toEqual([]);
 	});
 
 	it('keeps the description when the remote one is empty', async () => {

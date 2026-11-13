@@ -31,7 +31,7 @@ export const QUESTION_MAX_IN_LIST = 40;
 export const ANSWER_MAX = 40;
 
 const VERBS: Record<string, string> = {
-	'question.added': 'Asked',
+	'question.added': 'Added thread',
 	'question.answered': 'Answered',
 	'question.ignored': 'Ignored',
 	'question.reopened': 'Reopened',
@@ -43,7 +43,7 @@ const VERBS: Record<string, string> = {
 const str = (value: unknown) => (typeof value === 'string' && value.trim() ? value : null);
 
 /**
- * The action and the question: `Asked “Which database…” on SHOP-E1`. Pass the epic key to
+ * The action and the question: `Added thread “Which database…” on SHOP-E1`. Pass the epic key to
  * name where an added question lives. Null when the event carries no question text
  * (entries from before it was stored).
  */
@@ -60,8 +60,8 @@ export function questionPhrase(
 	const count = typeof data.count === 'number' ? data.count : 1;
 	if (type === 'question.added') {
 		return count > 1
-			? `Asked ${count} questions${where}: ${quoted(question, QUESTION_MAX_IN_LIST)} +${count - 1} more`
-			: `Asked ${quoted(question, max)}${where}`;
+			? `Added ${count} threads${where}: ${quoted(question, QUESTION_MAX_IN_LIST)} +${count - 1} more`
+			: `Added thread ${quoted(question, max)}${where}`;
 	}
 	const answer = str(data.answer);
 	const tail = type === 'question.answered' && answer ? `: ${shorten(answer, ANSWER_MAX)}` : '';

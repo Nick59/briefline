@@ -12,6 +12,8 @@ import { CommentRepository } from './modules/comments/repository.ts';
 import { CommentService } from './modules/comments/service.ts';
 import { EpicRepository } from './modules/epics/repository.ts';
 import { EpicService } from './modules/epics/service.ts';
+import { InboxRepository } from './modules/inbox/repository.ts';
+import { InboxService } from './modules/inbox/service.ts';
 import { ProfileRepository } from './modules/profile/repository.ts';
 import { PresenceRepository } from './modules/presence/repository.ts';
 import { isPresenceIgnored, PresenceService } from './modules/presence/service.ts';
@@ -66,6 +68,7 @@ export function createContainer(
 		specs: new SpecRepository(db),
 		questions: new QuestionRepository(db),
 		activity: new ActivityRepository(db),
+		inbox: new InboxRepository(db),
 		sessions: new SessionRepository(db),
 		profile: new ProfileRepository(db),
 		syncJobs: new SyncJobRepository(db),
@@ -84,6 +87,7 @@ export function createContainer(
 		deps.events.subscribe((event) => event.type === type && attachments.sweepOrphans());
 	}
 	const activity = new ActivityService(deps);
+	const inbox = new InboxService(deps);
 	const tasks = new TaskService(deps);
 	const specs = new SpecService(deps, briefs);
 	const profile = new ProfileService(deps);
@@ -113,6 +117,7 @@ export function createContainer(
 		questions: new QuestionService(deps),
 		briefs,
 		activity,
+		inbox,
 		sessions: new SessionService(deps, activity),
 		profile,
 		presence,

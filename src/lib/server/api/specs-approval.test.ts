@@ -47,7 +47,7 @@ describe('epic spec approval', () => {
 		] as const)
 			await expect(run(name, input)).rejects.toMatchObject(blocked);
 		expect(app.tasks.get('SHOP-1').stages).toEqual({ dev: 'todo', test: 'todo', deploy: 'todo' });
-		expect(app.tasks.list('SHOP-E1')).toHaveLength(2);
+		expect(app.epics.detail('SHOP-E1').tasks).toHaveLength(2);
 		const approved = await run('approve_epic_specs', { epic: 'shop-e1' });
 		expect(approved).toMatchObject({
 			specsApprovedAt: expect.any(String),
@@ -99,10 +99,10 @@ describe('epic spec approval', () => {
 		const start = (task: string) =>
 			run('set_task_stage_status', { task, stage: 'dev', status: 'in_progress' });
 		const bare = app.epics.create('SHOP', { title: 'Bare', tasks: [{ title: 'T' }] }, 'test');
-		const [bareTask] = app.tasks.list(bare.id);
+		const [bareTask] = app.epics.detail(bare.id).tasks;
 		await expect(start(bareTask.id)).resolves.toMatchObject({ stages: { dev: 'in_progress' } });
 		const other = app.epics.create('SHOP', { title: 'Task spec', tasks: [{ title: 'U' }] }, 'test');
-		const [otherTask] = app.tasks.list(other.id);
+		const [otherTask] = app.epics.detail(other.id).tasks;
 		app.specs.createForTask(otherTask.id, { title: 'Detail' }, 'test');
 		await expect(start(otherTask.id)).rejects.toMatchObject(blocked);
 		const [q] = app.questions.add(bare.id, { questions: [{ question: 'Which?' }] }, 'test');

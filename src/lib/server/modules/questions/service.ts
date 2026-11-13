@@ -1,4 +1,3 @@
-import type { QuestionStatus } from '#lib/shared/domain/constants.ts';
 import {
 	addEpicQuestionsSchema,
 	answerQuestionSchema,
@@ -26,11 +25,6 @@ const summarize = (markdown: string) => {
 
 export class QuestionService {
 	constructor(private readonly deps: ServiceDeps) {}
-
-	list(epicIdOrKey: string, status?: QuestionStatus): EpicQuestion[] {
-		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		return this.deps.repos.questions.listByEpic(epic.id, status);
-	}
 
 	get(id: string): EpicQuestion {
 		const question = this.deps.repos.questions.find(id);

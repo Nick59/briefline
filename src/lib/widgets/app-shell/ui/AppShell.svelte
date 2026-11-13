@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import InboxIcon from '@lucide/svelte/icons/inbox';
 	import HistoryIcon from '@lucide/svelte/icons/history';
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
@@ -21,10 +22,12 @@
 		activeProjectKey: string | null;
 		activeEpics: EpicSummary[];
 		profileName: string | null;
+		inboxCount: number;
 		children: Snippet;
 	}
 
-	let { projects, activeProjectKey, activeEpics, profileName, children }: Props = $props();
+	let { projects, activeProjectKey, activeEpics, profileName, inboxCount, children }: Props =
+		$props();
 	let mobileOpen = $state(false);
 
 	const links = [
@@ -33,6 +36,12 @@
 			label: 'Overview',
 			icon: LayoutGridIcon,
 			match: (p: string) => p === '/'
+		},
+		{
+			href: resolve('/inbox'),
+			label: 'Inbox',
+			icon: InboxIcon,
+			match: (p: string) => p.startsWith('/inbox')
 		},
 		{
 			href: resolve('/sessions'),
@@ -66,6 +75,12 @@
 					)}
 				>
 					<link.icon class="size-4" />{link.label}
+					{#if link.label === 'Inbox' && inboxCount > 0}
+						<span
+							class="ml-auto rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground"
+							aria-label="{inboxCount} unread">{inboxCount}</span
+						>
+					{/if}
 				</a>
 			{/each}
 		</nav>

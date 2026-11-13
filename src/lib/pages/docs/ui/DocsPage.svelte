@@ -164,9 +164,9 @@ ${fence(
 
 When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) name a Briefline project, track the work there through the \`briefline\` MCP server:
 - Before planning, read the project with \`get_project\` and the current epic with \`get_epic\`.
-- At the start of a session, call \`get_last_session\` (with the project when known) to read what the previous session did, and \`get_activity_changes\` to see what changed since your last pull.
-- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`list_specs\` (\`project\`) before planning, and add new ones with \`add_spec\`.
-- Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Approval is a one-time gate: later spec changes keep the epic approved. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`list_epic_questions\` and follow them.
+- At the start of a session, call \`register_agent\` with your GitHub project (\`owner/repo\` from \`git remote get-url origin\`) and a short role name, then \`get_last_session\`, then \`get_inbox\`; handle each item, then \`ack_inbox\` it with the \`seq\` you received. Responses include a \`meanwhile\` block with what other agents and people changed since your last call.
+- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`get_project\` before planning, and add new ones with \`add_spec\`.
+- Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Approval is a one-time gate: later spec changes keep the epic approved. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`get_epic\` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single \`create_epic\` call.
 - Every spec includes a plain-language \`brief\` for non-engineers.
 - Move each task as you work with \`set_task_stage_status\`: dev, then test, then deploy; in_progress when you start, done when you finish.
@@ -185,11 +185,13 @@ ${fence('markdown', 'Briefline project: SHOP')}
 Claude Code reads \`CLAUDE.md\` instead of \`AGENTS.md\`. Make \`CLAUDE.md\` contain one line, \`@AGENTS.md\`, so the rules are written once.
 
 > [!NOTE]
-> \`get_activity_changes\` keeps one bookmark per \`X-Actor\`. Give each concurrent session its own \`X-Actor\`, for example \`codex-api\` and \`claude-code-web\`.
+### How-to guide
+
+\`how_to\` (\`GET /api/v1/how-to\`, optional \`topic\`) explains Briefline's concepts to an agent. Without a topic it returns the overview and the list of topics: \`overview\`, \`workflow\`, \`inbox\`, \`agents\`, \`threads\`, \`specs\` and \`tickets\`.
 
 ### Sessions
 
-Every MCP connection is an agent session. The server opens one on \`initialize\` and the client sends its id back in the \`Mcp-Session-Id\` header, so each change in the activity log links to the session that made it. The **Sessions** page groups them by day with a recap of what each did. \`list_sessions\` and \`get_session\` read them, \`get_last_session\` returns the previous one for context at the start of a new session, and \`set_session_summary\` lets the agent write the recap. REST and dashboard changes belong to no session.`;
+Every MCP connection is an agent session. The server opens one on \`initialize\` and the client sends its id back in the \`Mcp-Session-Id\` header, so each change in the activity log links to the session that made it. The **Sessions** page groups them by day with a recap of what each did. \`get_last_session\` returns the previous one for context at the start of a new session, and \`set_session_summary\` lets the agent write the recap. REST and dashboard changes belong to no session.`;
 
 	const rest = $derived(`## Call the REST API
 

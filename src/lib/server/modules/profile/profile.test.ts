@@ -93,8 +93,13 @@ describe('user profile', () => {
 	it('is added to the MCP initialize instructions only when set', async () => {
 		const { app } = testApp();
 		const before = await initialize(app);
-		expect(before).toContain('get_activity_changes');
-		expect(before).toContain('get_user_profile');
+		expect(before).toContain('get_last_session');
+		expect(before).toContain('register_agent');
+		expect(before).toContain('get_inbox');
+		expect(before).toContain('ack_inbox it with the seq you received');
+		expect(before).toContain('`meanwhile` block');
+		expect(before).toContain("The user's profile is at the end of these instructions");
+		expect(before).toContain('Call how_to for the concepts');
 		expect(before).not.toContain('Guidance:');
 		await run(app, 'update_user_profile', { ...base, language: 'French' });
 		const after = await initialize(app);

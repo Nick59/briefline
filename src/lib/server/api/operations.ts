@@ -5,10 +5,8 @@ import {
 	createProjectSchema,
 	createTicketingConnectionSchema,
 	createSpecSchema,
-	setSpecBriefSchema,
 	cancelTaskSchema,
 	createTaskSchema,
-	listTasksQuerySchema,
 	moveEpicSchema,
 	moveProjectSchema,
 	moveTaskSchema,
@@ -29,18 +27,12 @@ import {
 	userProfileSchema,
 	workStatusSchema
 } from '#lib/shared/domain/schemas.ts';
-import { ACTIVITY_WHO } from '#lib/shared/domain/actors.ts';
 import { SYNC_JOB_STATUSES } from '#lib/shared/domain/constants.ts';
-import {
-	DEFAULT_PAGE_SIZE,
-	MAX_ACTIVITY_LIST_SIZE,
-	MAX_PAGE_SIZE
-} from '../modules/activity/repository.ts';
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../modules/activity/repository.ts';
 import { summarySchema } from '../modules/sessions/service.ts';
-import { DEFAULT_CHANGES_LIMIT, MAX_CHANGES_LIMIT } from '../modules/activity/service.ts';
-import { ANONYMOUS_ACTORS } from './execute.ts';
 import type { Page } from '#lib/shared/domain/types.ts';
 import { InvalidInputError } from '../core/errors.ts';
+import { HOW_TO_TOPICS, howTo } from '../modules/guide/how-to.ts';
 import { defineOperation, type Operation } from './operation.ts';
 
 const ref = (what: string) => z.string().min(1).describe(`${what} id or key`);
@@ -51,20 +43,6 @@ const question = z.string().min(1).describe('Question id');
 const comment = z.string().min(1).describe('Comment id');
 const spec = z.string().min(1).describe('Spec id');
 const limit = z.coerce.number().int().min(1).max(500).optional();
-const pageLimit = z.coerce
-	.number()
-	.int()
-	.min(1)
-	.max(100)
-	.optional()
-	.describe('Entries per page (default 10, max 100)');
-const offset = z.coerce.number().int().min(0).optional().describe('Entries to skip (default 0)');
-const ACTIVITY_PAGING =
-	'Paginated, newest first. Returns at most `limit` entries (default 10, max 100); use `offset`/`nextOffset` and `hasMore` to fetch older entries.';
-
-const ACTIVITY_LIST_DEFAULT = 50;
-const ACTIVITY_LIST_MAX = MAX_ACTIVITY_LIST_SIZE;
-
 const pagedResult = <T>(page: Page<T>, paging: { limit?: number; offset?: number }) =>
 	listedPage(page, {
 		...paging,
@@ -100,6 +78,15 @@ const specOwner = (input: { project?: string; epic?: string; task?: string }) =>
 };
 
 export const operations: Operation[] = [
+	defineOperation({
+		name: 'how_to',
+		method: 'GET',
+		path: '/how-to',
+		tag: 'Guide',
+		summary: 'Explains Briefline concepts; start here',
+		input: z.object({ topic: z.enum(HOW_TO_TOPICS).optional() }),
+		run: (_app, { topic }) => howTo(topic)
+	}),
 	defineOperation({
 		name: 'find_tickets',
 		method: 'GET',
@@ -143,10 +130,18 @@ export const operations: Operation[] = [
 		path: '/projects/{project}',
 		tag: 'Projects',
 		summary: 'Get a project with its epics and specs',
-		input: z.object({ project }),
-		run: (app, { project }) => ({
+		description:
+			'ready: true limits epics to the ones you can start: no open questions, approved specs (or none), not done, in the order the user set. Start with the first one.',
+		input: z.object({
+			project,
+			ready: z
+				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
+				.optional()
+				.describe('Only list the epics ready to work on')
+		}),
+		run: (app, { project, ready }) => ({
 			...app.projects.get(project),
-			epics: app.epics.list(project),
+			epics: ready ? app.epics.workToDo(project) : app.epics.list(project),
 			specs: app.specs.listForProject(project)
 		})
 	}),
@@ -186,87 +181,94 @@ export const operations: Operation[] = [
 		}
 	}),
 	defineOperation({
-		name: 'list_activity',
-		method: 'GET',
-		path: '/activity',
-		tag: 'Activity',
-		summary: 'Activity across all projects, or in one project or epic',
-		description: `${ACTIVITY_PAGING.replace('default 10, max 100', `default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX}`)} Filter by \`project\` or \`epic\`, by exact \`actor\`, or by \`who\` (people are the dashboard and the profile name; agents are everyone else).`,
-		input: z.object({
-			project: project.optional(),
-			epic: epic.optional(),
-			actor: z.string().min(1).optional().describe('Only entries by this actor'),
-			who: z.enum(ACTIVITY_WHO).default('all').describe('all, people or agents'),
-			limit: z.coerce
-				.number()
-				.int()
-				.min(1)
-				.max(ACTIVITY_LIST_MAX)
-				.optional()
-				.describe(`Entries per page (default ${ACTIVITY_LIST_DEFAULT}, max ${ACTIVITY_LIST_MAX})`),
-			offset
-		}),
-		run: (app, { limit = ACTIVITY_LIST_DEFAULT, offset = 0, ...filter }) =>
-			listedPage(app.activity.list({ ...filter, limit, offset }), { limit, offset })
-	}),
-	defineOperation({
 		name: 'list_agents',
 		method: 'GET',
 		path: '/agents',
 		tag: 'Activity',
 		summary: 'Agents that have used the API or MCP, with when they were last seen',
 		description:
-			'Any request with an X-Actor header counts as seen. `status` is online (seen in the last 5 minutes), away (5 to 20 minutes) or offline.',
+			'Any request with an X-Actor header counts as seen. `status` is online (seen in the last 5 minutes), away (5 to 20 minutes) or offline. Agents that called register_agent also carry `repo`, `name` and `role`.',
 		input: z.object({}),
-		run: (app) => app.presence.withStatus()
+		run: (app) => {
+			const registrations = app.sessions.registrations();
+			return app.presence
+				.withStatus()
+				.map((agent) => ({ ...agent, ...registrations.get(agent.actor) }));
+		}
+	}),
+
+	// Inbox
+	defineOperation({
+		name: 'get_inbox',
+		method: 'GET',
+		path: '/inbox',
+		tag: 'Inbox',
+		summary: 'Tasks and epics that people changed since you last acknowledged them',
+		description:
+			"Tasks a person created, commented or moved, and epics where a person added or answered a thread, that you have not acknowledged up to their latest change, oldest first. Each item has its `changes` (the people's activity entries after your last acknowledgement), `seq` (pass it to ack_inbox), `ackedBy` (the other agents that acknowledged it and whether they are up to date) and, for tasks, the current `assignee`. Read `changes`, act on them, then call ack_inbox.",
+		input: z.object({ project: project.optional() }),
+		run: (app, { project }, { actor }) => app.inbox.list(project, actor)
 	}),
 	defineOperation({
-		name: 'get_activity_changes',
-		method: 'GET',
-		path: '/activity/changes',
-		tag: 'Activity',
-		summary: 'Activity that changed since your last pull',
+		name: 'ack_inbox',
+		method: 'POST',
+		path: '/inbox/ack',
+		tag: 'Inbox',
+		summary: 'Acknowledge inbox items once handled',
 		description:
-			'Entries after a cursor, oldest first, across all projects or filtered by project or epic. `gap` is true when your cursor points before the oldest entry that still exists (for example after the database was reset), so you may have missed some. Without `since`, the cursor stored for your X-Actor (and this project/epic filter) is used, then updated to the returned `cursor`; with no stored cursor you get the latest `limit` entries. Without X-Actor and `since` you get the latest entries and nothing is stored. Pass the returned `cursor` as `since` to continue, and repeat while `hasMore` is true. Your own entries are left out unless excludeOwn is false.',
+			'Marks items handled for you only; other agents still see them until they acknowledge too. Pass `{ item, seq }` with the `seq` from get_inbox so a person change that arrived since is not acknowledged unseen; a plain key acknowledges up to the latest change. Safe to repeat. An unknown key fails and acknowledges nothing. A later change by a person shows the item again with only the new changes. Returns `acknowledged`: the keys whose acknowledgement advanced.',
 		input: z.object({
-			since: z.string().min(1).optional().describe('Cursor from a previous call'),
-			project: project.optional(),
-			epic: epic.optional(),
-			excludeOwn: z
-				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
-				.default(true)
-				.describe('Leave out entries made by you (default true)'),
-			limit: z.coerce
-				.number()
-				.int()
+			items: z
+				.array(
+					z.union([
+						z.string().min(1),
+						z.object({ item: z.string().min(1), seq: z.number().int().min(0) })
+					])
+				)
 				.min(1)
-				.max(MAX_CHANGES_LIMIT)
-				.default(DEFAULT_CHANGES_LIMIT)
-				.describe(`Entries to return (default ${DEFAULT_CHANGES_LIMIT}, max ${MAX_CHANGES_LIMIT})`)
+				.describe('Task or epic keys (e.g. PMA-12 or PMA-E1), or { item, seq } objects')
 		}),
-		run: (app, input, { actor }) =>
-			app.activity.changes(input, ANONYMOUS_ACTORS.has(actor) ? null : actor)
+		run: (app, { items }, { actor }) => app.inbox.ack(actor, items)
+	}),
+	defineOperation({
+		name: 'dismiss_inbox',
+		method: 'POST',
+		path: '/inbox/dismiss',
+		tag: 'Inbox',
+		summary: 'Remove inbox items for every agent',
+		description:
+			'Deletes the items and all acknowledgements; a later person change flags them again. An unknown key fails and dismisses nothing. Returns `dismissed`: the keys that were in the inbox.',
+		input: z.object({
+			items: z.array(z.string().min(1)).min(1).describe('Task or epic keys (e.g. PMA-12 or PMA-E1)')
+		}),
+		mcp: { excluded: true },
+		run: (app, { items }) => app.inbox.dismiss(items)
 	}),
 
 	// Sessions
 	defineOperation({
-		name: 'list_sessions',
-		method: 'GET',
-		path: '/sessions',
+		name: 'register_agent',
+		method: 'POST',
+		path: '/agents/register',
 		tag: 'Sessions',
-		summary: 'Agent sessions, newest first, with a recap of what each one did',
-		description: `${ACTIVITY_PAGING.replaceAll('entries', 'sessions')} A session is one MCP connection of an agent (from initialize to its last request). Each has the projects it touched, counts of what it changed (\`recap\`) and the summary the agent wrote. Sessions that recorded no activity are left out unless \`includeEmpty\` is true.`,
+		summary: 'Name this MCP session as an agent working in a GitHub project',
+		description:
+			'Call first in a session. `repo` is the GitHub project, owner/repo from `git remote get-url origin` (the folder name when there is no remote); `name` is a short role name such as backend-agent. Your agent name becomes `<repo without owner>:<name>` (e.g. briefline:backend-agent) for every later call in the session. A name is held by one online session at a time (409 otherwise); a name whose session is away or offline can be claimed, which ends that session. MCP sessions only.',
 		input: z.object({
-			actor: z.string().min(1).optional().describe('Only sessions of this actor'),
-			includeEmpty: z
-				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
-				.default(false)
-				.describe('Also list sessions without any activity (default false)'),
-			limit: pageLimit,
-			offset
+			repo: z
+				.string()
+				.min(1)
+				.max(100)
+				.regex(/^[\w.-]+(\/[\w.-]+)?$/, 'Use owner/repo')
+				.describe('GitHub project, owner/repo'),
+			name: z
+				.string()
+				.regex(/^[\w.-]{1,40}$/, 'Use letters, digits, dot, dash or underscore (max 40)')
+				.describe('Short role name, e.g. backend-agent'),
+			role: z.string().max(200).optional().describe('What this agent does')
 		}),
-		run: (app, { limit, offset, ...filter }) =>
-			pagedResult(app.sessions.list({ ...filter, limit, offset }), { limit, offset })
+		mcp: { required: ['repo', 'name'] },
+		run: (app, input) => app.sessions.register(input)
 	}),
 	defineOperation({
 		name: 'get_last_session',
@@ -275,7 +277,7 @@ export const operations: Operation[] = [
 		tag: 'Sessions',
 		summary: 'The previous agent session, for context on work already done',
 		description:
-			'Read the previous agent session: its summary, what it changed (recap counts) and its latest activity. Call at the start of a session for context on work already done; pass `project` to scope it. Your own current session is skipped, as are sessions without activity. Returns `{ session: null, message }` when there is none. Use `hasMore`/`nextOffset` and get_session to read older activity.',
+			'Read the previous agent session: its summary, what it changed (recap counts) and its latest activity. Call at the start of a session for context on work already done; pass `project` to scope it. Your own current session is skipped, as are sessions without activity. Returns `{ session: null, message }` when there is none.',
 		input: z.object({
 			project: ref('Only sessions that touched this project').optional(),
 			actor: z.string().min(1).optional().describe('Only sessions of this actor (default: any)'),
@@ -298,26 +300,6 @@ export const operations: Operation[] = [
 		}
 	}),
 	defineOperation({
-		name: 'get_session',
-		method: 'GET',
-		path: '/sessions/{session}',
-		tag: 'Sessions',
-		summary: 'One agent session with its summary and the activity it produced',
-		description: `The session's activity is ${ACTIVITY_PAGING.charAt(0).toLowerCase()}${ACTIVITY_PAGING.slice(1)}`,
-		input: z.object({
-			session: z.string().min(1).describe('Session id'),
-			limit: pageLimit,
-			offset
-		}),
-		run: (app, { session, limit, offset }) => {
-			const detail = app.sessions.get(session, { limit, offset });
-			return {
-				session: detail.session,
-				activity: pagedResult(detail.activity, { limit, offset })
-			};
-		}
-	}),
-	defineOperation({
 		name: 'set_session_summary',
 		method: 'PUT',
 		path: '/sessions/summary',
@@ -334,26 +316,6 @@ export const operations: Operation[] = [
 	}),
 
 	// Epics
-	defineOperation({
-		name: 'list_epics',
-		method: 'GET',
-		path: '/projects/{project}/epics',
-		tag: 'Epics',
-		summary: 'List the epics of a project with progress per stage',
-		input: z.object({ project }),
-		run: (app, { project }) => app.epics.list(project)
-	}),
-	defineOperation({
-		name: 'get_work_to_do',
-		method: 'GET',
-		path: '/projects/{project}/work-to-do',
-		tag: 'Epics',
-		summary: 'List the epics ready to work on, in the order the user set',
-		description:
-			'Epics with no open questions, approved specs (or no specs), and not done, ordered by their board position (move_epic). Start with the first one.',
-		input: z.object({ project }),
-		run: (app, { project }) => app.epics.workToDo(project)
-	}),
 	defineOperation({
 		name: 'create_epic',
 		method: 'POST',
@@ -407,6 +369,7 @@ export const operations: Operation[] = [
 
 	defineOperation({
 		name: 'move_epic',
+		mcp: { excluded: true },
 		method: 'POST',
 		path: '/epics/{epic}/move',
 		tag: 'Epics',
@@ -430,17 +393,6 @@ export const operations: Operation[] = [
 	}),
 
 	// Tasks
-	defineOperation({
-		name: 'list_tasks',
-		method: 'GET',
-		path: '/epics/{epic}/tasks',
-		tag: 'Tasks',
-		summary: 'List the tasks of an epic',
-		description:
-			'Filter with stage + status, e.g. stage=test&status=in_progress, to see one column of the board.',
-		input: listTasksQuerySchema.extend({ epic }),
-		run: (app, { epic, ...filter }) => app.tasks.list(epic, filter)
-	}),
 	defineOperation({
 		name: 'create_task',
 		method: 'POST',
@@ -497,12 +449,16 @@ export const operations: Operation[] = [
 		tag: 'Tasks',
 		summary: 'Move a task to todo, in_progress or done in one stage (dev, test, deploy)',
 		description:
-			'This is the main progress signal. It updates the linked tickets when ticket sync is on.',
+			'This is the main progress signal. It updates the linked tickets when ticket sync is on. When an agent sets in_progress on a task without an assignee, it becomes the assignee (a soft claim). If another agent already holds the task the call still succeeds and the response carries `claimedBy`: back off or coordinate on the task comments.',
 		input: setStageStatusSchema.extend({ task, stage: stageSchema, status: workStatusSchema }),
-		run: (app, { task, ...input }, { actor }) => app.tasks.setStage(task, input, actor)
+		run: (app, { task, ...input }, { actor }) => {
+			const updated = app.tasks.setStage(task, input, actor);
+			return input.status === 'in_progress' ? app.tasks.claim(updated, actor) : updated;
+		}
 	}),
 	defineOperation({
 		name: 'move_task',
+		mcp: { excluded: true },
 		method: 'POST',
 		path: '/tasks/{task}/move',
 		tag: 'Tasks',
@@ -526,15 +482,6 @@ export const operations: Operation[] = [
 	}),
 
 	// Task comments
-	defineOperation({
-		name: 'list_task_comments',
-		method: 'GET',
-		path: '/tasks/{task}/comments',
-		tag: 'Comments',
-		summary: 'List the comments of a task, oldest first',
-		input: z.object({ task }),
-		run: (app, { task }) => app.comments.list(task)
-	}),
 	defineOperation({
 		name: 'add_task_comment',
 		method: 'POST',
@@ -590,6 +537,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_attachments',
+		mcp: { excluded: true },
 		method: 'GET',
 		path: '/attachments',
 		tag: 'Attachments',
@@ -601,7 +549,6 @@ export const operations: Operation[] = [
 			type: attachmentTargetSchema.shape.type.optional(),
 			id: attachmentTargetSchema.shape.id.optional()
 		}),
-		mcp: { required: ['target'] },
 		run: (app, { target, type, id }) => {
 			const resolved = target ?? (type && id ? { type, id } : null);
 			if (!resolved) throw new InvalidInputError('Give a target (type and id)');
@@ -619,6 +566,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'delete_attachment',
+		mcp: { excluded: true },
 		method: 'DELETE',
 		path: '/attachments/{attachment}',
 		tag: 'Attachments',
@@ -632,17 +580,6 @@ export const operations: Operation[] = [
 	}),
 
 	// Questions
-	defineOperation({
-		name: 'list_epic_questions',
-		method: 'GET',
-		path: '/epics/{epic}/questions',
-		tag: 'Questions',
-		summary: 'List the question threads of an epic with their answers and replies',
-		description:
-			'status is open (waiting for a person), answered (follow the answer) or ignored (use your judgement). Filter with status. Each question is a thread: messages holds the replies, oldest first. A person may have opened it, so read and act on those too.',
-		input: z.object({ epic, status: questionStatusSchema.optional() }),
-		run: (app, { epic, status }) => app.questions.list(epic, status)
-	}),
 	defineOperation({
 		name: 'add_epic_questions',
 		method: 'POST',
@@ -713,27 +650,6 @@ export const operations: Operation[] = [
 
 	// Specs
 	defineOperation({
-		name: 'list_specs',
-		method: 'GET',
-		path: '/specs',
-		tag: 'Specs',
-		summary: 'List the specs of a project, epic or task (without content)',
-		description:
-			"Send exactly one of project, epic or task. Project specs hold context that applies to every epic: architecture, conventions, product goals. includeTaskSpecs adds the specs of the epic's tasks.",
-		input: z.object({
-			project: project.optional(),
-			epic: epic.optional(),
-			task: task.optional(),
-			includeTaskSpecs: z.stringbool().optional()
-		}),
-		run: (app, input) => {
-			const owner = specOwner(input);
-			if (owner.type === 'project') return app.specs.listForProject(owner.id);
-			if (owner.type === 'epic') return app.specs.listForEpic(owner.id, input.includeTaskSpecs);
-			return app.specs.listForTask(owner.id);
-		}
-	}),
-	defineOperation({
 		name: 'add_spec',
 		method: 'POST',
 		path: '/specs',
@@ -766,6 +682,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_spec_versions',
+		mcp: { excluded: true },
 		method: 'GET',
 		path: '/specs/{spec}/versions',
 		tag: 'Specs',
@@ -779,7 +696,7 @@ export const operations: Operation[] = [
 		path: '/specs/{spec}',
 		tag: 'Specs',
 		summary: 'Edit a spec. Changing the content clears its human brief unless you send a new one.',
-		description: `Over MCP, brief is required whenever content is sent, so the human brief always matches the content. Title, kind and position edits do not need it. ${BRIEF_GUIDANCE}`,
+		description: `Over MCP, brief is required whenever content is sent, so the human brief always matches the content. Title, kind and position edits do not need it. Send brief alone to rewrite the brief and leave the content untouched. ${BRIEF_GUIDANCE}`,
 		input: updateSpecSchema.extend({ spec }),
 		mcp: { check: (input) => (input.content !== undefined ? briefCheck(input) : null) },
 		run: (app, input, { actor }) => app.specs.update(input.spec, pick(input, 'spec'), actor)
@@ -797,17 +714,8 @@ export const operations: Operation[] = [
 		}
 	}),
 	defineOperation({
-		name: 'set_spec_brief',
-		method: 'PUT',
-		path: '/specs/{spec}/brief',
-		tag: 'Specs',
-		summary: 'Write or replace the human brief of a spec, leaving its content untouched',
-		description: BRIEF_GUIDANCE,
-		input: setSpecBriefSchema.extend({ spec }),
-		run: (app, input, { actor }) => app.specs.setBrief(input.spec, pick(input, 'spec'), actor)
-	}),
-	defineOperation({
 		name: 'translate_spec',
+		mcp: { excluded: true },
 		method: 'POST',
 		path: '/specs/{spec}/brief',
 		tag: 'Specs',
@@ -824,6 +732,7 @@ export const operations: Operation[] = [
 	// Profile
 	defineOperation({
 		name: 'get_user_profile',
+		mcp: { excluded: true },
 		method: 'GET',
 		path: '/profile',
 		tag: 'Profile',
@@ -988,6 +897,7 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'sync_epic_ticket',
+		mcp: { excluded: true },
 		method: 'POST',
 		path: '/epics/{epic}/sync',
 		tag: 'Ticketing',

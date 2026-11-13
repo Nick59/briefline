@@ -13,11 +13,6 @@ const MAX_STORED = 500;
 export class CommentService {
 	constructor(private readonly deps: ServiceDeps) {}
 
-	list(taskIdOrKey: string): TaskComment[] {
-		const task = requireTask(this.deps.repos, taskIdOrKey);
-		return this.deps.repos.comments.listByTask(task.id);
-	}
-
 	add(taskIdOrKey: string, input: { body: string }, actor: string): TaskComment {
 		const { body } = taskCommentSchema.parse(input);
 		const task = requireTask(this.deps.repos, taskIdOrKey);

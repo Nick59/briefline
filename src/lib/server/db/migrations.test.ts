@@ -52,7 +52,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -85,7 +85,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 	});
 });
 
@@ -113,7 +113,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -132,7 +132,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -175,17 +175,13 @@ describe('activity cursor and profile migrations', () => {
 		]);
 		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
 		app.projects.update('PMA', { name: 'Renamed' }, 'bot');
-		expect(
-			app.activity.changes({ since: 'act_1', excludeOwn: false, limit: 10 }, null).items
-		).toHaveLength(2);
+		expect(app.activity.recent().total).toBe(3);
 		expect(app.profile.get()).toBeNull();
 		const tables = (
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
 		).map((row) => row.name);
-		expect(tables).toEqual(
-			expect.arrayContaining(['activity_counter', 'activity_cursors', 'user_profile'])
-		);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(tables).toEqual(expect.arrayContaining(['activity_counter', 'user_profile']));
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 	});
 });
 
@@ -237,13 +233,16 @@ describe('agent sessions migration', () => {
 			'summary',
 			'started_at',
 			'last_seen_at',
-			'ended_at'
+			'ended_at',
+			'repo',
+			'name',
+			'role'
 		]);
 		const indexes = (
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 	});
 });
 
@@ -271,7 +270,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 22 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
 	});
 });
 
@@ -367,5 +366,24 @@ describe('ticket pull migration', () => {
 		migrate(db);
 		const app = createContainer(db, { config: testConfig(), env: {}, fetch });
 		expect(app.projects.get('SHOP').ticketing).toMatchObject({ autoPull: false, pullMinutes: 10 });
+	});
+});
+
+describe('inbox migration', () => {
+	it('creates the inbox table, drops a row with its task and removes the activity cursors', () => {
+		const db = new DatabaseSync(':memory:');
+		migrate(db, MIGRATIONS.length - 1);
+		migrate(db);
+		db.exec(`
+			INSERT INTO projects (id, key, name, created_at, updated_at) VALUES ('p', 'SHOP', 'Shop', 't', 't');
+			INSERT INTO epics (id, project_id, key, title, created_at, updated_at) VALUES ('e', 'p', 'SHOP-E1', 'E', 't', 't');
+			INSERT INTO tasks (id, epic_id, key, title, position, created_at, updated_at) VALUES ('t', 'e', 'SHOP-1', 'T', 0, 't', 't');
+			INSERT INTO inbox (id, task_id, since_seq, last_seq, flagged_at) VALUES (1, 't', 1, 1, 't');
+			INSERT INTO inbox_acks (item_id, agent, acked_seq, acked_at) VALUES (1, 'a', 1, 't');
+		`);
+		db.exec("DELETE FROM tasks WHERE id = 't'");
+		expect(db.prepare('SELECT COUNT(*) AS n FROM inbox').get()).toEqual({ n: 0 });
+		expect(db.prepare('SELECT COUNT(*) AS n FROM inbox_acks').get()).toEqual({ n: 0 });
+		expect(() => db.prepare('SELECT 1 FROM activity_cursors').get()).toThrow();
 	});
 });

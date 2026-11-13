@@ -31,7 +31,7 @@ describe('questionPhrase', () => {
 	const data = { question: 'Which database should we use?', key: 'SHOP-E1' };
 	it('describes each action', () => {
 		expect(questionPhrase('question.added', data, { key: 'SHOP-E1' })).toBe(
-			'Asked “Which database should we use?” on SHOP-E1'
+			'Added thread “Which database should we use?” on SHOP-E1'
 		);
 		expect(questionPhrase('question.answered', { ...data, answer: 'Postgres' })).toBe(
 			'Answered “Which database should we use?”: Postgres'
@@ -55,7 +55,7 @@ describe('questionPhrase', () => {
 				{ question: 'Which database should we use for orders and invoices?', count: 3 },
 				{ key: 'SHOP-E1' }
 			)
-		).toBe('Asked 3 questions on SHOP-E1: “Which database should we use for orders…” +2 more');
+		).toBe('Added 3 threads on SHOP-E1: “Which database should we use for orders…” +2 more');
 	});
 
 	it('truncates the answer', () => {

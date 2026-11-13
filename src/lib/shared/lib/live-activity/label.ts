@@ -25,7 +25,7 @@ const VERBS: Record<string, string> = {
 	'spec.updated': 'Updated spec',
 	'spec.deleted': 'Removed spec',
 	'spec.translated': 'Wrote brief',
-	'question.added': 'Asked question',
+	'question.added': 'Added thread',
 	'question.updated': 'Edited question',
 	'question.answered': 'Answered question',
 	'question.ignored': 'Ignored question',

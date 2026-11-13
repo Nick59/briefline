@@ -9,7 +9,7 @@ A dev dashboard that tracks work planned and executed by AI agents, and translat
 - **Threads.** Before starting an epic, agents ask what is unclear (`add_epic_questions`), and you can open threads yourself with
   New thread. Both sides add replies over time (`reply_to_question`) so knowledge is kept; you answer or ignore a thread in the
   Threads dialog on the epic page. While an epic has open threads its tasks can't be started (HTTP 409 `open_questions`);
-  work already in progress continues. Agents read answers and replies (`messages`) with `list_epic_questions` or `get_epic`.
+  work already in progress continues. Agents read answers and replies (`messages`) with `get_epic`.
 - **External tickets** (optional) in GitHub Issues, Jira, Linear, Plane or any system behind a webhook are updated when
   work moves on the dashboard.
 - **API first.** Every action is a REST operation and an **MCP tool**, so agents such as Claude Code, Codex, Cursor or Gemini CLI can plan
@@ -134,7 +134,7 @@ The MCP server speaks JSON-RPC over HTTP (`POST /mcp`) with no server-initiated 
 explain the model and the expected workflow to the agent, and the response carries an `Mcp-Session-Id` header (see Sessions).
 
 Over MCP, agents must send a `brief` (the plain-language summary for non-engineers) whenever they create a spec or change its
-content (`add_spec`, `update_spec` with `content`, `create_epic` specs). `set_spec_brief` rewrites the
+content (`add_spec`, `update_spec` with `content`, `create_epic` specs). `update_spec` with only `brief` rewrites the
 brief alone. The REST API and the dashboard keep the brief optional.
 
 ### Agent rules
@@ -149,9 +149,9 @@ belongs to. Add them once to your global instructions file: `~/.claude/CLAUDE.md
 When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) name a Briefline project, track the work there through the `briefline` MCP server:
 
 - Before planning, read the project with `get_project` and the current epic with `get_epic`.
-- At the start of a session, call `get_last_session` (with the project when known) to read what the previous session did, and `get_activity_changes` to see what changed since your last pull.
-- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with `list_specs` (`project`) before planning, and add new ones with `add_spec`.
-- Ask anything unclear with `add_epic_questions` before starting an epic. Questions are threads: people can open them too, and anyone adds details with `reply_to_question`. Tasks can't start while questions are open; read the answers and the replies (`messages`) with `list_epic_questions` and follow them.
+- At the start of a session, call `register_agent` with your GitHub project (`owner/repo` from `git remote get-url origin`) and a short role name, then `get_last_session`, then `get_inbox`; handle each item, then `ack_inbox` it with the `seq` you received. Responses include a `meanwhile` block with what other agents and people changed since your last call.
+- Project-wide context (architecture, conventions, product goals) lives in project specs: read them with `get_project` before planning, and add new ones with `add_spec`.
+- Ask anything unclear with `add_epic_questions` before starting an epic. Questions are threads: people can open them too, and anyone adds details with `reply_to_question`. Tasks can't start while questions are open; read the answers and the replies (`messages`) with `get_epic` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single `create_epic` call.
 - Every spec includes a plain-language `brief` for non-engineers.
 - Move each task as you work with `set_task_stage_status`: dev, then test, then deploy; in_progress when you start, done when you finish.
@@ -167,9 +167,6 @@ Briefline project: SHOP
 ```
 
 Claude Code reads `CLAUDE.md` rather than `AGENTS.md`, so make `CLAUDE.md` contain one line, `@AGENTS.md`.
-
-`get_activity_changes` keeps one bookmark per `X-Actor`. Give each concurrent session its own `X-Actor`, for example
-`codex-api` and `claude-code-web`.
 
 **REST:** `GET /api/v1` lists every operation, and `GET /api/v1/openapi.json` describes them in OpenAPI 3.1.
 The in-app page **API & MCP** (`/docs`) shows the same list with copy-paste examples.
@@ -187,7 +184,7 @@ curl -X PUT localhost:5173/api/v1/tasks/SHOP-7/stages/dev -H 'content-type: appl
 
 Cancelling: `update_task` with `cancelled: true` (`PATCH /api/v1/tasks/{task}`, optional `cancelReason`) keeps a task on the board but leaves it out of epic, project and ticket progress; its stage statuses are kept and stage changes are refused until `cancelled: false` restores it.
 
-Task comments: `get_task` returns `comments` (markdown, oldest first) and task lists carry a `commentCount`. `add_task_comment` (`POST /api/v1/tasks/{task}/comments`) and `list_task_comments` work for anyone; `update_task_comment` and `delete_task_comment` (`/api/v1/task-comments/{comment}`) only for the comment's author (403 otherwise).
+Task comments: `get_task` returns `comments` (markdown, oldest first) and task lists carry a `commentCount`. `add_task_comment` (`POST /api/v1/tasks/{task}/comments`) works for anyone; `update_task_comment` and `delete_task_comment` (`/api/v1/task-comments/{comment}`) only for the comment's author (403 otherwise).
 
 ### Image uploads
 
@@ -197,26 +194,50 @@ markdown field, or press **Add image**; it is uploaded and `![name](/attachments
 a task, spec or thread reply is still being created, the image is stored on its project. Agents call `upload_attachment`
 (`POST /api/v1/attachments`, `{ "target": { "type": "project|task|spec", "id" }, "filename", "data": "<base64>" }`) and
 paste the returned `markdown` into a spec, task description or comment. `list_attachments` (`GET /api/v1/attachments?type=&id=`)
-and `delete_attachment` (`DELETE /api/v1/attachments/{attachment}`) manage them. The dashboard form posts
+and `delete_attachment` (`DELETE /api/v1/attachments/{attachment}`) manage them over REST and the dashboard; they are not MCP tools. The dashboard form posts
 `multipart/form-data` (`file`, `targetType`, `targetId`) to `POST /attachments`. Images are served at
 `/attachments/<id>` behind the same sign-in as the dashboard, and deleted with their project, task or spec. Files live
 in an `attachments` folder next to the database (`BRIEFLINE_ATTACHMENTS_DIR` overrides it); the Docker image sets
 `BODY_SIZE_LIMIT=15M` so adapter-node accepts the base64 payload.
 
 Projects keep a user-defined order (drag them in the sidebar or on the projects page, or call `move_project` with `beforeProject`; omit it to move last).
-Epics keep a user-defined order within their project (drag them on the project timeline, or call `move_epic` with `beforeEpic`; omit it to move last). `get_work_to_do` (`GET /projects/{project}/work-to-do`) lists the epics ready to work on (no open questions, specs approved, not done) in that order.
+Epics keep a user-defined order within their project (drag them on the project timeline, or call `move_epic` with `beforeEpic`; omit it to move last). `get_project` with `ready: true` lists only the epics ready to work on (no open questions, specs approved, not done) in that order.
 
 Conventions: ids and keys are interchangeable (`SHOP`, `SHOP-E1`, `SHOP-12`); `X-Actor` names who made a change in
 the activity log and ticket comments; errors are `{ "error": { "code", "message", "issues" } }`.
-Activity (`list_activity`, filtered by `project` or `epic`) is paginated, newest first: pass `limit` (default 50, max 200) and
-`offset`, and read `{ items, total, limit, offset, hasMore, nextOffset }` to fetch older entries.
+Activity (`GET /api/v1/activity`, filtered by `project` or `epic`) is paginated, newest first: pass `limit` (default 50, max 200) and
+`offset`, and read `{ items, total, limit, offset, hasMore, nextOffset }` to fetch older entries. It is a REST endpoint, not an MCP tool.
 
-To see only what changed since your last pull, call `get_activity_changes` (`GET /api/v1/activity/changes`). It
-returns `{ items, cursor, hasMore }`, oldest first; every item carries its own `cursor`. Filter with `project` or
-`epic`; your own entries are left out unless `excludeOwn=false`; `limit` defaults to 50 (max 200). Without `since`,
-the cursor stored for your `X-Actor` (per project/epic filter) is used and then advanced, so a repeated call returns
-only new entries; with no stored cursor you get the latest entries. Without `X-Actor` nothing is stored. Pass
-`cursor` as `since` to read from an exact point, and repeat while `hasMore` is true.
+### How-to guide
+
+`how_to` (`GET /api/v1/how-to`, optional `topic`) explains Briefline's concepts to an agent and is listed as a normal MCP
+tool. Without a topic it returns the overview and the list of topics: `overview`, `workflow` (the MCP instructions),
+`inbox`, `agents`, `threads`, `specs` and `tickets`.
+
+### Inbox
+
+Every change a person makes to a task (create, edit, cancel, restore, comment, stage change), and every thread a person
+adds to or answers on an epic, flags it in the **Inbox** (`/inbox`); agent changes never do. Each agent has its own state.
+`get_inbox` (`GET /api/v1/inbox`, optional `project`) lists the items the calling agent has not acknowledged up to their
+latest change, oldest first, each with `kind` (`task` or `epic`), `key`, `changes` (the people's activity since that agent's
+last acknowledgement), `seq`, `ackedBy` (`[{ agent, ackedAt, upToDate }]`) and, for tasks, the `assignee`. After handling
+items, an agent calls `ack_inbox` (`POST /api/v1/inbox/ack`) with `{ "items": ["SHOP-12", { "item": "SHOP-E1", "seq": 42 }] }`:
+a key acknowledges up to the latest change, `{ item, seq }` up to the `seq` the agent read, so a change that arrived in
+between stays visible. Acknowledging is idempotent and per agent; an unknown key fails and acknowledges nothing. On the
+dashboard, **Dismiss** (`dismiss_inbox`, not an MCP tool) clears an item for every agent; a later human change flags it again.
+
+### Agents
+
+An MCP session names itself with `register_agent` (`POST /api/v1/agents/register`, `{ "repo": "acme/shop", "name": "backend-agent", "role": "optional" }`):
+`repo` is the GitHub project (`owner/repo` from `git remote get-url origin`, or the folder name), and the agent name becomes
+`shop:backend-agent` for every later request in that session. A name is held by one live session at a time (409 otherwise,
+free again when that session ends or is quiet for 20 minutes). An unregistered session whose `X-Actor` is already used by a
+live session gets `<actor>-2`, `-3`... `list_agents` and the session pages show `repo`, `name` and `role`.
+
+When an agent sets a task to `in_progress` with `set_task_stage_status` and the task has no assignee, it becomes the assignee;
+if another agent holds the task the call succeeds and the response carries `claimedBy`. Every MCP `tools/call` response may
+end with a second text item `{ "meanwhile": { "items": [{ actor, message, target, createdAt }], "andMore": 0 } }`: up to 20
+changes by other actors since the session's previous response, oldest first.
 
 ### Sessions
 
@@ -230,10 +251,9 @@ created on the fly, and `DELETE /mcp` with the header marks the session ended.
   a recap (tasks done, stage changes, specs, threads, replies, answers). A session opens to its summary and activity.
   Sessions that changed nothing are hidden.
 - `get_last_session` (`GET /api/v1/sessions/last`, optional `project`, `actor`, `activityLimit`) returns the most recent
-  other session that has activity, in the shape of `get_session`, or `{ "session": null, "message": "No previous session" }`.
+  other session that has activity, as a session with its paged activity, or `{ "session": null, "message": "No previous session" }`.
   Agents call it at the start of a session for context on work already done.
-- MCP tools / REST: `list_sessions` (`GET /api/v1/sessions`, optional `actor` and `includeEmpty`), `get_session`
-  (`GET /api/v1/sessions/{session}`, with paged activity) and `set_session_summary` (`PUT /api/v1/sessions/summary`).
+- MCP tools / REST: `set_session_summary` (`PUT /api/v1/sessions/summary`).
   The agent writes a short markdown recap for the user's profile; without `session` it applies to the caller's current
   session, and each call overwrites the previous summary.
 - Activity is never pruned, so session history is kept.
@@ -241,9 +261,9 @@ created on the fly, and `DELETE /mcp` with the header marks the session ended.
 ### User profile
 
 On first launch the dashboard asks for your name, role, comfort with code and preferred language for briefs
-(there is a Profile entry in the sidebar to edit it later). There is one profile per install. Agents read it with
-`get_user_profile` (`GET /api/v1/profile`, returns `{ profile, guidance }`, `profile` is `null` until set) and the
-MCP `initialize` instructions include it once set, so they adapt their tone and how technical their briefs are.
+(there is a Profile entry in the sidebar to edit it later). There is one profile per install. Agents get it in the
+MCP `initialize` instructions once set, so they adapt their tone and how technical their briefs are. Over REST,
+`GET /api/v1/profile` (`get_user_profile`) returns `{ profile, guidance }`.
 `update_user_profile` (`PUT /api/v1/profile`) sets it. The Claude-based `translate_spec` also writes briefs for this
 reader, and dashboard actions appear in the activity log under your name.
 

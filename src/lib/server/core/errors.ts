@@ -35,7 +35,7 @@ export class InvalidInputError extends DomainError {
 export class OpenQuestionsError extends DomainError {
 	constructor(epicKey: string, open: number) {
 		super(
-			`Epic ${epicKey} has ${open} open ${open === 1 ? 'question' : 'questions'}. Answer or ignore them before starting a task (list_epic_questions).`,
+			`Epic ${epicKey} has ${open} open ${open === 1 ? 'question' : 'questions'}. Answer or ignore them before starting a task (get_epic).`,
 			409,
 			'open_questions'
 		);

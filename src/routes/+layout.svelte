@@ -75,6 +75,7 @@
 			activeProjectKey={data.activeProjectKey}
 			activeEpics={data.activeEpics}
 			profileName={data.profile?.name ?? null}
+			inboxCount={data.inboxCount}
 		>
 			{@render children()}
 		</AppShell>

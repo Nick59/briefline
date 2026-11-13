@@ -97,14 +97,6 @@ describe('tasks', () => {
 			data: { note: 'All green' }
 		});
 	});
-
-	it('filters a board column', () => {
-		const { app, epic } = withEpic();
-		app.tasks.setStage('PMA-2', { stage: 'dev', status: 'done' }, 'test');
-		expect(app.tasks.list(epic.key, { stage: 'dev', status: 'done' }).map((t) => t.key)).toEqual([
-			'PMA-2'
-		]);
-	});
 });
 
 describe('specs', () => {
@@ -130,7 +122,7 @@ describe('specs', () => {
 
 describe('moving tasks on the board', () => {
 	const order = (app: ReturnType<typeof testApp>['app'], epicKey: string) =>
-		app.tasks.list(epicKey).map((t) => t.key);
+		app.epics.detail(epicKey).tasks.map((t) => t.key);
 
 	it('reorders within the epic', () => {
 		const { app, epic } = withEpic();
@@ -146,7 +138,7 @@ describe('moving tasks on the board', () => {
 	});
 
 	const positions = (app: ReturnType<typeof testApp>['app'], epicKey: string) =>
-		app.tasks.list(epicKey).map((t) => t.position);
+		app.epics.detail(epicKey).tasks.map((t) => t.position);
 
 	it('appends new tasks and moves a task up, down and to the end with dense positions', () => {
 		const { app, epic } = withEpic();
@@ -212,7 +204,7 @@ describe('moving tasks between epics', () => {
 		expect(app.epics.detail(epic.id).progress.status).toBe('todo');
 		expect(app.epics.detail(target.id).progress).toMatchObject({ status: 'done', percent: 100 });
 		app.tasks.move('PMA-2', { epic: target.id, beforeTask: moved.id }, 'test');
-		expect(app.tasks.list(target.id).map((t) => t.key)).toEqual(['PMA-2', 'PMA-1']);
+		expect(app.epics.detail(target.id).tasks.map((t) => t.key)).toEqual(['PMA-2', 'PMA-1']);
 		expect(app.epics.detail(target.id).progress.status).toBe('in_progress');
 		expect(app.epics.detail(epic.id).tasks).toHaveLength(0);
 	});
@@ -222,14 +214,14 @@ describe('moving tasks between epics', () => {
 		const target = app.epics.create('PMA', { title: 'Destination' }, 'test');
 		app.tasks.create(target.key, { title: 'A' }, 'test');
 		app.tasks.create(target.key, { title: 'B' }, 'test');
-		const [a, b] = app.tasks.list(target.key);
+		const [a, b] = app.epics.detail(target.key).tasks;
 		app.tasks.move('PMA-1', { epic: target.id, beforeTask: b.key }, 'test');
-		expect(app.tasks.list(target.key).map((t) => [t.key, t.position])).toEqual([
+		expect(app.epics.detail(target.key).tasks.map((t) => [t.key, t.position])).toEqual([
 			[a.key, 0],
 			['PMA-1', 1],
 			[b.key, 2]
 		]);
-		expect(app.tasks.list(epic.key).map((t) => [t.key, t.position])).toEqual([
+		expect(app.epics.detail(epic.key).tasks.map((t) => [t.key, t.position])).toEqual([
 			['PMA-2', 0],
 			['PMA-3', 1]
 		]);

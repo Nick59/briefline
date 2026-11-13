@@ -251,6 +251,11 @@ export interface SessionSummary {
 	actor: string;
 	clientName: string | null;
 	clientVersion: string | null;
+	/** The GitHub project (owner/repo) the agent registered for. */
+	repo: string | null;
+	/** The role name the agent registered with. */
+	name: string | null;
+	role: string | null;
 	/** Markdown recap written by the agent. */
 	summary: string | null;
 	startedAt: ISODate;
@@ -380,4 +385,20 @@ export interface UserProfileView {
 	profile: UserProfile | null;
 	/** How agents should write for this user; null until a profile is set. */
 	guidance: string | null;
+}
+
+export interface InboxItem {
+	kind: 'task' | 'epic';
+	key: string;
+	title: string;
+	/** The epic itself for an epic item. */
+	epicKey: string;
+	projectKey: string;
+	flaggedAt: string;
+	/** Sequence number of the latest person's change; pass it to ack_inbox. */
+	seq: number;
+	/** The current assignee of a task item. */
+	assignee?: string | null;
+	ackedBy: { agent: string; ackedAt: string; upToDate: boolean }[];
+	changes: Activity[];
 }

@@ -3,6 +3,7 @@ import type { ActivityRepository } from '../modules/activity/repository.ts';
 import type { AttachmentRepository } from '../modules/attachments/repository.ts';
 import type { CommentRepository } from '../modules/comments/repository.ts';
 import type { EpicRepository } from '../modules/epics/repository.ts';
+import type { InboxRepository } from '../modules/inbox/repository.ts';
 import type { ProfileRepository } from '../modules/profile/repository.ts';
 import type { ProjectRepository } from '../modules/projects/repository.ts';
 import type { QuestionRepository } from '../modules/questions/repository.ts';
@@ -22,6 +23,7 @@ export interface Repositories {
 	specs: SpecRepository;
 	questions: QuestionRepository;
 	activity: ActivityRepository;
+	inbox: InboxRepository;
 	sessions: SessionRepository;
 	profile: ProfileRepository;
 	syncJobs: SyncJobRepository;

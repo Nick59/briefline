@@ -3,8 +3,6 @@ import {
 	type BriefInput,
 	updateSpecSchema,
 	type CreateSpecInput,
-	setSpecBriefSchema,
-	type SetSpecBriefInput,
 	type UpdateSpecInput
 } from '#lib/shared/domain/schemas.ts';
 import { profileGuidance } from '#lib/shared/domain/profile-guidance.ts';
@@ -148,14 +146,6 @@ export class SpecService {
 		this.deps.repos.specs.update(spec);
 		this.#emit('spec.updated', spec, actor);
 		if (data.brief) this.#emit('spec.translated', spec, actor);
-		return spec;
-	}
-
-	setBrief(id: string, input: SetSpecBriefInput, actor: string): Spec {
-		const { brief } = setSpecBriefSchema.parse(input);
-		const spec: Spec = { ...this.get(id), brief: agentBrief(brief, actor), updatedAt: now() };
-		this.deps.repos.specs.update(spec);
-		this.#emit('spec.translated', spec, actor);
 		return spec;
 	}
 

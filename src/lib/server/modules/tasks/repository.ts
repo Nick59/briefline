@@ -1,6 +1,6 @@
-import type { Priority, Stage, WorkStatus } from '#lib/shared/domain/constants.ts';
+import type { Priority, WorkStatus } from '#lib/shared/domain/constants.ts';
 import type { ExternalRef, Task } from '#lib/shared/domain/types.ts';
-import { all, fromJson, one, run, toJson, type Db, type Params } from '../../db/connection.ts';
+import { all, fromJson, one, run, toJson, type Db } from '../../db/connection.ts';
 
 interface TaskRow {
 	id: string;
@@ -44,34 +44,15 @@ const toTask = (row: TaskRow): Task => ({
 	updatedAt: row.updated_at
 });
 
-export interface TaskFilter {
-	stage?: Stage;
-	status?: WorkStatus;
-}
-
-const STAGE_COLUMN: Record<Stage, string> = {
-	dev: 'dev_status',
-	test: 'test_status',
-	deploy: 'deploy_status'
-};
-
 const SELECT_TASK = `SELECT t.*, (SELECT COUNT(*) FROM task_comments c WHERE c.task_id = t.id) AS comment_count FROM tasks t`;
 
 export class TaskRepository {
 	constructor(private readonly db: Db) {}
 
-	listByEpic(epicId: string, filter: TaskFilter = {}): Task[] {
-		const where = ['t.epic_id = :epicId'];
-		const params: Params = { epicId };
-		if (filter.status) {
-			where.push(`t.${STAGE_COLUMN[filter.stage ?? 'dev']} = :status`);
-			params.status = filter.status;
-		}
-		return all<TaskRow>(
-			this.db,
-			`${SELECT_TASK} WHERE ${where.join(' AND ')} ORDER BY t.position`,
-			params
-		).map(toTask);
+	listByEpic(epicId: string): Task[] {
+		return all<TaskRow>(this.db, `${SELECT_TASK} WHERE t.epic_id = :epicId ORDER BY t.position`, {
+			epicId
+		}).map(toTask);
 	}
 
 	listByProject(projectId: string): Task[] {

@@ -67,25 +67,19 @@ export interface ActivityFilter {
 	epicId?: string;
 	taskId?: string;
 	sessionId?: string;
+	/** Only entries whose action starts with this. */
+	actionPrefix?: string;
+	/** Only entries with this sequence number or a higher one. */
+	sinceSeq?: number;
 	actor?: string;
 	/** Only entries by these actors. */
 	actorIn?: string[];
 	/** Leaves out entries by these actors. */
 	actorNotIn?: string[];
+	/** Oldest first instead of newest first. */
+	ascending?: boolean;
 	limit?: number;
 	offset?: number;
-}
-
-export interface ChangesFilter {
-	projectId?: string;
-	epicId?: string;
-	/** Only entries with a higher sequence number. */
-	after?: number;
-	/** Leaves out entries made by this actor. */
-	excludeActor?: string;
-	limit: number;
-	/** Take the newest entries instead of the oldest after `after`; the result stays oldest first. */
-	newest?: boolean;
 }
 
 export class ActivityRepository {
@@ -93,10 +87,6 @@ export class ActivityRepository {
 
 	insert(activity: Omit<Activity, 'target'>) {
 		transaction(this.db, () => this.insertEntry(activity));
-	}
-
-	oldestSeq(): number | null {
-		return one<{ seq: number | null }>(this.db, 'SELECT MIN(seq) AS seq FROM activity')!.seq;
 	}
 
 	actors(): string[] {
@@ -148,6 +138,14 @@ export class ActivityRepository {
 				params[key] = value;
 			}
 		}
+		if (filter.actionPrefix) {
+			where.push("a.action LIKE :actionPrefix || '%'");
+			params.actionPrefix = filter.actionPrefix;
+		}
+		if (filter.sinceSeq !== undefined) {
+			where.push('a.seq >= :sinceSeq');
+			params.sinceSeq = filter.sinceSeq;
+		}
 		if (filter.actor) {
 			where.push('a.actor = :actor');
 			params.actor = filter.actor;
@@ -184,7 +182,7 @@ export class ActivityRepository {
 			 LEFT JOIN tasks t ON t.id = a.task_id
 			 LEFT JOIN epics e ON e.id = a.epic_id
 			 LEFT JOIN projects p ON p.id = a.project_id
-			 ${clause} ORDER BY a.seq DESC LIMIT :limit OFFSET :offset`,
+			 ${clause} ORDER BY a.seq ${filter.ascending ? 'ASC' : 'DESC'} LIMIT :limit OFFSET :offset`,
 			{
 				...params,
 				limit: Math.min(filter.limit ?? DEFAULT_PAGE_SIZE, MAX_ACTIVITY_LIST_SIZE),
@@ -194,59 +192,8 @@ export class ActivityRepository {
 		return { items, total };
 	}
 
-	changes(filter: ChangesFilter): { seq: number; activity: Activity }[] {
-		const where = ['a.seq > :after'];
-		const params: Params = { after: filter.after ?? 0, limit: filter.limit };
-		if (filter.projectId) {
-			where.push('a.project_id = :projectId');
-			params.projectId = filter.projectId;
-		}
-		if (filter.epicId) {
-			where.push('a.epic_id = :epicId');
-			params.epicId = filter.epicId;
-		}
-		if (filter.excludeActor) {
-			where.push('a.actor != :actor');
-			params.actor = filter.excludeActor;
-		}
-		const rows = all<ActivityRow>(
-			this.db,
-			`SELECT a.*, t.external_ref AS task_ref, e.external_ref AS epic_ref,
-			        p.key AS project_key, e.key AS epic_key, t.key AS task_key
-			 FROM activity a
-			 LEFT JOIN tasks t ON t.id = a.task_id
-			 LEFT JOIN epics e ON e.id = a.epic_id
-			 LEFT JOIN projects p ON p.id = a.project_id
-			 WHERE ${where.join(' AND ')}
-			 ORDER BY a.seq ${filter.newest ? 'DESC' : 'ASC'} LIMIT :limit`,
-			params
-		);
-		if (filter.newest) rows.reverse();
-		return rows.map((row) => ({ seq: row.seq, activity: toActivity(row) }));
-	}
-
 	head(): number {
 		return one<{ value: number }>(this.db, 'SELECT value FROM activity_counter WHERE id = 1')!
 			.value;
-	}
-
-	storedCursor(actor: string, scope: string): string | null {
-		return (
-			one<{ cursor: string }>(
-				this.db,
-				'SELECT cursor FROM activity_cursors WHERE actor = :actor AND scope = :scope',
-				{ actor, scope }
-			)?.cursor ?? null
-		);
-	}
-
-	storeCursor(actor: string, scope: string, cursor: string, updatedAt: string) {
-		run(
-			this.db,
-			`INSERT INTO activity_cursors (actor, scope, cursor, updated_at)
-			 VALUES (:actor, :scope, :cursor, :updatedAt)
-			 ON CONFLICT(actor, scope) DO UPDATE SET cursor = :cursor, updated_at = :updatedAt`,
-			{ actor, scope, cursor, updatedAt }
-		);
 	}
 }

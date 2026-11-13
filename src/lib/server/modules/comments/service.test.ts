@@ -21,10 +21,10 @@ describe('task comments', () => {
 		const { app } = setup();
 		const first = app.comments.add('SHOP-1', { body: 'first' }, 'nick');
 		const second = app.comments.add('shop-1', { body: 'second **bold**' }, 'claude');
-		expect(app.comments.list('SHOP-1').map((c) => c.id)).toEqual([first.id, second.id]);
+		expect(app.tasks.detail('SHOP-1').comments.map((c) => c.id)).toEqual([first.id, second.id]);
 		expect(second).toMatchObject({ taskId: app.tasks.get('SHOP-1').id, author: 'claude' });
 
-		const counts = app.tasks.list('SHOP-E1').map((t) => [t.key, t.commentCount]);
+		const counts = app.epics.detail('SHOP-E1').tasks.map((t) => [t.key, t.commentCount]);
 		expect(counts).toEqual([
 			['SHOP-1', 2],
 			['SHOP-2', 0]
@@ -56,9 +56,9 @@ describe('task comments', () => {
 		const edited = app.comments.update(comment.id, { body: 'edited' }, 'claude');
 		expect(edited.body).toBe('edited');
 		expect(edited.createdAt).toBe(comment.createdAt);
-		expect(app.comments.list('SHOP-1')[0].body).toBe('edited');
+		expect(app.tasks.detail('SHOP-1').comments[0].body).toBe('edited');
 		app.comments.delete(comment.id, 'claude');
-		expect(app.comments.list('SHOP-1')).toEqual([]);
+		expect(app.tasks.detail('SHOP-1').comments).toEqual([]);
 		expect(() => app.comments.delete(comment.id, 'claude')).toThrow(/not found/);
 	});
 
@@ -73,7 +73,7 @@ describe('task comments', () => {
 		expect(app.comments.update(comment.id, { body: 'edited' }, 'Nicolas').body).toBe('edited');
 		app.comments.delete(comment.id, 'Nicolas');
 		app.comments.delete(viaDashboard.id, 'dashboard');
-		expect(app.comments.list('SHOP-1')).toEqual([]);
+		expect(app.tasks.detail('SHOP-1').comments).toEqual([]);
 	});
 
 	it('keeps person and agent comments apart', () => {

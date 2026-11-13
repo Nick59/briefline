@@ -1,23 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { execute } from '../../api/execute.ts';
-import { operationsByName } from '../../api/operations.ts';
 import { testApp } from '../../testing/app.ts';
-
-type Listed = {
-	items: { actor: string; message: string; projectId: string }[];
-	total: number;
-	limit: number;
-	offset: number;
-	hasMore: boolean;
-	nextOffset: number | null;
-};
 
 function setup() {
 	const { app } = testApp();
-	const list = (input: object = {}) =>
-		execute(app, operationsByName.get('list_activity')!, input, {
-			actor: 'dashboard'
-		}) as Promise<Listed>;
+	const list = async (input: Parameters<typeof app.activity.list>[0] = {}) =>
+		app.activity.list(input);
 	app.projects.create({ key: 'AA', name: 'Alpha' }, 'dashboard');
 	app.projects.create({ key: 'BB', name: 'Beta' }, 'claude');
 	app.epics.create('AA', { title: 'One' }, 'codex');
@@ -26,21 +13,16 @@ function setup() {
 	return { app, list };
 }
 
-describe('list_activity', () => {
-	it('lists everything newest first with paging details', async () => {
+describe('activity list', () => {
+	it('lists everything newest first and pages with limit and offset', async () => {
 		const { list } = setup();
 		const all = await list();
 		expect(all.total).toBe(5);
-		expect(all.limit).toBe(50);
 		expect(all.items[0].message).toContain('Three');
-		expect(all.hasMore).toBe(false);
 
-		expect((await list({ limit: 200 })).limit).toBe(200);
 		const page = await list({ limit: 2, offset: 2 });
 		expect(page.items).toHaveLength(2);
 		expect(page.items[0].message).toBe(all.items[2].message);
-		expect(page.hasMore).toBe(true);
-		expect(page.nextOffset).toBe(4);
 	});
 
 	it('filters by project, actor and who', async () => {

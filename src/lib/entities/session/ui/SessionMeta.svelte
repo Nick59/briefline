@@ -22,6 +22,9 @@
 	<p class="flex flex-wrap items-center gap-x-2 gap-y-1">
 		<BotIcon class="size-4 text-muted-foreground" />
 		<span class="font-medium">{session.actor}</span>
+		{#if session.role}
+			<span class="text-muted-foreground">{session.role}</span>
+		{/if}
 		{#if session.clientName}
 			<span class="text-muted-foreground">
 				{session.clientName}{session.clientVersion ? ` ${session.clientVersion}` : ''}
@@ -40,6 +43,9 @@
 		{session.activityCount}
 		{session.activityCount === 1 ? 'change' : 'changes'}
 	</p>
+	{#if session.repo}
+		<p class="font-mono text-xs text-muted-foreground">{session.repo}</p>
+	{/if}
 	{#if session.projects.length}
 		<p class="flex flex-wrap items-center gap-1.5 text-xs">
 			{#each session.projects as project (project.id)}

@@ -222,18 +222,6 @@ describe('session service', () => {
 		});
 		await expect(set({ summary: 'x', session: 'nope' })).rejects.toMatchObject({ status: 404 });
 	});
-
-	it('exposes the operations with sessionId on activity', async () => {
-		const { app, id } = work();
-		const call = (name: string, input: object = {}) =>
-			execute(app, operationsByName.get(name)!, input, { actor: 'dashboard' }) as Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-		expect(await call('list_sessions')).toMatchObject({ total: 1, limit: 10, hasMore: false });
-		const detail = await call('get_session', { session: id, limit: 3 });
-		expect(detail.activity).toMatchObject({ total: 6, hasMore: true, nextOffset: 3 });
-		expect(detail.activity.items[0].sessionId).toBe(id);
-		const all = await call('list_activity');
-		expect(all.items.some((a: { sessionId: string | null }) => a.sessionId === null)).toBe(true);
-	});
 });
 
 describe('get_last_session', () => {

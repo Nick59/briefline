@@ -6,6 +6,9 @@ interface SessionRow {
 	actor: string;
 	client_name: string | null;
 	client_version: string | null;
+	repo: string | null;
+	name: string | null;
+	role: string | null;
 	summary: string | null;
 	started_at: string;
 	last_seen_at: string;
@@ -48,6 +51,12 @@ export interface LatestFilter {
 	excludeId?: string | null;
 }
 
+export interface Registration {
+	repo: string;
+	name: string;
+	role: string | null;
+}
+
 export interface ClientInfo {
 	name?: string | null;
 	version?: string | null;
@@ -87,6 +96,71 @@ export class SessionRepository {
 			this.db,
 			'UPDATE agent_sessions SET ended_at = :at, last_seen_at = :at WHERE id = :id AND ended_at IS NULL',
 			{ id, at }
+		);
+	}
+
+	/** Null once the session ended: a claimed name must not outlive the session that held it. */
+	actorOf(id: string): string | null {
+		return (
+			one<{ actor: string }>(
+				this.db,
+				'SELECT actor FROM agent_sessions WHERE id = :id AND ended_at IS NULL',
+				{ id }
+			)?.actor ?? null
+		);
+	}
+
+	endHolders(actor: string, exceptId: string, at: string) {
+		run(
+			this.db,
+			`UPDATE agent_sessions SET ended_at = :at, last_seen_at = :at
+			 WHERE actor = :actor AND id IS NOT :exceptId AND ended_at IS NULL`,
+			{ actor, exceptId, at }
+		);
+	}
+
+	/** Whether another session that has not ended and was seen since `cutoff` uses this actor. */
+	actorHeld(actor: string, exceptId: string | null, cutoff: string): boolean {
+		return !!one(
+			this.db,
+			`SELECT 1 AS found FROM agent_sessions
+			 WHERE actor = :actor AND id IS NOT :exceptId AND ended_at IS NULL AND last_seen_at > :cutoff`,
+			{ actor, exceptId, cutoff }
+		);
+	}
+
+	register(id: string, actor: string, registration: Registration) {
+		run(
+			this.db,
+			'UPDATE agent_sessions SET actor = :actor, repo = :repo, name = :name, role = :role WHERE id = :id',
+			{ id, actor, ...registration }
+		);
+	}
+
+	/** The latest registration of each agent name. */
+	registrations(): Map<string, Registration> {
+		return new Map(
+			all<SessionRow>(
+				this.db,
+				'SELECT actor, repo, name, role FROM agent_sessions WHERE repo IS NOT NULL ORDER BY last_seen_at'
+			).map((row) => [row.actor, { repo: row.repo!, name: row.name!, role: row.role }])
+		);
+	}
+
+	cursor(id: string): number | null {
+		return (
+			one<{ seq: number }>(this.db, 'SELECT seq FROM session_cursors WHERE session_id = :id', {
+				id
+			})?.seq ?? null
+		);
+	}
+
+	setCursor(id: string, seq: number) {
+		run(
+			this.db,
+			`INSERT INTO session_cursors (session_id, seq) VALUES (:id, :seq)
+			 ON CONFLICT(session_id) DO UPDATE SET seq = :seq`,
+			{ id, seq }
 		);
 	}
 
@@ -210,6 +284,9 @@ export class SessionRepository {
 				actor: row.actor,
 				clientName: row.client_name,
 				clientVersion: row.client_version,
+				repo: row.repo,
+				name: row.name,
+				role: row.role,
 				summary: row.summary,
 				startedAt: row.started_at,
 				lastSeenAt: row.last_seen_at,

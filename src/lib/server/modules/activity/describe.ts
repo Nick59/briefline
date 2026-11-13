@@ -18,8 +18,8 @@ function describeQuestion(event: Extract<DomainEvent, { type: `question.${string
 	if (phrase) return phrase;
 	if (event.type === 'question.added') {
 		return data.count && data.count > 1
-			? `Asked ${data.count} questions on ${data.key}`
-			: `Asked "${data.title}" on ${data.key}`;
+			? `Added ${data.count} threads on ${data.key}`
+			: `Added thread "${data.title}" on ${data.key}`;
 	}
 	return `${QUESTION_FALLBACK[event.type]} "${data.title}" on ${data.key}`;
 }

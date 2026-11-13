@@ -130,7 +130,7 @@ describe('mcp', () => {
 
 		it('stays within the size budget', async () => {
 			expect(JSON.stringify(await list()).length, 'tools/list grew past budget').toBeLessThan(
-				42800
+				31500
 			);
 		});
 	});
@@ -157,68 +157,6 @@ describe('mcp', () => {
 		expect(unknown.error.code).toBe(-32602);
 	});
 
-	it('pages activity with limit and offset and reports paging details', async () => {
-		const { app } = testApp();
-		app.projects.create({ key: 'PG', name: 'Paging' }, 'test');
-		for (let i = 0; i < 4; i++) app.epics.create('PG', { title: `E${i}` }, 'test');
-		const page = async (args: object) =>
-			(
-				await call(app, 'tools/call', {
-					name: 'list_activity',
-					arguments: { project: 'PG', ...args }
-				})
-			).result.structuredContent;
-		const all = await page({});
-		expect(all).toMatchObject({
-			total: 5,
-			limit: 50,
-			offset: 0,
-			hasMore: false,
-			nextOffset: null
-		});
-		expect(all.items).toHaveLength(5);
-
-		const first = await page({ limit: 2 });
-		expect(first).toMatchObject({ total: 5, limit: 2, offset: 0, hasMore: true, nextOffset: 2 });
-		const second = await page({ limit: 2, offset: 2 });
-		expect(second).toMatchObject({ offset: 2, hasMore: true, nextOffset: 4 });
-		expect(second.items.map((a: { id: string }) => a.id)).toEqual(
-			all.items.slice(2, 4).map((a: { id: string }) => a.id)
-		);
-		const last = await page({ limit: 2, offset: 4 });
-		expect(last).toMatchObject({ offset: 4, hasMore: false, nextOffset: null });
-		expect(last.items).toHaveLength(1);
-	});
-
-	it('pages epic activity and describes the paging in the tool and OpenAPI', async () => {
-		const { app } = testApp();
-		app.projects.create({ key: 'PE', name: 'Paging' }, 'test');
-		app.epics.create('PE', { title: 'E' }, 'test');
-		const result = (
-			await call(app, 'tools/call', { name: 'list_activity', arguments: { epic: 'PE-E1' } })
-		).result.structuredContent;
-		expect(result).toMatchObject({ limit: 50, offset: 0, hasMore: false, nextOffset: null });
-		expect(result.items).toBeInstanceOf(Array);
-		expect(result.items.items).toBeUndefined();
-
-		const tools = (await call(app, 'tools/list')).result.tools as {
-			name: string;
-			description: string;
-		}[];
-		expect(tools.find((t) => t.name === 'list_activity')?.description).toContain(
-			'Paginated, newest first'
-		);
-		const spec = JSON.stringify(buildOpenApi('http://localhost'));
-		expect(spec).toContain('use `offset`/`nextOffset` and `hasMore`');
-		const filtered = await call(app, 'tools/call', {
-			name: 'list_activity',
-			arguments: { epic: 'PE-E1' }
-		});
-		expect(
-			filtered.result.structuredContent.items.every((a: { epicId: string | null }) => a.epicId)
-		).toBe(true);
-	});
-
 	it('requires the agent to write the human brief over MCP only', async () => {
 		const { app } = testApp();
 		app.projects.create({ key: 'BR', name: 'Briefs' }, 'test');
@@ -242,7 +180,6 @@ describe('mcp', () => {
 			inputSchema: { required?: string[] };
 		}[];
 		expect(tools.find((t) => t.name === 'add_spec')?.inputSchema.required).toContain('brief');
-		expect(tools.find((t) => t.name === 'set_spec_brief')?.inputSchema.required).toContain('brief');
 
 		const missing = await tool('add_spec', {
 			epic: 'BR-E1',
@@ -273,9 +210,9 @@ describe('mcp', () => {
 		});
 		expect(rewritten.structuredContent.brief.summary).toBe('Checkout is much faster.');
 
-		const set = await tool('set_spec_brief', { spec: id, brief: { ...brief, effort: 'L' } });
+		const set = await tool('update_spec', { spec: id, brief: { ...brief, effort: 'L' } });
 		expect(set.structuredContent).toMatchObject({ content: '# Plan v2', brief: { effort: 'L' } });
-		const invalid = await tool('set_spec_brief', { spec: id, brief: { ...brief, effort: 'HUGE' } });
+		const invalid = await tool('update_spec', { spec: id, brief: { ...brief, effort: 'HUGE' } });
 		expect(invalid.isError).toBe(true);
 
 		const epicPlan = await tool('create_epic', {
@@ -293,6 +230,9 @@ describe('mcp', () => {
 		expect(plain.brief).toBeNull();
 		await expect(http('update_spec', { spec: id, content: 'edited' })).resolves.toMatchObject({
 			brief: null
+		});
+		await expect(http('update_spec', { spec: id, brief })).resolves.toMatchObject({
+			brief: { summary: brief.summary }
 		});
 	});
 
@@ -328,7 +268,7 @@ describe('project specs', () => {
 			Record<string, unknown> & { id: string }
 		>;
 
-	it('creates, lists and includes project specs in get_project', async () => {
+	it('creates project specs and includes them in get_project', async () => {
 		const { app } = testApp();
 		app.projects.create({ key: 'shop', name: 'Shop' }, 'test');
 		const created = await run(app, 'add_spec', {
@@ -337,13 +277,10 @@ describe('project specs', () => {
 			content: '# Rules'
 		});
 		expect(created).toMatchObject({ epicId: null, taskId: null, viewedAt: null });
-		const listed = (await run(app, 'list_specs', { project: 'shop' })) as unknown as {
-			id: string;
-		}[];
-		expect(listed.map((s) => s.id)).toEqual([created.id]);
-		expect(listed[0]).not.toHaveProperty('content');
 		const project = await run(app, 'get_project', { project: 'SHOP' });
-		expect(project.specs).toHaveLength(1);
+		const specs = project.specs as { id: string }[];
+		expect(specs.map((s) => s.id)).toEqual([created.id]);
+		expect(specs[0]).not.toHaveProperty('content');
 		expect(
 			app.activity.forProject('SHOP').items.find((item) => item.action === 'spec.created')
 		).toMatchObject({ epicId: null });
@@ -368,13 +305,15 @@ describe('project specs', () => {
 		await expect(
 			run(app, 'update_spec', { spec: id, title: 'Architecture' })
 		).resolves.toMatchObject({ title: 'Architecture' });
-		await expect(run(app, 'set_spec_brief', { spec: id, brief })).resolves.toMatchObject({
+		await expect(run(app, 'update_spec', { spec: id, brief })).resolves.toMatchObject({
 			brief: { summary: brief.summary }
 		});
 		const translated = await run(app, 'translate_spec', { spec: id, engine: 'heuristic' });
 		expect(translated.brief).not.toBeNull();
 		await run(app, 'delete_spec', { spec: id });
-		await expect(run(app, 'list_specs', { project: 'SHOP' })).resolves.toEqual([]);
+		await expect(run(app, 'get_project', { project: 'SHOP' })).resolves.toMatchObject({
+			specs: []
+		});
 	});
 
 	it('removes project specs with the project', async () => {
@@ -457,7 +396,7 @@ describe('viewed specs', () => {
 	it('resets when the content changes but not for brief-only changes', () => {
 		const { app, id } = setup();
 		app.specs.markViewed(id);
-		app.specs.setBrief(id, { brief }, 'claude');
+		app.specs.update(id, { brief }, 'claude');
 		expect(app.specs.get(id).viewedAt).not.toBeNull();
 		app.specs.update(id, { title: 'Renamed' }, 'claude');
 		expect(app.specs.get(id).viewedAt).not.toBeNull();
@@ -519,26 +458,23 @@ describe('epic questions', () => {
 			askedBy: 'claude',
 			answer: null
 		});
-		const all = await run(app, 'list_epic_questions', { epic: 'SHOP-E1' });
+		const all = (await run(app, 'get_epic', { epic: 'SHOP-E1' })).questions;
 		expect(all.map((q: { position: number }) => q.position)).toEqual([0, 1]);
 		expect(all[1]).toMatchObject({ context: null, options: [] });
 		await run(app, 'update_question', { question: all[1].id, status: 'ignored' });
-		const open = await run(app, 'list_epic_questions', { epic: 'SHOP-E1', status: 'open' });
+		const open = (await run(app, 'get_epic', { epic: 'SHOP-E1' })).questions.filter(
+			(q: { status: string }) => q.status === 'open'
+		);
 		expect(open).toHaveLength(1);
 		const epic = await run(app, 'get_epic', { epic: 'SHOP-E1' });
 		expect(epic.questions).toHaveLength(2);
 		expect(epic.openQuestions).toBe(1);
 		expect(epic.questionCount).toBe(2);
 		const openIn = async () => {
-			const listed = await run(app, 'list_epics', { project: 'SHOP' });
 			const project = await run(app, 'get_project', { project: 'SHOP' });
-			const find = (epics: { key: string; openQuestions: number; questionCount: number }[]) =>
-				epics.find((e) => e.key === 'SHOP-E1');
-			const count = (epics: Parameters<typeof find>[0]) => find(epics)?.openQuestions;
-			expect(find(listed)?.questionCount).toBe(2);
-			expect(find(project.epics)?.questionCount).toBe(2);
-			expect(count(project.epics)).toBe(count(listed));
-			return count(listed);
+			const found = project.epics.find((e: { key: string }) => e.key === 'SHOP-E1');
+			expect(found.questionCount).toBe(2);
+			return found.openQuestions;
 		};
 		expect(await openIn()).toBe(1);
 		await run(app, 'update_question', { question: open[0].id, answer: 'Stripe' });
@@ -552,12 +488,12 @@ describe('epic questions', () => {
 		const app = setup();
 		const [q] = await ask(app, '**Which** database should we use?');
 		await run(app, 'update_question', { question: q.id, answer: 'Postgres' }, 'nick');
-		const { items } = await run(app, 'list_activity', {});
-		const answered = items.find((i: { action: string }) => i.action === 'question.answered');
+		const { items } = app.activity.list({});
+		const answered = items.find((i) => i.action === 'question.answered')!;
 		expect(answered.message).toBe('Answered \u201cWhich database should we use?\u201d: Postgres');
 		expect(answered.data.questionId).toBe(q.id);
-		const added = items.find((i: { action: string }) => i.action === 'question.added');
-		expect(added.message).toBe('Asked \u201cWhich database should we use?\u201d on SHOP-E1');
+		const added = items.find((i) => i.action === 'question.added')!;
+		expect(added.message).toBe('Added thread \u201cWhich database should we use?\u201d on SHOP-E1');
 	});
 
 	it('answers, ignores, reopens, updates and deletes', async () => {
@@ -600,18 +536,17 @@ describe('epic questions', () => {
 		expect(first).toMatchObject({ questionId: q.id, author: 'dashboard', body: 'More **detail**' });
 		await run(app, 'update_question', { question: q.id, answer: 'Stripe' }, 'nick');
 		await run(app, 'reply_to_question', { question: q.id, body: 'Noted' }, 'claude');
-		const [listed] = await run(app, 'list_epic_questions', { epic: 'SHOP-E1' });
+		const epic = await run(app, 'get_epic', { epic: 'SHOP-E1' });
+		const [listed] = epic.questions;
 		expect(listed.status).toBe('answered');
 		expect(listed.messages.map((m: { author: string }) => m.author)).toEqual([
 			'dashboard',
 			'claude'
 		]);
-		const epic = await run(app, 'get_epic', { epic: 'SHOP-E1' });
-		expect(epic.questions[0].messages).toHaveLength(2);
 		expect(app.questions.get(q.id).messages).toHaveLength(2);
 
-		const { items } = await run(app, 'list_activity', {});
-		const replied = items.find((i: { action: string }) => i.action === 'question.replied');
+		const { items } = app.activity.list({});
+		const replied = items.find((i) => i.action === 'question.replied')!;
 		expect(replied.message).toBe('Replied in thread \u201cWhich?\u201d');
 		expect(replied.data).toMatchObject({ questionId: q.id, body: 'Noted' });
 
@@ -648,7 +583,7 @@ describe('epic questions', () => {
 				error: {
 					code: 'open_questions',
 					message:
-						'Epic SHOP-E1 has 2 open questions. Answer or ignore them before starting a task (list_epic_questions).'
+						'Epic SHOP-E1 has 2 open questions. Answer or ignore them before starting a task (get_epic).'
 				}
 			}
 		});
@@ -733,7 +668,7 @@ describe('epic questions', () => {
 			.map((i) => [i.action, i.actor, i.message])
 			.sort((x, y) => x[0].localeCompare(y[0]));
 		expect(entries).toEqual([
-			['question.added', 'claude', 'Asked 2 questions on SHOP-E1: \u201cWhich?\u201d +1 more'],
+			['question.added', 'claude', 'Added 2 threads on SHOP-E1: \u201cWhich?\u201d +1 more'],
 			['question.answered', 'nick', 'Answered \u201cWhich?\u201d: x'],
 			['question.deleted', 'nick', 'Deleted \u201cWhy?\u201d'],
 			['question.ignored', 'nick', 'Ignored \u201cWhy?\u201d'],
@@ -824,7 +759,7 @@ describe('task comments', () => {
 	const run = (app: App, name: string, input: object, actor = 'dashboard') =>
 		execute(app, operationsByName.get(name)!, input, { actor }) as Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-	it('adds a comment over REST with 201 and shows it in get_task and list_tasks', async () => {
+	it('adds a comment over REST with 201 and shows it in get_task and get_epic', async () => {
 		const app = setup();
 		expect(operationsByName.get('add_task_comment')).toMatchObject({
 			method: 'POST',
@@ -841,10 +776,9 @@ describe('task comments', () => {
 		const task = await run(app, 'get_task', { task: 'SHOP-1' });
 		expect(task.comments).toHaveLength(1);
 		expect(task.commentCount).toBe(1);
-		const [listed] = await run(app, 'list_tasks', { epic: 'SHOP-E1' });
+		const [listed] = (await run(app, 'get_epic', { epic: 'SHOP-E1' })).tasks;
 		expect(listed.commentCount).toBe(1);
 		expect(listed.comments).toBeUndefined();
-		expect(await run(app, 'list_task_comments', { task: 'SHOP-1' })).toHaveLength(1);
 
 		await expect(run(app, 'add_task_comment', { task: 'SHOP-1', body: ' ' })).rejects.toThrow();
 		await expect(run(app, 'add_task_comment', { task: 'SHOP-9', body: 'x' })).rejects.toMatchObject(
@@ -894,7 +828,7 @@ describe('task comments', () => {
 			author: 'claude',
 			body: 'Blocked on API'
 		});
-		expect(app.comments.list('SHOP-1')).toHaveLength(1);
+		expect(app.tasks.detail('SHOP-1').comments).toHaveLength(1);
 		const init = (await handleMcp(
 			app,
 			{ jsonrpc: '2.0', id: 2, method: 'initialize', params: {} },
@@ -910,7 +844,9 @@ describe('epic order', () => {
 			Record<string, unknown>
 		>;
 	const keys = async (app: ReturnType<typeof testApp>['app'], project = 'AAA') =>
-		((await run(app, 'list_epics', { project })) as unknown as { key: string }[]).map((e) => e.key);
+		(
+			(await run(app, 'get_project', { project })) as unknown as { epics: { key: string }[] }
+		).epics.map((e) => e.key);
 	function setup() {
 		const { app } = testApp();
 		for (const key of ['AAA', 'BBB']) {
@@ -948,9 +884,11 @@ describe('epic order', () => {
 		for (const stage of ['dev', 'test', 'deploy'])
 			await run(app, 'set_task_stage_status', { task: 'AAA-1', stage, status: 'done' });
 		const todo = async () =>
-			((await run(app, 'get_work_to_do', { project: 'AAA' })) as unknown as { key: string }[]).map(
-				(e) => e.key
-			);
+			(
+				(await run(app, 'get_project', { project: 'AAA', ready: true })) as unknown as {
+					epics: { key: string }[];
+				}
+			).epics.map((e) => e.key);
 		// E1 has an open question, E4 an unapproved spec, E6 is done
 		expect(await todo()).toEqual(['AAA-E2', 'AAA-E3', 'AAA-E5']);
 		await run(app, 'move_epic', { epic: 'AAA-E5', beforeEpic: 'AAA-E2' });
@@ -1089,7 +1027,7 @@ describe('merged operations', () => {
 	const run = (app: ReturnType<typeof setup>, name: string, input: object) =>
 		execute(app, operationsByName.get(name)!, input, { actor: 'claude' }) as Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-	it('add_spec and list_specs work for each owner', async () => {
+	it('add_spec works for each owner and get_project, get_epic and get_task list them', async () => {
 		const app = setup();
 		const p = await run(app, 'add_spec', { project: 'SHOP', title: 'P' });
 		const e = await run(app, 'add_spec', { epic: 'SHOP-E1', title: 'E' });
@@ -1099,18 +1037,10 @@ describe('merged operations', () => {
 			[false, true],
 			[false, false]
 		]);
-		expect(
-			(await run(app, 'list_specs', { project: 'SHOP' })).map((x: { id: string }) => x.id)
-		).toEqual(app.specs.listForProject('SHOP').map((x) => x.id));
-		expect(await run(app, 'list_specs', { epic: 'SHOP-E1' })).toEqual(
-			app.specs.listForEpic('SHOP-E1', undefined)
-		);
-		expect(await run(app, 'list_specs', { epic: 'SHOP-E1', includeTaskSpecs: 'true' })).toEqual(
-			app.specs.listForEpic('SHOP-E1', true)
-		);
-		expect(await run(app, 'list_specs', { task: 'SHOP-1' })).toEqual(
-			app.specs.listForTask('SHOP-1')
-		);
+		const ids = (specs: { id: string }[]) => specs.map((x) => x.id);
+		expect(ids((await run(app, 'get_project', { project: 'SHOP' })).specs)).toEqual([p.id]);
+		expect(ids((await run(app, 'get_epic', { epic: 'SHOP-E1' })).specs)).toContain(e.id);
+		expect(ids((await run(app, 'get_task', { task: 'SHOP-1' })).specs)).toContain(t.id);
 	});
 
 	it('rejects zero or several spec owners', async () => {
@@ -1120,10 +1050,6 @@ describe('merged operations', () => {
 		await expect(
 			run(app, 'add_spec', { project: 'SHOP', epic: 'SHOP-E1', title: 'x' })
 		).rejects.toThrow(message);
-		await expect(run(app, 'list_specs', {})).rejects.toThrow(message);
-		await expect(run(app, 'list_specs', { project: 'SHOP', task: 'SHOP-1' })).rejects.toThrow(
-			message
-		);
 	});
 
 	it('update_question answers, ignores and reopens through status', async () => {
@@ -1148,15 +1074,6 @@ describe('merged operations', () => {
 			answer: 'B'
 		});
 		expect(both).toMatchObject({ context: 'Why', status: 'answered', answer: 'B' });
-	});
-
-	it('list_activity filters by project and epic', async () => {
-		const app = setup();
-		const project = await run(app, 'list_activity', { project: 'OTHER' });
-		expect(project.items.length).toBeGreaterThan(0);
-		expect(project.total).toBe(app.activity.forProject('OTHER').total);
-		const epic = await run(app, 'list_activity', { epic: 'SHOP-E1' });
-		expect(epic.total).toBe(app.activity.forEpic('SHOP-E1').total);
 	});
 
 	it('no longer knows the removed operations', async () => {

@@ -4,7 +4,8 @@ import { inputJsonSchema } from '../api/openapi.ts';
 import type { Operation } from '../api/operation.ts';
 import { codingLevelPhrase, roleLabel } from '#lib/shared/domain/profile-guidance.ts';
 import { operations, operationsByName } from '../api/operations.ts';
-import { runInRequestContext } from '../core/request-context.ts';
+import { MCP_INSTRUCTIONS } from '../modules/guide/how-to.ts';
+import { currentSessionId, runInRequestContext } from '../core/request-context.ts';
 
 const SUPPORTED_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'];
 
@@ -13,30 +14,6 @@ export function instructionsFor(app: Container): string {
 	if (!profile) return MCP_INSTRUCTIONS;
 	return `${MCP_INSTRUCTIONS}\n\nUser: ${profile.name}, ${roleLabel(profile)}, ${codingLevelPhrase(profile.codingLevel)}${profile.language ? `, prefers ${profile.language}` : ''}. Guidance: ${guidance}`;
 }
-
-export const MCP_INSTRUCTIONS = `Briefline tracks software work for humans.
-Model: Project > Epic > Task.
-Every task moves through three stages: dev, test, deploy. Each stage is todo, in_progress or done.
-Typical flow for an agent:
-0. At the start of a session, and before resuming work, call get_last_session (with the project when you know it) to read what the previous session did, and get_activity_changes to see what people changed since your last pull (answered questions, moved tasks, edited specs).
-   Read get_user_profile and adapt your tone and every spec \`brief\` to the user's role and coding level.
-1. list_projects, then get_epic to read the plan and the current board.
-2. When you plan new work, call create_epic with tasks and specs in one call.
-   Before starting work on an epic, ask anything unclear with add_epic_questions (one call, several questions; add context and suggested options).
-   Questions are threads: a person can open one too, and anyone can add replies over time. Read the replies in each question's \`messages\` (list_epic_questions or get_epic), reply or act on threads a person opened, and add details or findings with reply_to_question.
-   When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Approval is a one-time gate: later spec changes keep the epic approved. Tasks cannot be started while an epic has open questions, whoever opened them. Read the answers and follow them; an ignored question means use your judgement.
-3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
-   A task that will not be done: update_task { cancelled: true, cancelReason }; it stays visible but leaves the progress. cancelled: false restores it.
-   Read a task's comments in get_task; people comment too, so act on their comments, and use add_task_comment to record findings, decisions or blockers on the task as you work.
-4. Attach your specs/plans as markdown with add_spec { project | epic | task }, always including the \`brief\` argument:
-   the plain-language summary for non-engineers is written by you, in the same call (set_spec_brief rewrites it alone).
-   Project-wide context (architecture, conventions, product goals) goes in project specs via add_spec { project }; read it with list_specs { project } before planning.
-   Add diagrams as \`\`\`mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
-   Attach screenshots with upload_attachment and embed the returned markdown in specs, task descriptions and comments.
-Linked tickets in Jira, GitHub, Linear, Plane or a webhook are updated automatically when ticket sync is on.
-5. Before you end your work, call set_session_summary with a short plain-language recap of what this session did, written for the user's profile. Call it again after later chunks of work; it overwrites the previous summary.
-Setup tools (projects, ticketing connections, profile) are listed only when the client connects with /mcp?tools=all.
-Ids and keys are interchangeable: PMA, PMA-E1 and PMA-12 work wherever an id is expected.`;
 
 interface JsonRpcRequest {
 	jsonrpc: '2.0';
@@ -151,8 +128,17 @@ async function dispatch(
 			return reply({ result: {} });
 		case 'tools/list':
 			return reply({ result: { tools: tools(options) } });
-		case 'tools/call':
-			return reply(await callTool(app, request.params ?? {}, actor));
+		case 'tools/call': {
+			const called = await callTool(app, request.params ?? {}, actor);
+			const sessionId = currentSessionId();
+			const meanwhile =
+				sessionId && called.result
+					? app.sessions.meanwhile(sessionId, app.sessions.actorOf(sessionId) ?? actor)
+					: null;
+			if (meanwhile)
+				called.result?.content.push({ type: 'text', text: JSON.stringify({ meanwhile }, null, 2) });
+			return reply(called);
+		}
 		default:
 			if (request.method.startsWith('notifications/')) return null;
 			return reply({
@@ -230,6 +216,7 @@ export async function handleMcpRequest(
 	} else if (sessionId) {
 		app.sessions.touch(sessionId, actor);
 	}
+	if (sessionId) actor = app.sessions.actorOf(sessionId) ?? actor;
 	const body = await runInRequestContext({ sessionId }, () =>
 		dispatchAll(app, payload, actor, options)
 	);
