@@ -1,9 +1,11 @@
 <script lang="ts">
 	import MessageSquarePlusIcon from '@lucide/svelte/icons/message-square-plus';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 
@@ -13,6 +15,7 @@
 	let title = $state('');
 	let details = $state('');
 	let busy = $state(false);
+	let detailsEl = $state<EditorView | null>(null);
 
 	$effect(() => {
 		if (open) {
@@ -62,7 +65,14 @@
 				/>
 			</Field>
 			<Field label="Details (markdown, optional)" for="thread-details">
-				<Textarea id="thread-details" bind:value={details} maxlength={10000} rows={5} />
+				<FormatToolbar view={detailsEl} />
+				<MarkdownEditor
+					id="thread-details"
+					bind:view={detailsEl}
+					bind:value={details}
+					maxlength={10000}
+					minRows={5}
+				/>
 			</Field>
 			<Dialog.Footer>
 				<Button type="submit" disabled={busy || title.trim() === ''}>Open thread</Button>

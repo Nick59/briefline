@@ -1,17 +1,20 @@
 <script lang="ts">
-	import { tick, type Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import {
 		AddImageButton,
-		imageUpload,
+		imageCommand,
+		imageUploadExtension,
 		type ImageTarget
 	} from '#lib/features/attachment-upload/index.ts';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
 	import { ChoiceSelect } from '#lib/shared/ui/choice-select/index.ts';
 	import { MarkdownViewer } from '#lib/shared/ui/markdown/index.ts';
@@ -19,6 +22,7 @@
 	import { SPEC_KINDS, SPEC_KIND_LABELS, type SpecKind } from '#lib/shared/domain/constants.ts';
 	import type { Spec } from '#lib/shared/domain/types.ts';
 	import { insertBlock, type DiagramTemplate } from '../model/diagram-templates.ts';
+	import { diagramCommands } from '../model/diagram-commands.ts';
 	import InsertDiagramMenu from './InsertDiagramMenu.svelte';
 
 	type Owner = { type: 'project' | 'epic' | 'task'; id: string };
@@ -38,7 +42,7 @@
 	let content = $state('');
 	let busy = $state(false);
 	let tab = $state('write');
-	let editor = $state<HTMLTextAreaElement | null>(null);
+	let editor = $state<EditorView | null>(null);
 
 	// A spec being created has no id yet, so its images go to the project.
 	const imageTarget = $derived<ImageTarget | null>(
@@ -51,14 +55,23 @@
 					: null
 	);
 
-	async function insertDiagram(template: DiagramTemplate) {
-		const cursor = editor?.selectionStart ?? content.length;
-		const result = insertBlock(content, cursor, template.source);
-		content = result.text;
+	function insertDiagram(template: DiagramTemplate) {
+		// The editor does not exist on the Preview tab; the block then goes at the end.
+		const text = editor ? editor.state.doc.toString() : content;
+		const at = editor ? editor.state.selection.main.head : text.length;
+		const result = insertBlock(text, at, template.source);
+		if (editor) {
+			const inserted = result.text.slice(at, at + result.text.length - text.length);
+			editor.dispatch({
+				changes: { from: at, insert: inserted },
+				selection: { anchor: result.cursor },
+				scrollIntoView: true
+			});
+			editor.focus();
+		} else {
+			content = result.text;
+		}
 		tab = 'write';
-		await tick();
-		editor?.focus();
-		editor?.setSelectionRange(result.cursor, result.cursor);
 	}
 
 	$effect(() => {
@@ -128,17 +141,19 @@
 						<Tabs.Trigger value="preview">Preview</Tabs.Trigger>
 					</Tabs.List>
 					<div class="flex items-center gap-1">
-						<AddImageButton textarea={editor} target={imageTarget} />
+						{#if tab === 'write'}<FormatToolbar view={editor} />{/if}
+						<AddImageButton view={editor} target={imageTarget} />
 						<InsertDiagramMenu oninsert={insertDiagram} />
 					</div>
 				</div>
 				<Tabs.Content value="write">
-					<Textarea
-						bind:ref={editor}
+					<MarkdownEditor
+						id="spec-content"
+						bind:view={editor}
 						bind:value={content}
-						{@attach imageUpload(() => imageTarget)}
-						rows={18}
-						class="font-mono text-xs leading-relaxed"
+						extensions={[imageUploadExtension(() => imageTarget)]}
+						commands={[...diagramCommands, imageCommand(() => imageTarget)]}
+						minRows={18}
 						aria-label="Markdown content"
 					/>
 				</Tabs.Content>

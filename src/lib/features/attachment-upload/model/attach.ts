@@ -1,43 +1,67 @@
-import type { Attachment } from 'svelte/attachments';
-import { insertImages, isImageFile, type ImageTarget } from './upload.ts';
+import type { Extension } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { insertText } from '#lib/shared/ui/markdown-editor/index.ts';
+import { toast } from 'svelte-sonner';
+import ImageIcon from '@lucide/svelte/icons/image-plus';
+import type { SlashCommand } from '#lib/shared/ui/markdown-editor/index.ts';
+import {
+	IMAGE_ACCEPT,
+	insertImages,
+	isImageFile,
+	type ImageSink,
+	type ImageTarget
+} from './upload.ts';
+
+export function viewSink(view: EditorView): ImageSink {
+	return {
+		insert: (text) => insertText(view, text),
+		replace(from, to) {
+			const at = view.state.doc.toString().indexOf(from);
+			if (at !== -1) view.dispatch({ changes: { from: at, to: at + from.length, insert: to } });
+		}
+	};
+}
 
 /**
- * Lets a markdown textarea take images by paste and drag and drop. The target is read on each
- * event; with no target (the owner does not exist yet) the textarea behaves as usual.
+ * Lets a markdown editor take images by paste and drag and drop. The target is read on each
+ * event; with no target (the owner does not exist yet) the editor behaves as usual.
  */
-export function imageUpload(getTarget: () => ImageTarget | null): Attachment<HTMLTextAreaElement> {
-	return (textarea) => {
-		const images = (files: FileList | null | undefined) => [...(files ?? [])].filter(isImageFile);
+export function imageUploadExtension(getTarget: () => ImageTarget | null): Extension {
+	const images = (files: FileList | null | undefined) => [...(files ?? [])].filter(isImageFile);
 
-		function onpaste(event: ClipboardEvent) {
+	function upload(files: File[], view: EditorView) {
+		const target = getTarget();
+		if (!target || files.length === 0) return false;
+		void insertImages(viewSink(view), files, target);
+		return true;
+	}
+
+	return EditorView.domEventHandlers({
+		paste: (event, view) => upload(images(event.clipboardData?.files), view),
+		dragover: (event) =>
+			!!getTarget() && [...(event.dataTransfer?.items ?? [])].some((i) => i.kind === 'file'),
+		drop: (event, view) => upload(images(event.dataTransfer?.files), view)
+	});
+}
+
+/** The `/image` slash command: opens the file picker and uploads the chosen images at the cursor. */
+export function imageCommand(getTarget: () => ImageTarget | null): SlashCommand {
+	return {
+		name: 'image',
+		label: 'Image',
+		detail: 'Upload a file',
+		icon: ImageIcon,
+		keywords: ['picture', 'photo', 'upload'],
+		apply(view, from, to) {
+			view.dispatch({ changes: { from, to }, selection: { anchor: from } });
 			const target = getTarget();
-			const files = images(event.clipboardData?.files);
-			if (!target || files.length === 0) return;
-			event.preventDefault();
-			void insertImages(textarea, files, target);
+			if (!target) return void toast.error('Save first to add images');
+			const input = document.createElement('input');
+			input.type = 'file';
+			input.accept = IMAGE_ACCEPT;
+			input.multiple = true;
+			input.onchange = () => void insertImages(viewSink(view), [...(input.files ?? [])], target);
+			input.click();
 		}
-
-		function ondragover(event: DragEvent) {
-			if (getTarget() && [...(event.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) {
-				event.preventDefault();
-			}
-		}
-
-		function ondrop(event: DragEvent) {
-			const target = getTarget();
-			const files = images(event.dataTransfer?.files);
-			if (!target || files.length === 0) return;
-			event.preventDefault();
-			void insertImages(textarea, files, target);
-		}
-
-		textarea.addEventListener('paste', onpaste);
-		textarea.addEventListener('dragover', ondragover);
-		textarea.addEventListener('drop', ondrop);
-		return () => {
-			textarea.removeEventListener('paste', onpaste);
-			textarea.removeEventListener('dragover', ondragover);
-			textarea.removeEventListener('drop', ondrop);
-		};
 	};
 }

@@ -14,7 +14,7 @@ function setup() {
 }
 
 describe('inbox', () => {
-	it('flags human task changes, ignores agents, and shows only new changes after an ack', async () => {
+	it('shows an agent the changes of others, never its own, and shows only new changes after an ack', async () => {
 		const { app, run, epic, actions } = setup();
 		const mine = await run('create_task', { epic: epic.key, title: 'Mine' });
 		await run('add_task_comment', { task: mine.key, body: 'Please look' });
@@ -35,17 +35,17 @@ describe('inbox', () => {
 		});
 		expect(actions(inbox[0])).toEqual(['task.created', 'task.commented', 'task.stage_changed']);
 		expect(await run('get_inbox', { project: 'AA' }, 'claude')).toHaveLength(1);
-		expect(app.inbox.count()).toBe(1);
+		expect(app.inbox.count('claude')).toBe(1);
 
 		expect(await run('ack_inbox', { items: [mine.key] }, 'claude')).toEqual({
 			acknowledged: [mine.key]
 		});
 		expect(await run('ack_inbox', { items: [mine.key] }, 'claude')).toEqual({ acknowledged: [] });
 		expect(await run('get_inbox', {}, 'claude')).toEqual([]);
-		expect(app.inbox.count()).toBe(0);
+		expect(app.inbox.count('claude')).toBe(0);
 
 		await run('add_task_comment', { task: mine.key, body: 'Again' });
-		expect(app.inbox.count()).toBe(1);
+		expect(app.inbox.count('claude')).toBe(1);
 		expect(actions((await run('get_inbox', {}, 'claude'))[0])).toEqual(['task.commented']);
 	});
 
@@ -102,7 +102,7 @@ describe('inbox', () => {
 		expect(await run('dismiss_inbox', { items: [task.key] })).toEqual({ dismissed: [task.key] });
 		expect(await run('get_inbox', {}, 'b')).toEqual([]);
 		expect(app.db.prepare('SELECT COUNT(*) AS n FROM inbox_acks').get()).toEqual({ n: 0 });
-		expect(app.inbox.list()).toEqual([]);
+		expect(app.inbox.list('dashboard')).toEqual([]);
 
 		await run('add_task_comment', { task: task.key, body: 'Back' });
 		const [item] = await run('get_inbox', {}, 'a');
@@ -110,14 +110,15 @@ describe('inbox', () => {
 		expect(item.ackedBy).toEqual([]);
 	});
 
-	it('flags an epic when a person opens a thread, not when an agent does', async () => {
-		const { run, epic, actions } = setup();
+	it('flags an epic for the others of whoever opens a thread', async () => {
+		const { app, run, epic, actions } = setup();
 		await run(
 			'add_epic_questions',
 			{ epic: epic.key, questions: [{ question: 'Which?' }] },
 			'claude'
 		);
 		expect(await run('get_inbox', {}, 'claude')).toEqual([]);
+		expect(app.inbox.list('dashboard')).toHaveLength(1);
 
 		await run('add_epic_questions', { epic: epic.key, questions: [{ question: 'Why?' }] });
 		const [item] = await run('get_inbox', {}, 'claude');
@@ -167,6 +168,69 @@ describe('inbox', () => {
 
 		await run('delete_task', { task: task.key });
 		expect(await run('get_inbox', {}, 'a')).toEqual([]);
-		expect(app.inbox.count()).toBe(0);
+		expect(app.inbox.count('a')).toBe(0);
+	});
+
+	it('shows a person the changes of agents, never their own', async () => {
+		const { app, run, epic, actions } = setup();
+		const task = await run('create_task', { epic: epic.key, title: 'T' });
+		expect(app.inbox.list('dashboard')).toEqual([]);
+		expect(app.inbox.count('dashboard')).toBe(0);
+
+		await run('add_task_comment', { task: task.key, body: 'From A' }, 'a');
+		const seen = app.inbox.list('dashboard');
+		expect(seen).toHaveLength(1);
+		expect(actions(seen[0])).toEqual(['task.commented']);
+		expect(app.inbox.count('dashboard')).toBe(1);
+		expect(actions((await run('get_inbox', {}, 'b'))[0])).toEqual([
+			'task.created',
+			'task.commented'
+		]);
+		expect(actions((await run('get_inbox', {}, 'a'))[0])).toEqual(['task.created']);
+	});
+
+	it('does not count an item whose new changes are all the viewer own', async () => {
+		const { app, run, epic } = setup();
+		const task = await run('create_task', { epic: epic.key, title: 'T' }, 'a');
+		await run('add_task_comment', { task: task.key, body: 'Mine' }, 'a');
+		expect(await run('get_inbox', {}, 'a')).toEqual([]);
+		expect(app.inbox.count('a')).toBe(0);
+		expect(app.inbox.list('dashboard')).toHaveLength(1);
+
+		await run('add_task_comment', { task: task.key, body: 'Mine too' });
+		expect(app.inbox.list('dashboard')).toHaveLength(1);
+		app.inbox.markSeen([task.key]);
+		await run('add_task_comment', { task: task.key, body: 'Person own' });
+		expect(app.inbox.list('dashboard')).toEqual([]);
+		expect(app.inbox.count('dashboard')).toBe(0);
+		expect(app.inbox.count('a')).toBe(1);
+	});
+
+	it('marks seen for the person only', async () => {
+		const { app, run, epic } = setup();
+		const task = await run('create_task', { epic: epic.key, title: 'T' }, 'a');
+		expect(await run('mark_inbox_seen', { items: [task.key] })).toEqual({
+			acknowledged: [task.key]
+		});
+		expect(app.inbox.count('dashboard')).toBe(0);
+		expect(await run('get_inbox', {}, 'b')).toHaveLength(1);
+
+		await run('add_task_comment', { task: task.key, body: 'More' }, 'b');
+		expect(app.inbox.count('dashboard')).toBe(1);
+	});
+
+	it('shows an item again to an agent when another agent changes it after its ack', async () => {
+		const { run, epic, actions } = setup();
+		const task = await run('create_task', { epic: epic.key, title: 'T' });
+		await run('ack_inbox', { items: [task.key] }, 'a');
+		expect(await run('get_inbox', {}, 'a')).toEqual([]);
+		await run('add_task_comment', { task: task.key, body: 'From B' }, 'b');
+		expect(actions((await run('get_inbox', {}, 'a'))[0])).toEqual(['task.commented']);
+	});
+
+	it('refuses acknowledgements under a person name', async () => {
+		const { run, epic } = setup();
+		const task = await run('create_task', { epic: epic.key, title: 'T' }, 'a');
+		await expect(run('ack_inbox', { items: [task.key] })).rejects.toMatchObject({ status: 400 });
 	});
 });

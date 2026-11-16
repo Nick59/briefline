@@ -216,15 +216,16 @@ tool. Without a topic it returns the overview and the list of topics: `overview`
 
 ### Inbox
 
-Every change a person makes to a task (create, edit, cancel, restore, comment, stage change), and every thread a person
-adds to or answers on an epic, flags it in the **Inbox** (`/inbox`); agent changes never do. Each agent has its own state.
+Every change to a task (create, edit, cancel, restore, comment, stage change), and every thread added to or answered on an
+epic, flags it in the **Inbox** (`/inbox`) for everyone except whoever made it: the person sees what agents changed, an
+agent sees what people and other agents changed. Each viewer has its own state.
 `get_inbox` (`GET /api/v1/inbox`, optional `project`) lists the items the calling agent has not acknowledged up to their
-latest change, oldest first, each with `kind` (`task` or `epic`), `key`, `changes` (the people's activity since that agent's
+latest change, oldest first, each with `kind` (`task` or `epic`), `key`, `changes` (the others' activity since that agent's
 last acknowledgement), `seq`, `ackedBy` (`[{ agent, ackedAt, upToDate }]`) and, for tasks, the `assignee`. After handling
 items, an agent calls `ack_inbox` (`POST /api/v1/inbox/ack`) with `{ "items": ["SHOP-12", { "item": "SHOP-E1", "seq": 42 }] }`:
 a key acknowledges up to the latest change, `{ item, seq }` up to the `seq` the agent read, so a change that arrived in
 between stays visible. Acknowledging is idempotent and per agent; an unknown key fails and acknowledges nothing. On the
-dashboard, **Dismiss** (`dismiss_inbox`, not an MCP tool) clears an item for every agent; a later human change flags it again.
+dashboard, **Mark seen** (`mark_inbox_seen`, not an MCP tool) clears an item for the person only, and **Dismiss** (`dismiss_inbox`, not an MCP tool) clears it for everyone; a later change flags it again.
 
 ### Agents
 

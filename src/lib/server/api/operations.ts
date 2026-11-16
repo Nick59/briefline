@@ -203,11 +203,11 @@ export const operations: Operation[] = [
 		method: 'GET',
 		path: '/inbox',
 		tag: 'Inbox',
-		summary: 'Tasks and epics that people changed since you last acknowledged them',
+		summary: 'Tasks and epics that others changed since you last acknowledged them',
 		description:
-			"Tasks a person created, commented or moved, and epics where a person added or answered a thread, that you have not acknowledged up to their latest change, oldest first. Each item has its `changes` (the people's activity entries after your last acknowledgement), `seq` (pass it to ack_inbox), `ackedBy` (the other agents that acknowledged it and whether they are up to date) and, for tasks, the current `assignee`. Read `changes`, act on them, then call ack_inbox.",
+			"Tasks that people or other agents created, commented or moved, and epics where they added or answered a thread, that you have not acknowledged up to their latest change, oldest first. Your own changes never show. Each item has its `changes` (the others' activity entries after your last acknowledgement), `seq` (pass it to ack_inbox), `ackedBy` (the other agents that acknowledged it and whether they are up to date) and, for tasks, the current `assignee`. Read `changes`, act on them, then call ack_inbox.",
 		input: z.object({ project: project.optional() }),
-		run: (app, { project }, { actor }) => app.inbox.list(project, actor)
+		run: (app, { project }, { actor }) => app.inbox.list(actor, project)
 	}),
 	defineOperation({
 		name: 'ack_inbox',
@@ -216,7 +216,7 @@ export const operations: Operation[] = [
 		tag: 'Inbox',
 		summary: 'Acknowledge inbox items once handled',
 		description:
-			'Marks items handled for you only; other agents still see them until they acknowledge too. Pass `{ item, seq }` with the `seq` from get_inbox so a person change that arrived since is not acknowledged unseen; a plain key acknowledges up to the latest change. Safe to repeat. An unknown key fails and acknowledges nothing. A later change by a person shows the item again with only the new changes. Returns `acknowledged`: the keys whose acknowledgement advanced.',
+			'Marks items handled for you only; other agents still see them until they acknowledge too. Pass `{ item, seq }` with the `seq` from get_inbox so a change that arrived since is not acknowledged unseen; a plain key acknowledges up to the latest change. Safe to repeat. An unknown key fails and acknowledges nothing. A later change by someone else shows the item again with only the new changes. Returns `acknowledged`: the keys whose acknowledgement advanced.',
 		input: z.object({
 			items: z
 				.array(
@@ -237,12 +237,26 @@ export const operations: Operation[] = [
 		tag: 'Inbox',
 		summary: 'Remove inbox items for every agent',
 		description:
-			'Deletes the items and all acknowledgements; a later person change flags them again. An unknown key fails and dismisses nothing. Returns `dismissed`: the keys that were in the inbox.',
+			'Deletes the items and all acknowledgements; a later change flags them again. An unknown key fails and dismisses nothing. Returns `dismissed`: the keys that were in the inbox.',
 		input: z.object({
 			items: z.array(z.string().min(1)).min(1).describe('Task or epic keys (e.g. PMA-12 or PMA-E1)')
 		}),
 		mcp: { excluded: true },
 		run: (app, { items }) => app.inbox.dismiss(items)
+	}),
+	defineOperation({
+		name: 'mark_inbox_seen',
+		method: 'POST',
+		path: '/inbox/seen',
+		tag: 'Inbox',
+		summary: 'Mark inbox items seen by the person',
+		description:
+			'Clears items from the person inbox up to their latest change; agents still see them until they acknowledge. Returns `acknowledged`: the keys whose acknowledgement advanced.',
+		input: z.object({
+			items: z.array(z.string().min(1)).min(1).describe('Task or epic keys (e.g. PMA-12 or PMA-E1)')
+		}),
+		mcp: { excluded: true },
+		run: (app, { items }) => app.inbox.markSeen(items)
 	}),
 
 	// Sessions

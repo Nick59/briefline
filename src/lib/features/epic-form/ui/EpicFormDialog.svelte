@@ -1,11 +1,13 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import { resolve } from '$app/paths';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import type { Epic, EpicDetail } from '#lib/shared/domain/types.ts';
@@ -24,6 +26,7 @@
 	let summary = $state('');
 	let targetDate = $state('');
 	let busy = $state(false);
+	let summaryEl = $state<EditorView | null>(null);
 
 	$effect(() => {
 		if (open) {
@@ -94,12 +97,13 @@
 				for="epic-summary"
 				hint="The outcome in plain language."
 			>
-				<Textarea
+				<FormatToolbar view={summaryEl} />
+				<MarkdownEditor
 					id="epic-summary"
+					bind:view={summaryEl}
 					bind:value={summary}
 					maxlength={5000}
-					rows={10}
-					class="font-mono text-xs leading-relaxed"
+					minRows={10}
 				/>
 			</Field>
 			<Field label="Target date" for="epic-target">

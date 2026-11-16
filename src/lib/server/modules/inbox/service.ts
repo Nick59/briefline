@@ -2,7 +2,7 @@ import type { InboxItem } from '#lib/shared/domain/types.ts';
 import { HUMAN_ACTORS, isHumanActor } from '#lib/shared/domain/actors.ts';
 import { transaction } from '../../db/connection.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
-import { NotFoundError } from '../../core/errors.ts';
+import { InvalidInputError, NotFoundError } from '../../core/errors.ts';
 import { now } from '../../core/ids.ts';
 import { requireProject } from '../../core/lookup.ts';
 import { MAX_ACTIVITY_LIST_SIZE } from '../activity/repository.ts';
@@ -29,18 +29,29 @@ export class InboxService {
 					: event.epicId && event.type.startsWith('question.') && event.type !== 'question.deleted'
 						? { epicId: event.epicId }
 						: null;
-			if (!target || !isHumanActor(event.actor, deps.repos.profile.get()?.name)) return;
+			if (!target) return;
 			deps.repos.inbox.flag(target, deps.repos.activity.head(), now());
 		});
 	}
 
-	/** With an agent, the items it has not acknowledged up to their latest change; without, all of them. */
-	list(project?: string, agent?: string): InboxItem[] {
+	/** The viewer of a person's dashboard; acknowledgements by any human actor are stored under it. */
+	static readonly PERSON = 'dashboard';
+
+	/** Whoever calls as a person sees the person's inbox; an agent sees its own. */
+	#viewer(actor: string) {
 		const { repos } = this.deps;
 		const name = repos.profile.get()?.name;
-		const people = name ? [...HUMAN_ACTORS, name] : [...HUMAN_ACTORS];
+		return isHumanActor(actor, name)
+			? { ack: InboxService.PERSON, exclude: name ? [...HUMAN_ACTORS, name] : [...HUMAN_ACTORS] }
+			: { ack: actor, exclude: [actor] };
+	}
+
+	/** Items with changes by others since the viewer's acknowledgement, oldest first. */
+	list(viewer: string, project?: string): InboxItem[] {
+		const { repos } = this.deps;
+		const { ack, exclude } = this.#viewer(viewer);
 		return repos.inbox
-			.list(project ? requireProject(repos, project).id : undefined, agent)
+			.list(ack, exclude, project ? requireProject(repos, project).id : undefined)
 			.flatMap((row) => {
 				const task = row.taskId ? repos.tasks.find(row.taskId) : undefined;
 				const epic = repos.epics.find(row.epicId ?? task?.epicId ?? '');
@@ -50,7 +61,7 @@ export class InboxService {
 					.list({
 						...(task ? { taskId: task.id } : { epicId: epic.id, actionPrefix: 'question.' }),
 						sinceSeq: row.ackedSeq === null ? row.sinceSeq : row.ackedSeq + 1,
-						actorIn: people,
+						actorNotIn: exclude,
 						limit: MAX_ACTIVITY_LIST_SIZE
 					})
 					.items.reverse();
@@ -75,9 +86,15 @@ export class InboxService {
 			});
 	}
 
-	count(project?: string): number {
+	count(viewer: string, project?: string): number {
 		const { repos } = this.deps;
-		return repos.inbox.count(project ? requireProject(repos, project).id : undefined);
+		const { ack, exclude } = this.#viewer(viewer);
+		return repos.inbox.count(ack, exclude, project ? requireProject(repos, project).id : undefined);
+	}
+
+	/** Acknowledges for the person, up to each item's latest change. */
+	markSeen(items: string[]): { acknowledged: string[] } {
+		return this.#ack(InboxService.PERSON, items);
 	}
 
 	/**
@@ -85,6 +102,15 @@ export class InboxService {
 	 * latest change. An unknown key fails before anything is acknowledged.
 	 */
 	ack(
+		agent: string,
+		items: (string | { item: string; seq: number })[]
+	): { acknowledged: string[] } {
+		if (this.#viewer(agent).ack === InboxService.PERSON)
+			throw new InvalidInputError('People mark inbox items seen in the dashboard');
+		return this.#ack(agent, items);
+	}
+
+	#ack(
 		agent: string,
 		items: (string | { item: string; seq: number })[]
 	): { acknowledged: string[] } {
@@ -109,7 +135,7 @@ export class InboxService {
 		};
 	}
 
-	/** Removes items for every agent; a later person's change flags them again. */
+	/** Removes items for every agent; a later change flags them again. */
 	dismiss(items: string[]): { dismissed: string[] } {
 		const targets = items.map((item) => this.#resolve(item));
 		return {

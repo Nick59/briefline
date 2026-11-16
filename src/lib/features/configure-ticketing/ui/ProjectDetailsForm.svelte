@@ -1,12 +1,15 @@
 <script lang="ts">
 	import {
 		AddImageButton,
-		imageUpload,
+		imageCommand,
+		imageUploadExtension,
 		type ImageTarget
 	} from '#lib/features/attachment-upload/index.ts';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import type { Project } from '#lib/shared/domain/types.ts';
@@ -15,7 +18,7 @@
 	let name = $state('');
 	let description = $state('');
 	let busy = $state(false);
-	let descriptionEl = $state<HTMLTextAreaElement | null>(null);
+	let descriptionEl = $state<EditorView | null>(null);
 	const imageTarget = $derived<ImageTarget>({ type: 'project', id: project.id });
 
 	$effect.pre(() => {
@@ -45,15 +48,16 @@
 		>
 	</div>
 	<Field label="Description" for="project-description">
-		<Textarea
+		<FormatToolbar view={descriptionEl} />
+		<MarkdownEditor
 			id="project-description"
-			bind:ref={descriptionEl}
+			bind:view={descriptionEl}
 			bind:value={description}
-			{@attach imageUpload(() => imageTarget)}
-			rows={3}
+			extensions={[imageUploadExtension(() => imageTarget)]}
+			commands={[imageCommand(() => imageTarget)]}
 		/>
 		<div class="flex justify-end">
-			<AddImageButton textarea={descriptionEl} target={imageTarget} />
+			<AddImageButton view={descriptionEl} target={imageTarget} />
 		</div>
 	</Field>
 	<div><Button type="submit" disabled={busy || !name}>Save</Button></div>

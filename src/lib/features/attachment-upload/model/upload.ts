@@ -2,6 +2,8 @@ import { toast } from 'svelte-sonner';
 
 export type ImageTarget = { type: 'project' | 'task' | 'spec'; id: string };
 
+export const IMAGE_ACCEPT = 'image/png,image/jpeg,image/gif,image/webp';
+
 const MAX_BYTES = 10 * 1024 * 1024;
 
 export const isImageFile = (file: File) => file.type.startsWith('image/');
@@ -17,15 +19,16 @@ async function uploadImage(file: File, target: ImageTarget): Promise<string> {
 	return body.markdown;
 }
 
-/** Changing the value from code does not notify a bound textarea unless it receives an input event. */
-function setValue(textarea: HTMLTextAreaElement, value: string) {
-	textarea.value = value;
-	textarea.dispatchEvent(new Event('input', { bubbles: true }));
+export interface ImageSink {
+	/** Inserts text at the cursor. */
+	insert(text: string): void;
+	/** Swaps the first occurrence of `from` for `to`; nothing happens when it is gone. */
+	replace(from: string, to: string): void;
 }
 
 /** Inserts a placeholder at the cursor per image, then swaps each for the markdown the server returns. */
 export async function insertImages(
-	textarea: HTMLTextAreaElement,
+	sink: ImageSink,
 	files: File[],
 	target: ImageTarget
 ): Promise<void> {
@@ -37,8 +40,7 @@ export async function insertImages(
 				toast.error(`${name} is larger than 10 MB`);
 				return;
 			}
-			textarea.setRangeText(placeholder, textarea.selectionStart, textarea.selectionEnd, 'end');
-			setValue(textarea, textarea.value);
+			sink.insert(placeholder);
 			let replacement = '';
 			try {
 				replacement = await uploadImage(file, target);
@@ -46,13 +48,7 @@ export async function insertImages(
 				toast.error(error instanceof Error ? error.message : 'Upload failed');
 			}
 			// The user may have kept typing, so the placeholder is found again instead of using its old offset.
-			const at = textarea.value.indexOf(placeholder);
-			if (at !== -1) {
-				setValue(
-					textarea,
-					textarea.value.replace(placeholder, () => replacement)
-				);
-			}
+			sink.replace(placeholder, replacement);
 		})
 	);
 }

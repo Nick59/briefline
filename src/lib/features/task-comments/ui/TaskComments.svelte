@@ -1,15 +1,18 @@
 <script lang="ts">
 	import {
 		AddImageButton,
-		imageUpload,
+		imageCommand,
+		imageUploadExtension,
 		type ImageTarget
 	} from '#lib/features/attachment-upload/index.ts';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { ConfirmAction } from '#lib/shared/ui/confirm-action/index.ts';
 	import { MarkdownViewer } from '#lib/shared/ui/markdown/index.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
@@ -29,8 +32,8 @@
 	let busy = $state(false);
 	let editingId = $state<string | null>(null);
 	let editDraft = $state('');
-	let draftEl = $state<HTMLTextAreaElement | null>(null);
-	let editEl = $state<HTMLTextAreaElement | null>(null);
+	let draftEl = $state<EditorView | null>(null);
+	let editEl = $state<EditorView | null>(null);
 	const imageTarget = $derived<ImageTarget>({ type: 'task', id: taskId });
 
 	const text = $derived(draft.trim());
@@ -62,13 +65,6 @@
 
 	const remove = (comment: TaskComment) =>
 		runOperation('delete_task_comment', { comment: comment.id }, { success: 'Deleted comment' });
-
-	function submitOnModEnter(event: KeyboardEvent, submit: () => void) {
-		if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-			event.preventDefault();
-			submit();
-		}
-	}
 </script>
 
 <Section title="Comments" count={comments.length}>
@@ -117,16 +113,18 @@
 						{/if}
 					</div>
 					{#if editingId === comment.id}
-						<Textarea
-							bind:ref={editEl}
+						<MarkdownEditor
+							id="edit-comment-{comment.id}"
+							bind:view={editEl}
 							bind:value={editDraft}
-							{@attach imageUpload(() => imageTarget)}
-							rows={3}
+							extensions={[imageUploadExtension(() => imageTarget)]}
+							commands={[imageCommand(() => imageTarget)]}
 							aria-label="Edit comment"
-							onkeydown={(event) => submitOnModEnter(event, () => save(comment))}
+							onsubmit={() => save(comment)}
 						/>
 						<div class="flex justify-end gap-2">
-							<AddImageButton textarea={editEl} target={imageTarget} class="mr-auto" />
+							<FormatToolbar view={editEl} class="mr-auto" />
+							<AddImageButton view={editEl} target={imageTarget} />
 							<Button variant="outline" size="sm" onclick={() => (editingId = null)}>Cancel</Button>
 							<Button size="sm" disabled={busy || editText === ''} onclick={() => save(comment)}
 								>Save</Button
@@ -141,17 +139,19 @@
 	{/if}
 
 	<div class="grid gap-2">
-		<Textarea
-			bind:ref={draftEl}
+		<MarkdownEditor
+			id="new-comment"
+			bind:view={draftEl}
 			bind:value={draft}
-			{@attach imageUpload(() => imageTarget)}
-			rows={3}
+			extensions={[imageUploadExtension(() => imageTarget)]}
+			commands={[imageCommand(() => imageTarget)]}
 			placeholder="Write a comment (markdown). Ctrl or ⌘ + Enter to post."
 			aria-label="New comment"
-			onkeydown={(event) => submitOnModEnter(event, add)}
+			onsubmit={add}
 		/>
 		<div class="flex justify-end gap-2">
-			<AddImageButton textarea={draftEl} target={imageTarget} class="mr-auto" />
+			<FormatToolbar view={draftEl} class="mr-auto" />
+			<AddImageButton view={draftEl} target={imageTarget} />
 			<Button size="sm" onclick={add} disabled={busy || text === ''}>Comment</Button>
 		</div>
 	</div>

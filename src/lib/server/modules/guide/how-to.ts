@@ -49,13 +49,13 @@ Tools: how_to, list_projects, get_project, get_epic, get_task, update_task, set_
 
 const INBOX = `# Inbox
 
-The inbox lists tasks and epics that people changed since you last acknowledged them.
+The inbox lists tasks and epics that others (people and other agents) changed since you last acknowledged them. Your own changes never show.
 
-- Flagged by people only (dashboard, seed or the profile name), never by agents. Tasks: created, updated, cancelled, restored, commented, comment edited or deleted, stage changed. Epics: a thread (question) added, edited, answered, ignored, reopened or replied to.
-- Per-agent state: acknowledging only clears the item for you. Other agents still see it until they acknowledge too.
-- get_inbox { project? } returns items oldest first. Each has changes (people's activity after your last acknowledgement), seq, ackedBy (other agents that acknowledged it, with upToDate telling if they saw the latest change) and, for tasks, the assignee.
-- ack_inbox { items: [{ item, seq }] } with the seq you received, so a person's change that arrived meanwhile is not acknowledged unseen. A plain key acknowledges up to the latest change. It is safe to repeat; an unknown key fails and acknowledges nothing.
-- A later person change shows the item again with only the new changes.
+- Flagged by any actor. Tasks: created, updated, cancelled, restored, commented, comment edited or deleted, stage changed. Epics: a thread (question) added, edited, answered, ignored, reopened or replied to.
+- Per-agent state: acknowledging only clears the item for you. Other agents and the person still see it until they acknowledge too.
+- get_inbox { project? } returns items oldest first. Each has changes (others' activity after your last acknowledgement), seq, ackedBy (other agents that acknowledged it, with upToDate telling if they saw the latest change) and, for tasks, the assignee.
+- ack_inbox { items: [{ item, seq }] } with the seq you received, so a change that arrived meanwhile is not acknowledged unseen. A plain key acknowledges up to the latest change. It is safe to repeat; an unknown key fails and acknowledges nothing.
+- A later change by someone else shows the item again with only the new changes.
 - Dismissing an item for every agent is dashboard-only; there is no tool for it.
 
 Typical loop: get_inbox, act on each item's changes, ack_inbox with its seq.
@@ -83,7 +83,7 @@ Epic questions are threads. Ask before starting an epic when anything is unclear
 - Status: open (waiting for a person), answered (follow the answer), ignored (use your own judgement). update_question { status } answers (with answer), ignores or reopens (clears the answer); it also edits the text, context or options.
 - Gate: while any question of an epic is open, whoever opened it, its tasks cannot start (409 open_questions).
 - Gate: when an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (409 specs_not_approved). Epics without specs need no approval. Creating tasks is never blocked. Approval is one-time: later spec changes keep the epic approved.
-- Thread activity by people flags the epic in your inbox.
+- Thread activity by others flags the epic in your inbox.
 
 Tools: add_epic_questions, reply_to_question, update_question, delete_question, approve_epic_specs, get_epic, get_project`;
 
@@ -125,7 +125,7 @@ const TOPIC_TEXT: Record<HowToTopic, string> = {
 const TOPIC_SUMMARY: Record<HowToTopic, string> = {
 	overview: 'projects, epics, tasks, stages, people, agents, profile, sessions',
 	workflow: 'the step-by-step flow an agent follows',
-	inbox: 'what people changed since you last acknowledged it',
+	inbox: 'what others changed since you last acknowledged it',
 	agents: 'register_agent, names, claiming tasks, the meanwhile block, presence',
 	threads: 'epic questions, replies, and the gates that block starting tasks',
 	specs: 'project, epic and task specs, the brief, diagrams, attachments, versions',

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { resolve } from '$app/paths';
 	import { ActivityItem } from '#lib/entities/activity/index.ts';
@@ -14,6 +15,12 @@
 
 	let busy = $state<string | null>(null);
 
+	async function markSeen(key: string) {
+		busy = key;
+		await runOperation('mark_inbox_seen', { items: [key] }, { success: `Marked ${key} seen` });
+		busy = null;
+	}
+
 	async function dismiss(key: string) {
 		busy = key;
 		await runOperation('dismiss_inbox', { items: [key] }, { success: `Dismissed ${key}` });
@@ -24,15 +31,14 @@
 <div class="max-w-4xl space-y-6">
 	<PageHeader title="Inbox">
 		{#snippet description()}
-			Tasks and epics you changed, commented on or opened threads in. Each agent acknowledges them
-			on its own; dismiss an item to clear it for every agent.
+			Changes agents made to tasks and threads since you last looked.
 		{/snippet}
 	</PageHeader>
 
 	{#if items.length === 0}
 		<EmptyState
-			title="Inbox is empty"
-			description="Tasks and epics appear here when a person changes them, until you dismiss them."
+			title="You're up to date"
+			description="Tasks and threads appear here when an agent changes them."
 		/>
 	{:else}
 		<ul class="grid gap-4">
@@ -69,12 +75,18 @@
 								</p>
 							{/if}
 						</div>
-						<Button
-							size="sm"
-							variant="outline"
-							disabled={busy === item.key}
-							onclick={() => dismiss(item.key)}><XIcon />Dismiss</Button
-						>
+						<div class="flex gap-2">
+							<Button size="sm" disabled={busy === item.key} onclick={() => markSeen(item.key)}
+								><CheckIcon />Mark seen</Button
+							>
+							<Button
+								size="sm"
+								variant="outline"
+								title="Dismiss for everyone"
+								disabled={busy === item.key}
+								onclick={() => dismiss(item.key)}><XIcon />Dismiss</Button
+							>
+						</div>
 					</div>
 					<ol class="divide-y divide-border/70 rounded-xl border bg-card px-4">
 						{#each item.changes as change (change.id)}

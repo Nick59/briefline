@@ -7,7 +7,7 @@ export type InboxRow = {
 	sinceSeq: number;
 	lastSeq: number;
 	flaggedAt: string;
-	/** The calling agent's acknowledged sequence number. */
+	/** The viewer's acknowledged sequence number. */
 	ackedSeq: number | null;
 } & ({ taskId: string; epicId: null } | { taskId: null; epicId: string });
 
@@ -43,6 +43,13 @@ const scope = (projectId?: string) =>
 
 const whereOf = (conditions: string[]) =>
 	conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+// Epic items only watch thread events, as the activity list in the service does.
+const UNREAD = `EXISTS (
+	SELECT 1 FROM activity a
+	WHERE a.seq > COALESCE(k.acked_seq, i.since_seq - 1)
+	  AND a.actor NOT IN (SELECT value FROM json_each(:exclude))
+	  AND (a.task_id = i.task_id OR (a.epic_id = i.epic_id AND a.action LIKE 'question.%')))`;
 
 export class InboxRepository {
 	constructor(private readonly db: Db) {}
@@ -94,18 +101,15 @@ export class InboxRepository {
 		return Number(result.changes) > 0;
 	}
 
-	/** With an agent, only the items it has not acknowledged up to their latest change. */
-	list(projectId?: string, agent?: string): InboxRow[] {
+	/** Items with activity after the viewer's acknowledgement by anyone outside `exclude`, oldest first. */
+	list(viewer: string, exclude: string[], projectId?: string): InboxRow[] {
 		const { join, where, params } = scope(projectId);
-		const conditions = agent
-			? [...where, '(k.acked_seq IS NULL OR k.acked_seq < i.last_seq)']
-			: where;
 		return all<Row>(
 			this.db,
 			`SELECT i.*, k.acked_seq FROM inbox i ${join}
-			 LEFT JOIN inbox_acks k ON k.item_id = i.id AND k.agent = :agent
-			 ${whereOf(conditions)} ORDER BY i.since_seq`,
-			{ ...params, agent: agent ?? null }
+			 LEFT JOIN inbox_acks k ON k.item_id = i.id AND k.agent = :viewer
+			 ${whereOf([...where, UNREAD])} ORDER BY i.since_seq`,
+			{ ...params, viewer, exclude: JSON.stringify(exclude) }
 		).map(
 			(row) =>
 				({
@@ -120,17 +124,14 @@ export class InboxRepository {
 		);
 	}
 
-	/** Items with a change that no agent has acknowledged. */
-	count(projectId?: string): number {
+	count(viewer: string, exclude: string[], projectId?: string): number {
 		const { join, where, params } = scope(projectId);
 		return one<{ n: number }>(
 			this.db,
 			`SELECT COUNT(*) AS n FROM inbox i ${join}
-			 ${whereOf([
-					...where,
-					'i.last_seq > COALESCE((SELECT MAX(acked_seq) FROM inbox_acks WHERE item_id = i.id), 0)'
-				])}`,
-			params
+			 LEFT JOIN inbox_acks k ON k.item_id = i.id AND k.agent = :viewer
+			 ${whereOf([...where, UNREAD])}`,
+			{ ...params, viewer, exclude: JSON.stringify(exclude) }
 		)!.n;
 	}
 }

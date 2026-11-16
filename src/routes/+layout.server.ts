@@ -22,6 +22,6 @@ export const load: LayoutServerLoad = ({ params, url }) => {
 		activeEpics: active ? app().epics.list(active.id) : [],
 		profile: app().profile.get(),
 		presence: app().presence.snapshot(),
-		inboxCount: app().inbox.count()
+		inboxCount: app().inbox.count('dashboard')
 	};
 };

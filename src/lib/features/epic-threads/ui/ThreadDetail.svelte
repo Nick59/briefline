@@ -6,12 +6,15 @@
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import {
 		AddImageButton,
-		imageUpload,
+		imageCommand,
+		imageUploadExtension,
 		type ImageTarget
 	} from '#lib/features/attachment-upload/index.ts';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import { page } from '$app/state';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
-	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { MarkdownViewer } from '#lib/shared/ui/markdown/index.ts';
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import { RelativeTime } from '#lib/shared/ui/relative-time/index.ts';
@@ -34,7 +37,7 @@
 
 	let draft = $state('');
 	let busy = $state(false);
-	let replyEl = $state<HTMLTextAreaElement | null>(null);
+	let replyEl = $state<EditorView | null>(null);
 	const imageTarget = $derived<ImageTarget | null>(
 		page.params.project ? { type: 'project', id: page.params.project } : null
 	);
@@ -66,13 +69,6 @@
 
 	function pick(option: string) {
 		draft = draft === option ? '' : option;
-	}
-
-	function onkeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-			event.preventDefault();
-			void reply();
-		}
 	}
 </script>
 
@@ -180,17 +176,18 @@
 	{/if}
 
 	<Field label="Your reply (markdown)" for="thread-reply" hint="Ctrl or ⌘ + Enter to reply">
-		<Textarea
+		<MarkdownEditor
 			id="thread-reply"
-			bind:ref={replyEl}
+			bind:view={replyEl}
 			bind:value={draft}
-			{onkeydown}
-			{@attach imageUpload(() => imageTarget)}
-			rows={3}
+			onsubmit={() => void reply()}
+			extensions={[imageUploadExtension(() => imageTarget)]}
+			commands={[imageCommand(() => imageTarget)]}
 		/>
 	</Field>
 	<div class="flex flex-wrap items-center justify-end gap-2">
-		<AddImageButton textarea={replyEl} target={imageTarget} class="mr-auto" />
+		<FormatToolbar view={replyEl} class="mr-auto" />
+		<AddImageButton view={replyEl} target={imageTarget} />
 		<Button variant="outline" size="sm" onclick={reply} disabled={busy || text === ''}>Reply</Button
 		>
 		{#if thread.status !== 'answered'}

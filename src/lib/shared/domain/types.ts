@@ -395,7 +395,7 @@ export interface InboxItem {
 	epicKey: string;
 	projectKey: string;
 	flaggedAt: string;
-	/** Sequence number of the latest person's change; pass it to ack_inbox. */
+	/** Sequence number of the latest change; pass it to ack_inbox. */
 	seq: number;
 	/** The current assignee of a task item. */
 	assignee?: string | null;

@@ -6,7 +6,7 @@
 		type Stage
 	} from '#lib/shared/domain/constants.ts';
 	import type { Task } from '#lib/shared/domain/types.ts';
-	import { stageTone } from '#lib/shared/config/tokens/index.ts';
+	import { statusTone, toneClasses } from '#lib/shared/config/tokens/index.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { StatusIcon, StageIcon } from '#lib/entities/work-status/index.ts';
 	import { moveTask } from '../model/move-task.ts';
@@ -16,9 +16,19 @@
 		stage,
 		disabled = false
 	}: { task: Task; stage: Stage; disabled?: boolean } = $props();
+
+	const current = $derived(task.stages[stage]);
+	const tone = $derived(toneClasses[statusTone[current]]);
 </script>
 
-<div class="flex items-center justify-between gap-3 rounded-lg border bg-card p-2 pl-3">
+<div
+	class={cn(
+		'flex items-center justify-between gap-3 rounded-lg border p-2 pl-3 transition-colors',
+		tone.border,
+		tone.soft,
+		'text-foreground'
+	)}
+>
 	<span class="flex items-center gap-2 text-sm font-medium"
 		><StageIcon {stage} />{STAGE_LABELS[stage]}</span
 	>
@@ -36,11 +46,13 @@
 				{disabled}
 				class={cn(
 					'flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors disabled:pointer-events-none disabled:opacity-60',
-					active ? 'bg-card font-medium shadow-xs' : 'text-muted-foreground hover:text-foreground'
+					active
+						? cn('bg-card font-medium shadow-xs', toneClasses[statusTone[status]].text)
+						: 'text-muted-foreground hover:text-foreground'
 				)}
 				onclick={() => !active && moveTask(task.id, stage, status)}
 			>
-				<StatusIcon {status} tone={status === 'todo' ? undefined : stageTone[stage]} size={12} />
+				<StatusIcon {status} size={12} />
 				{STATUS_LABELS[status]}
 			</button>
 		{/each}

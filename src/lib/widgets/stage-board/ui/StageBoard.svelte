@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { resolve } from '$app/paths';
+	import BanIcon from '@lucide/svelte/icons/ban';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
 	import {
 		STAGES,
@@ -15,6 +17,7 @@
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import { cn } from '#lib/shared/lib/utils.ts';
 	import { StageIcon } from '#lib/entities/work-status/index.ts';
+	import { TaskCard } from '#lib/entities/task/index.ts';
 	import { applyDrop, byPosition, planDrop, type DropPlan } from '../model/drop.ts';
 	import { initialStage } from '../model/initial-stage.ts';
 	import BoardColumn from './BoardColumn.svelte';
@@ -22,7 +25,7 @@
 	let {
 		epic,
 		stage = $bindable(untrack(() => initialStage(epic.progress)))
-	}: { epic: EpicDetail; stage?: Stage } = $props();
+	}: { epic: EpicDetail; stage?: Stage | 'cancelled' } = $props();
 
 	const locked = $derived((epic.specsRequired && !epic.specsApprovedAt) || epic.openQuestions > 0);
 
@@ -35,8 +38,17 @@
 			: byPosition(epic.tasks)
 	);
 
+	const cancelled = $derived(tasks.filter((t) => t.cancelledAt));
+
 	const columns = (s: Stage) =>
-		WORK_STATUSES.map((status) => ({ status, tasks: tasks.filter((t) => t.stages[s] === status) }));
+		WORK_STATUSES.map((status) => ({
+			status,
+			tasks: tasks.filter((t) => !t.cancelledAt && t.stages[s] === status)
+		}));
+
+	$effect(() => {
+		if (stage === 'cancelled' && cancelled.length === 0) stage = initialStage(epic.progress);
+	});
 
 	async function drop({ id, zone, beforeId }: DropEvent) {
 		if (locked) return;
@@ -73,6 +85,18 @@
 				</span>
 			</Tabs.Trigger>
 		{/each}
+		{#if cancelled.length > 0}
+			<Tabs.Trigger
+				value="cancelled"
+				class="h-auto flex-none gap-2 rounded-lg border border-transparent px-3 py-2 data-active:border-border data-active:bg-card data-active:shadow-xs"
+			>
+				<BanIcon class="size-4" />
+				<span class="font-medium">Cancelled</span>
+				<span class="font-mono text-[11px] text-muted-foreground tabular-nums">
+					{cancelled.length}
+				</span>
+			</Tabs.Trigger>
+		{/if}
 	</Tabs.List>
 	{#each STAGES as s (s)}
 		<Tabs.Content value={s}>
@@ -91,6 +115,20 @@
 			</div>
 		</Tabs.Content>
 	{/each}
+	<Tabs.Content value="cancelled">
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+			{#each cancelled as task (task.id)}
+				<TaskCard
+					{task}
+					href={resolve('/projects/[project]/epics/[epic]/tasks/[task]', {
+						project: epic.project.key,
+						epic: epic.key,
+						task: task.key
+					})}
+				/>
+			{/each}
+		</div>
+	</Tabs.Content>
 </Tabs.Root>
 <p class="mt-2 text-xs text-muted-foreground">
 	{#if locked}

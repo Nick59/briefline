@@ -1,9 +1,13 @@
 <script lang="ts">
 	import {
 		AddImageButton,
-		imageUpload,
+		imageCommand,
+		imageUploadExtension,
 		type ImageTarget
 	} from '#lib/features/attachment-upload/index.ts';
+	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
+	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
+	import type { EditorView } from '@codemirror/view';
 	import { page } from '$app/state';
 	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
@@ -33,7 +37,7 @@
 	let priority = $state<Priority>('medium');
 	let assignee = $state('');
 	let busy = $state(false);
-	let descriptionEl = $state<HTMLTextAreaElement | null>(null);
+	let descriptionEl = $state<EditorView | null>(null);
 	// A new task has no id yet, so its images go to the project.
 	const imageTarget = $derived<ImageTarget | null>(
 		task
@@ -105,16 +109,17 @@
 				</Field>
 			</div>
 			<Field label="Description (markdown)" for="task-description">
-				<Textarea
+				<FormatToolbar view={descriptionEl} />
+				<MarkdownEditor
 					id="task-description"
-					bind:ref={descriptionEl}
+					bind:view={descriptionEl}
 					bind:value={description}
-					{@attach imageUpload(() => imageTarget)}
-					rows={10}
-					class="font-mono text-xs leading-relaxed"
+					extensions={[imageUploadExtension(() => imageTarget)]}
+					commands={[imageCommand(() => imageTarget)]}
+					minRows={10}
 				/>
 				<div class="flex justify-end">
-					<AddImageButton textarea={descriptionEl} target={imageTarget} />
+					<AddImageButton view={descriptionEl} target={imageTarget} />
 				</div>
 			</Field>
 			<Dialog.Footer>
