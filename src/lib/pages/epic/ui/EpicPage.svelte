@@ -138,7 +138,9 @@
 		<div id="epic-specs" class="scroll-mt-6">
 			<SpecPanel
 				specs={epic.specs}
-				approval={{ approvedAt: epic.specsApprovedAt, approvedBy: epic.specsApprovedBy }}
+				approval={epic.specsRequired
+					? { approvedAt: epic.specsApprovedAt, approvedBy: epic.specsApprovedBy }
+					: undefined}
 				selected={selectedSpec}
 				owner={{ type: 'epic', id: epic.id }}
 				{ownerLabel}

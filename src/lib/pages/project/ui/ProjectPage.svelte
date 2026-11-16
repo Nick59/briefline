@@ -13,6 +13,11 @@
 		SyncJob,
 		Task
 	} from '#lib/shared/domain/types.ts';
+	import { computeProgress } from '#lib/shared/domain/progress.ts';
+	import { statusTone } from '#lib/shared/config/tokens/index.ts';
+	import { pluralize } from '#lib/shared/lib/format.ts';
+	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
+	import { StageProgressList } from '#lib/entities/epic/index.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { EmptyState } from '#lib/shared/ui/empty-state/index.ts';
@@ -38,6 +43,9 @@
 	}
 
 	let { project, epics, specs, selectedSpec, activity, syncJobs, pullStatus }: Props = $props();
+
+	const tasks = $derived(epics.flatMap((e) => e.tasks).filter((t) => !t.cancelledAt));
+	const progress = $derived(computeProgress(tasks));
 </script>
 
 {#snippet newEpic()}
@@ -71,6 +79,26 @@
 			{@render newEpic()}
 		{/snippet}
 	</PageHeader>
+
+	{#if tasks.length > 0}
+		<div class="grid gap-6 rounded-xl border bg-card p-5 md:grid-cols-[auto_1fr] md:items-center">
+			<div class="flex items-center gap-4">
+				<ProgressRing
+					value={progress.percent}
+					size={64}
+					stroke={5}
+					tone={statusTone[progress.status]}
+				/>
+				<div class="text-sm">
+					<p class="font-medium">Overall progress</p>
+					<p class="text-muted-foreground">
+						{pluralize(tasks.length, 'task')} across {pluralize(epics.length, 'epic')}
+					</p>
+				</div>
+			</div>
+			<StageProgressList {progress} />
+		</div>
+	{/if}
 
 	<div class="grid gap-8 xl:grid-cols-[1fr_22rem]">
 		<Section title="Epics" count={epics.length}>
