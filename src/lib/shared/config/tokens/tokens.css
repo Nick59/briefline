@@ -97,9 +97,9 @@
 	--status-done: var(--p-green-500);
 
 	/* Semantic: delivery stages */
-	--stage-dev: var(--p-violet-500);
+	--stage-dev: var(--p-blue-500);
 	--stage-test: var(--p-amber-500);
-	--stage-deploy: var(--p-teal-500);
+	--stage-deploy: var(--p-violet-500);
 
 	/* Semantic: priority */
 	--priority-low: var(--p-gray-400);
@@ -156,9 +156,9 @@
 	--status-in-progress: var(--p-blue-400);
 	--status-done: var(--p-green-400);
 
-	--stage-dev: var(--p-violet-400);
+	--stage-dev: var(--p-blue-400);
 	--stage-test: var(--p-amber-400);
-	--stage-deploy: var(--p-teal-400);
+	--stage-deploy: var(--p-violet-400);
 
 	--priority-low: var(--p-gray-500);
 	--priority-medium: var(--p-blue-400);
