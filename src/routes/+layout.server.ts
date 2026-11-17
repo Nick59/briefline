@@ -1,7 +1,7 @@
 import type { LayoutServerLoad } from './$types';
 import { app } from '#lib/server/runtime.ts';
 
-export const load: LayoutServerLoad = ({ params, url }) => {
+export const load: LayoutServerLoad = ({ params, url, cookies }) => {
 	if (url.pathname === '/login')
 		return {
 			projects: [],
@@ -13,9 +13,17 @@ export const load: LayoutServerLoad = ({ params, url }) => {
 		};
 	const projects = app().projects.list();
 	const projectParam = 'project' in params ? params.project : undefined;
-	const active = projectParam
-		? projects.find((p) => p.key === projectParam.toUpperCase() || p.id === projectParam)
+	const key = projectParam ?? cookies.get('last_project');
+	const active = key
+		? projects.find((p) => p.key === key.toUpperCase() || p.id === key)
 		: undefined;
+	if (active && projectParam)
+		cookies.set('last_project', active.key, {
+			path: '/',
+			httpOnly: true,
+			sameSite: 'lax',
+			maxAge: 60 * 60 * 24 * 365
+		});
 	return {
 		projects,
 		activeProjectKey: active?.key ?? null,

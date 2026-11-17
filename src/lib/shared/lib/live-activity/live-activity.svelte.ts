@@ -17,6 +17,7 @@ import { notifyAgentEvent } from './toasts.ts';
 
 const RECENT_LIMIT = 5;
 const REFRESH_DEBOUNCE_MS = 150;
+const STALE_MS = 60_000;
 const MUTE_KEY = 'live-activity-muted';
 
 export class LiveActivity {
@@ -49,6 +50,7 @@ export class LiveActivity {
 	#attempts = 0;
 	#retry: ReturnType<typeof setTimeout> | null = null;
 	#listeningOnline = false;
+	#watchdog: ReturnType<typeof setTimeout> | null = null;
 
 	/** Streams one project's events, or every project's when `projectKey` is null. */
 	connect(projectKey: string | null) {
@@ -76,8 +78,10 @@ export class LiveActivity {
 			projectKey ? `/projects/${encodeURIComponent(projectKey)}/events` : '/activity/events'
 		);
 		this.#source = source;
+		this.#alive();
 		source.onopen = () => {
 			this.connected = 'open';
+			this.#alive();
 			this.#attempts = 0;
 			this.#startTick();
 			// EventSource auto-reconnects after an error, so events may have been missed.
@@ -91,6 +95,7 @@ export class LiveActivity {
 			}
 			// The browser gives up on a closed source, so reconnect with backoff.
 			source.close();
+			this.#clearWatchdog();
 			this.connected = 'closed';
 			if (this.#retry || this.#source !== source) return;
 			this.#retry = setTimeout(() => {
@@ -98,7 +103,9 @@ export class LiveActivity {
 				this.#open();
 			}, reconnectDelay(this.#attempts++));
 		};
+		source.addEventListener('ping', () => this.#alive());
 		source.addEventListener('presence', (message) => {
+			this.#alive();
 			try {
 				this.setPresence(JSON.parse((message as MessageEvent<string>).data) as PresenceSnapshot);
 			} catch (error) {
@@ -106,6 +113,7 @@ export class LiveActivity {
 			}
 		});
 		source.addEventListener('pull', (message) => {
+			this.#alive();
 			try {
 				const { projectId, status } = JSON.parse(
 					(message as MessageEvent<string>).data
@@ -116,12 +124,28 @@ export class LiveActivity {
 			}
 		});
 		source.onmessage = (message) => {
+			this.#alive();
 			try {
 				this.#handle(JSON.parse(message.data) as LiveEvent);
 			} catch (error) {
 				console.error('[live] unreadable event', error);
 			}
 		};
+	}
+
+	#alive() {
+		if (this.#watchdog) clearTimeout(this.#watchdog);
+		const source = this.#source;
+		this.#watchdog = setTimeout(() => {
+			if (this.#source !== source) return;
+			source?.close();
+			this.#open();
+		}, STALE_MS);
+	}
+
+	#clearWatchdog() {
+		if (this.#watchdog) clearTimeout(this.#watchdog);
+		this.#watchdog = null;
 	}
 
 	setPull(projectId: string, status: PullStatus) {
@@ -149,6 +173,7 @@ export class LiveActivity {
 	disconnect() {
 		this.#source?.close();
 		this.#source = null;
+		this.#clearWatchdog();
 		if (this.#retry) clearTimeout(this.#retry);
 		this.#retry = null;
 		if (this.#tick) clearInterval(this.#tick);

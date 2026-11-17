@@ -20,7 +20,7 @@
 	untrack(() => live.setPresence(data.presence));
 	$effect.pre(() => live.setPresence(data.presence));
 
-	const projectKey = $derived(data.activeProjectKey);
+	const projectKey = $derived(page.params.project ? data.activeProjectKey : null);
 	const streaming = $derived(page.url.pathname !== '/login');
 
 	const LATER_KEY = 'briefline.profile-later';
@@ -49,7 +49,8 @@
 
 	$effect(() => {
 		if (!streaming) return;
-		untrack(() => live.connect(projectKey));
+		const key = projectKey;
+		untrack(() => live.connect(key));
 		return () => live.disconnect();
 	});
 </script>

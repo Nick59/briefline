@@ -86,7 +86,7 @@
 		<Icon class="size-3.5" />
 	</span>
 	<div class="min-w-0 space-y-1.5 text-sm">
-		<p class={cn('line-clamp-2 leading-snug text-pretty', failed && 'text-danger')}>
+		<p class={cn('line-clamp-2 leading-snug text-pretty wrap-anywhere', failed && 'text-danger')}>
 			{#if questionHref}
 				<a href={questionHref} class="underline-offset-2 hover:underline">{activity.message}</a>
 			{:else if parts && ticketUrl}
@@ -118,7 +118,12 @@
 			</p>
 		{/if}
 		{#if typeof activity.data.note === 'string'}
-			<p class="border-l-2 pl-2 text-xs text-muted-foreground">{activity.data.note}</p>
+			<p
+				class="line-clamp-2 border-l-2 pl-2 text-xs wrap-anywhere text-muted-foreground"
+				title={activity.data.note}
+			>
+				{activity.data.note}
+			</p>
 		{/if}
 		<p class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
 			{#if project}
@@ -135,7 +140,7 @@
 				>
 				<span aria-hidden="true">·</span>
 			{/if}
-			<span class="font-mono">{activity.actor}</span>
+			<span class="max-w-full truncate font-mono">{activity.actor}</span>
 			<span aria-hidden="true">·</span>
 			<RelativeTime value={activity.createdAt} />
 			{#if ticketUrl && activity.ticket}

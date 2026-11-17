@@ -1,4 +1,5 @@
 <script lang="ts">
+	import GripVerticalIcon from '@lucide/svelte/icons/grip-vertical';
 	import LockKeyholeIcon from '@lucide/svelte/icons/lock-keyhole';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import SettingsIcon from '@lucide/svelte/icons/settings-2';
@@ -71,6 +72,10 @@
 					active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
 				)}
 			>
+				<GripVerticalIcon
+					class="-ml-1 size-3.5 shrink-0 text-muted-foreground/60"
+					aria-hidden="true"
+				/>
 				<span
 					class={cn(
 						'grid size-6 shrink-0 place-items-center rounded font-mono text-[9px] font-semibold',

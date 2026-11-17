@@ -32,7 +32,7 @@ export function liveEventStream(request: Request, projectId: string | null): Res
 			};
 			liveState().presence.add(onPresence);
 			liveState().pulls.add(onPull);
-			const ping = setInterval(() => send(': ping\n\n'), PING_MS);
+			const ping = setInterval(() => send('event: ping\ndata: \n\n'), PING_MS);
 			cleanup = () => {
 				unsubscribe();
 				liveState().presence.delete(onPresence);
