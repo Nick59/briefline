@@ -107,7 +107,7 @@
 	</div>
 {/snippet}
 
-<div class="min-h-dvh md:grid md:grid-cols-[16rem_1fr]">
+<div class="min-h-dvh md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
 	<aside class="sticky top-0 hidden h-dvh border-r bg-sidebar md:block" aria-label="Sidebar">
 		{@render sidebar()}
 	</aside>

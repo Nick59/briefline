@@ -26,7 +26,9 @@
 			{#if titleAddon}{@render titleAddon()}{/if}
 		</div>
 		{#if actions}
-			<div class="flex shrink-0 flex-wrap items-center gap-2">{@render actions()}</div>
+			<div class="flex min-w-0 flex-wrap items-center gap-2 md:justify-end">
+				{@render actions()}
+			</div>
 		{/if}
 	</div>
 	{#if description}

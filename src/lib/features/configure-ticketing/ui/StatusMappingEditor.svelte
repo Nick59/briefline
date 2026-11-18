@@ -93,7 +93,7 @@
 
 	<div class="grid gap-2">
 		{#each MAPPING_KEYS as key (key)}
-			<div class="grid items-center gap-1.5 sm:grid-cols-[9rem_1fr] sm:gap-3">
+			<div class="grid items-center gap-1.5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-3">
 				<Label for="mapping-{key}" class="text-sm font-normal">{MAPPING_LABELS[key]}</Label>
 				<ChoiceSelect
 					id="mapping-{key}"

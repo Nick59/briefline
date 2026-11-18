@@ -113,7 +113,7 @@
 	{@attach mount}
 	style:--md-rows={minRows}
 	class={cn(
-		'w-full rounded-lg border border-input bg-transparent transition-colors has-[.cm-focused]:border-ring has-[.cm-focused]:ring-3 has-[.cm-focused]:ring-ring/50 dark:bg-input/30',
+		'w-full min-w-0 rounded-lg border border-input bg-transparent transition-colors has-[.cm-focused]:border-ring has-[.cm-focused]:ring-3 has-[.cm-focused]:ring-ring/50 dark:bg-input/30',
 		className
 	)}
 ></div>

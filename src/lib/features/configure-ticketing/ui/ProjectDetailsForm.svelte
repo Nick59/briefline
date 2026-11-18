@@ -44,7 +44,7 @@
 </script>
 
 <form class="grid gap-4" onsubmit={submit}>
-	<div class="grid items-start gap-3 sm:grid-cols-[1fr_8rem]">
+	<div class="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
 		<Field label="Name" for="project-name"
 			><Input id="project-name" bind:value={name} required maxlength={120} /></Field
 		>

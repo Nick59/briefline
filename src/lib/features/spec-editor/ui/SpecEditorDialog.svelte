@@ -125,7 +125,7 @@
 					>Markdown written by you or by an agent. Editing the content clears the human brief.</Dialog.Description
 				>
 			</Dialog.Header>
-			<div class="grid gap-3 sm:grid-cols-[1fr_10rem]">
+			<div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
 				<Field label="Title" for="spec-title"
 					><Input id="spec-title" bind:value={title} required maxlength={200} /></Field
 				>
@@ -138,12 +138,12 @@
 				</Field>
 			</div>
 			<Tabs.Root bind:value={tab}>
-				<div class="flex items-center justify-between gap-2">
+				<div class="flex flex-wrap items-center justify-between gap-2">
 					<Tabs.List>
 						<Tabs.Trigger value="write">Write</Tabs.Trigger>
 						<Tabs.Trigger value="preview">Preview</Tabs.Trigger>
 					</Tabs.List>
-					<div class="flex items-center gap-1">
+					<div class="flex flex-wrap items-center gap-1">
 						{#if tab === 'write'}<FormatToolbar view={editor} />{/if}
 						<AddImageButton view={editor} target={imageTarget} />
 						<InsertDiagramMenu oninsert={insertDiagram} />

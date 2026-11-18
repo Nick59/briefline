@@ -63,7 +63,7 @@
 	}
 </script>
 
-<div role="toolbar" aria-label="Formatting" class={cn('flex items-center', className)}>
+<div role="toolbar" aria-label="Formatting" class={cn('flex flex-wrap items-center', className)}>
 	{#each buttons as { label, title, icon: Icon, run } (label)}
 		<button
 			type="button"

@@ -22,7 +22,7 @@
 	<Section title="Profile">
 		<div class="flex items-center justify-between gap-4 rounded-xl border bg-card p-5">
 			{#if profile}
-				<dl class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+				<dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-sm">
 					<dt class="text-muted-foreground">Name</dt>
 					<dd>{profile.name}</dd>
 					<dt class="text-muted-foreground">Role</dt>

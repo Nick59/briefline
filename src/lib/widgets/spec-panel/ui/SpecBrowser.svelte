@@ -39,8 +39,8 @@
 	}
 </script>
 
-<div {id} class={cn('grid gap-6 md:grid-cols-[15rem_1fr]', className)}>
-	<nav class="flex flex-col gap-0.5 md:border-r md:pr-3" aria-label="Specs">
+<div {id} class={cn('grid gap-6 lg:grid-cols-[15rem_minmax(0,1fr)]', className)}>
+	<nav class="flex flex-col gap-0.5 lg:border-r lg:pr-3" aria-label="Specs">
 		{#each specs as spec (spec.id)}
 			<SpecListItem
 				{spec}

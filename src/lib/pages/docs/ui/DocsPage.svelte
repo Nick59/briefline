@@ -251,7 +251,7 @@ curl -X PUT ${origin}/api/v1/tasks/SHOP-3/stages/dev \\
 			<div class="divide-y rounded-xl border bg-card">
 				{#each ops as op (op.name)}
 					<div
-						class="grid gap-1 p-3 md:grid-cols-[4.5rem_minmax(0,22rem)_1fr] md:items-center md:gap-4"
+						class="grid gap-1 p-3 lg:grid-cols-[4.5rem_minmax(0,22rem)_minmax(0,1fr)] lg:items-center lg:gap-4"
 					>
 						<ToneBadge tone={methodTone[op.method]} variant="outline" class="w-fit font-mono"
 							>{op.method}</ToneBadge

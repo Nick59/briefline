@@ -24,3 +24,8 @@ vite.config.ts.timestamp-*
 data/
 .playwright-mcp/
 .playwright-cli/
+
+# Playwright
+test-results/
+playwright-report/
+.e2e-data/

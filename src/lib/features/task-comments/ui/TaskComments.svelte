@@ -149,7 +149,7 @@
 			aria-label="New comment"
 			onsubmit={add}
 		/>
-		<div class="flex justify-end gap-2">
+		<div class="flex flex-wrap justify-end gap-2">
 			<FormatToolbar view={draftEl} class="mr-auto" />
 			<AddImageButton view={draftEl} target={imageTarget} />
 			<Button size="sm" onclick={add} disabled={busy || text === ''}>Comment</Button>

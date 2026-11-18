@@ -66,7 +66,7 @@
 					that ticket.
 				</Dialog.Description>
 			</Dialog.Header>
-			<div class="grid grid-cols-[8rem_1fr] gap-3">
+			<div class="grid grid-cols-[8rem_minmax(0,1fr)] gap-3">
 				<Field label="Provider" for="ticket-provider"
 					><Input id="ticket-provider" bind:value={provider} required placeholder="jira" /></Field
 				>

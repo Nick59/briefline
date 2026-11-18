@@ -97,7 +97,9 @@
 	</PageHeader>
 
 	{#if tasks.length > 0}
-		<div class="grid gap-6 rounded-xl border bg-card p-5 md:grid-cols-[auto_1fr] md:items-center">
+		<div
+			class="grid gap-6 rounded-xl border bg-card p-5 md:grid-cols-[auto_minmax(0,1fr)] md:items-center"
+		>
 			<div class="flex items-center gap-4">
 				<ProgressRing
 					value={progress.percent}
@@ -116,7 +118,7 @@
 		</div>
 	{/if}
 
-	<div class="grid gap-8 xl:grid-cols-[1fr_22rem]">
+	<div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
 		<Section title="Epics" count={epics.length}>
 			{#if epics.length === 0}
 				<EmptyState

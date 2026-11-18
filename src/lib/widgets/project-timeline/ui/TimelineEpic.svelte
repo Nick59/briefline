@@ -26,7 +26,7 @@
 	const stage = $derived(epicDisplayStage(epic.progress));
 </script>
 
-<li class="group/epic relative grid grid-cols-[1.75rem_1fr] gap-x-3">
+<li class="group/epic relative grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-3">
 	{#if !isLast}
 		<span
 			class={cn(

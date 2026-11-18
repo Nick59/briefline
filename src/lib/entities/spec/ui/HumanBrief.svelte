@@ -37,7 +37,7 @@
 			</h4>
 			<ul class="space-y-1.5">
 				{#each list.items as item, i (i)}
-					<li class="grid grid-cols-[1.25rem_1fr] gap-1 text-sm leading-relaxed">
+					<li class="grid grid-cols-[1.25rem_minmax(0,1fr)] gap-1 text-sm leading-relaxed">
 						<span class="font-mono text-xs leading-6 text-muted-foreground" aria-hidden="true"
 							>{list.marker}</span
 						>
@@ -53,7 +53,7 @@
 			<h4 class="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
 				Words you may meet
 			</h4>
-			<dl class="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[auto_1fr]">
+			<dl class="grid gap-x-4 gap-y-1.5 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
 				{#each brief.glossary as entry (entry.term)}
 					<dt class="font-mono text-xs leading-6 font-medium">{entry.term}</dt>
 					<dd class="text-muted-foreground">{entry.meaning}</dd>

@@ -14,7 +14,7 @@
 	let { label, for: htmlFor, hint, class: className, children }: Props = $props();
 </script>
 
-<div class={cn('grid gap-1.5', className)}>
+<div class={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1.5', className)}>
 	<Label for={htmlFor} class="text-xs font-medium">{label}</Label>
 	{@render children()}
 	{#if hint}

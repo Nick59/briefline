@@ -71,7 +71,7 @@
 </script>
 
 <Tabs.Root bind:value={stage} class="gap-4">
-	<Tabs.List class="h-auto w-full justify-start gap-1 bg-transparent p-0 sm:w-auto">
+	<Tabs.List class="h-auto w-full flex-wrap justify-start gap-1 bg-transparent p-0 sm:w-auto">
 		{#each STAGES as s (s)}
 			{@const counts = epic.progress.stages[s]}
 			<Tabs.Trigger

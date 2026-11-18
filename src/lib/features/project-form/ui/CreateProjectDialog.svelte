@@ -65,7 +65,7 @@
 					>A project groups epics. Its key prefixes every epic and task, like SHOP-E1 and SHOP-12.</Dialog.Description
 				>
 			</Dialog.Header>
-			<div class="grid grid-cols-[1fr_7rem] gap-3">
+			<div class="grid grid-cols-[minmax(0,1fr)_7rem] gap-3">
 				<Field label="Name" for="project-name">
 					<Input
 						id="project-name"

@@ -32,7 +32,7 @@
 		{#snippet actions()}<CreateProjectDialog />{/snippet}
 	</PageHeader>
 
-	<div class="grid gap-8 xl:grid-cols-[1fr_22rem]">
+	<div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
 		<Section title="All projects" count={projects.length}>
 			{#if projects.length === 0}
 				<EmptyState
