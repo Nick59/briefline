@@ -4,6 +4,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import UserIcon from '@lucide/svelte/icons/user-round';
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { STAGES } from '#lib/shared/domain/constants.ts';
 	import { taskOverallStatus } from '#lib/shared/domain/progress.ts';
@@ -78,7 +79,7 @@
 							><LinkIcon />Ticket</Button
 						>{/snippet}
 				</LinkTicketDialog>
-				<TaskFormDialog epicId={task.epicId} {task}>
+				<TaskFormDialog epicId={task.epicId} {task} epics={page.data.activeEpics}>
 					{#snippet trigger({ props })}<Button {...props} variant="outline" size="sm"
 							><PencilIcon />Edit</Button
 						>{/snippet}

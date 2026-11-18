@@ -4,6 +4,7 @@ import { all, fromJson, one, run, toJson, type Db } from '../../db/connection.ts
 interface EpicRow {
 	specs_approved_at: string | null;
 	specs_approved_by: string | null;
+	archived_at: string | null;
 	id: string;
 	project_id: string;
 	key: string;
@@ -20,6 +21,7 @@ const toEpic = (row: EpicRow): Epic => ({
 	id: row.id,
 	specsApprovedAt: row.specs_approved_at,
 	specsApprovedBy: row.specs_approved_by,
+	archivedAt: row.archived_at,
 	projectId: row.project_id,
 	key: row.key,
 	title: row.title,
@@ -75,8 +77,8 @@ export class EpicRepository {
 	insert(epic: Epic) {
 		run(
 			this.db,
-			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, position, created_at, updated_at, specs_approved_at, specs_approved_by)
-			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :position, :createdAt, :updatedAt, :specsApprovedAt, :specsApprovedBy)`,
+			`INSERT INTO epics (id, project_id, key, title, summary, external_ref, target_date, position, created_at, updated_at, specs_approved_at, specs_approved_by, archived_at)
+			 VALUES (:id, :projectId, :key, :title, :summary, :externalRef, :targetDate, :position, :createdAt, :updatedAt, :specsApprovedAt, :specsApprovedBy, :archivedAt)`,
 			{
 				...this.#params(epic),
 				projectId: epic.projectId,
@@ -91,7 +93,7 @@ export class EpicRepository {
 		run(
 			this.db,
 			`UPDATE epics SET title = :title, summary = :summary, external_ref = :externalRef, target_date = :targetDate,
-			 specs_approved_at = :specsApprovedAt, specs_approved_by = :specsApprovedBy, updated_at = :updatedAt WHERE id = :id`,
+			 specs_approved_at = :specsApprovedAt, specs_approved_by = :specsApprovedBy, archived_at = :archivedAt, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(epic)
 		);
 	}
@@ -105,6 +107,7 @@ export class EpicRepository {
 			id: epic.id,
 			specsApprovedAt: epic.specsApprovedAt,
 			specsApprovedBy: epic.specsApprovedBy,
+			archivedAt: epic.archivedAt,
 			title: epic.title,
 			summary: epic.summary,
 			externalRef: toJson(epic.externalRef),

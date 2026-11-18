@@ -6,9 +6,11 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { resolve } from '$app/paths';
 	import type { EpicDetail, Project } from '#lib/shared/domain/types.ts';
+	import { taskOverallStatus } from '#lib/shared/domain/progress.ts';
 	import { statusTone } from '#lib/shared/config/tokens/index.ts';
 	import { daysUntil, formatDate, pluralize } from '#lib/shared/lib/format.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
+	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import { KeyChip } from '#lib/shared/ui/key-chip/index.ts';
 	import { PageHeader } from '#lib/shared/ui/page-header/index.ts';
 	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
@@ -18,6 +20,7 @@
 		ReadinessBadge,
 		StageProgressList
 	} from '#lib/entities/epic/index.ts';
+	import { ArchiveEpicButton, RestoreEpicButton } from '#lib/features/archive-epics/index.ts';
 	import { EpicFormDialog } from '#lib/features/epic-form/index.ts';
 	import { TaskFormDialog } from '#lib/features/task-form/index.ts';
 	import { LinkTicketDialog } from '#lib/features/link-ticket/index.ts';
@@ -50,6 +53,9 @@
 					stage={epic.progress.currentStage}
 					variant="dot"
 				/>{/if}
+			{#if epic.archivedAt}<ToneBadge tone="neutral"
+					>Archived since {formatDate(epic.archivedAt, true)}</ToneBadge
+				>{/if}
 			{#if epic.externalRef}<ExternalTicketBadge ref={epic.externalRef} url={ticketUrl} />{/if}
 		{/snippet}
 		{#snippet titleAddon()}
@@ -88,6 +94,12 @@
 				{/snippet}
 			</LinkTicketDialog>
 			{#if epic.externalRef}<SyncNowButton epicId={epic.id} />{/if}
+			{#if epic.archivedAt}<RestoreEpicButton {epic} />{:else}<ArchiveEpicButton
+					{epic}
+					openTasks={epic.tasks.filter(
+						(t) => !t.cancelledAt && taskOverallStatus(t.stages) !== 'done'
+					).length}
+				/>{/if}
 			<EpicFormDialog projectKey={project.key} {epic}>
 				{#snippet trigger({ props })}
 					<Button {...props} variant="outline" size="sm"><PencilIcon />Edit</Button>

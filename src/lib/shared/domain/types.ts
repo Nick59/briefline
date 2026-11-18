@@ -86,6 +86,7 @@ export interface Project {
 export interface Epic {
 	specsApprovedAt: ISODate | null;
 	specsApprovedBy: string | null;
+	archivedAt: ISODate | null;
 	id: string;
 	projectId: string;
 	key: string;

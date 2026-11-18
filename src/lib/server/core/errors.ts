@@ -51,3 +51,13 @@ export class SpecsNotApprovedError extends DomainError {
 		);
 	}
 }
+
+export class EpicHasOpenTasksError extends DomainError {
+	constructor(epicKey: string, open: number) {
+		super(
+			`Epic ${epicKey} has ${open} unfinished ${open === 1 ? 'task' : 'tasks'}. Pass force: true to cancel them and archive the epic.`,
+			409,
+			'epic_has_open_tasks'
+		);
+	}
+}

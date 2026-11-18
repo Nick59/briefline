@@ -317,7 +317,8 @@ export const MIGRATIONS: Migration[] = [
 		session_id TEXT PRIMARY KEY,
 		seq INTEGER NOT NULL
 	);
-	`
+	`,
+	'ALTER TABLE epics ADD COLUMN archived_at TEXT;'
 ];
 
 const LEGACY_PROJECT_FIELDS: Record<string, string[]> = {

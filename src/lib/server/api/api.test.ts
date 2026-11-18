@@ -130,7 +130,7 @@ describe('mcp', () => {
 
 		it('stays within the size budget', async () => {
 			expect(JSON.stringify(await list()).length, 'tools/list grew past budget').toBeLessThan(
-				31500
+				32500
 			);
 		});
 	});

@@ -1,4 +1,4 @@
-import { computeProgress } from '#lib/shared/domain/progress.ts';
+import { computeProgress, taskOverallStatus } from '#lib/shared/domain/progress.ts';
 import {
 	createEpicSchema,
 	moveEpicSchema,
@@ -9,7 +9,7 @@ import {
 } from '#lib/shared/domain/schemas.ts';
 import type { Epic, EpicDetail, EpicSummary, ExternalRef } from '#lib/shared/domain/types.ts';
 import { transaction } from '../../db/connection.ts';
-import { InvalidInputError } from '../../core/errors.ts';
+import { EpicHasOpenTasksError, InvalidInputError } from '../../core/errors.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
@@ -29,21 +29,24 @@ export class EpicService {
 		private readonly specs: SpecService
 	) {}
 
-	list(projectIdOrKey: string): EpicSummary[] {
+	list(projectIdOrKey: string, { archived = false } = {}): EpicSummary[] {
 		const { repos } = this.deps;
 		const project = requireProject(repos, projectIdOrKey);
 		const questionCounts = repos.questions.countByProject(project.id);
-		return repos.epics.listByProject(project.id).map((epic) => {
-			const tasks = repos.tasks.listByEpic(epic.id);
-			return {
-				...epic,
-				progress: computeProgress(tasks),
-				taskCount: tasks.filter((task) => !task.cancelledAt).length,
-				openQuestions: questionCounts.get(epic.id)?.open ?? 0,
-				questionCount: questionCounts.get(epic.id)?.total ?? 0,
-				specsRequired: repos.specs.countByEpic(epic.id) > 0
-			};
-		});
+		return repos.epics
+			.listByProject(project.id)
+			.filter((epic) => !!epic.archivedAt === archived)
+			.map((epic) => {
+				const tasks = repos.tasks.listByEpic(epic.id);
+				return {
+					...epic,
+					progress: computeProgress(tasks),
+					taskCount: tasks.filter((task) => !task.cancelledAt).length,
+					openQuestions: questionCounts.get(epic.id)?.open ?? 0,
+					questionCount: questionCounts.get(epic.id)?.total ?? 0,
+					specsRequired: repos.specs.countByEpic(epic.id) > 0
+				};
+			});
 	}
 
 	/** Epics an agent can work on now, in the user's order. */
@@ -54,6 +57,26 @@ export class EpicService {
 				(!epic.specsRequired || epic.specsApprovedAt) &&
 				epic.progress.status !== 'done'
 		);
+	}
+
+	/** Archives every finished epic of the project; an epic without active tasks is never done. */
+	archiveDone(projectIdOrKey: string, actor: string): EpicSummary[] {
+		const { db, repos, events } = this.deps;
+		const done = this.list(projectIdOrKey).filter((epic) => epic.progress.status === 'done');
+		const archivedAt = now();
+		transaction(db, () => {
+			for (const epic of done) repos.epics.update({ ...epic, archivedAt, updatedAt: archivedAt });
+		});
+		for (const epic of done)
+			events.emit({
+				type: 'epic.updated',
+				projectId: epic.projectId,
+				epicId: epic.id,
+				taskId: null,
+				actor,
+				data: { key: epic.key, title: epic.title, fields: ['archivedAt'] }
+			});
+		return done.map((epic) => ({ ...epic, archivedAt }));
 	}
 
 	get(idOrKey: string): Epic {
@@ -91,6 +114,7 @@ export class EpicService {
 				id: newId(),
 				specsApprovedAt: null,
 				specsApprovedBy: null,
+				archivedAt: null,
 				projectId: project.id,
 				key: `${project.key}-E${repos.projects.nextSequence(project.id, 'epic')}`,
 				title: data.title,
@@ -125,6 +149,14 @@ export class EpicService {
 	update(idOrKey: string, input: UpdateEpicInput, actor: string): Epic {
 		const data = updateEpicSchema.parse(input);
 		const current = this.get(idOrKey);
+		const openTasks =
+			data.archived && !current.archivedAt
+				? this.deps.repos.tasks
+						.listByEpic(current.id)
+						.filter((task) => !task.cancelledAt && taskOverallStatus(task.stages) !== 'done')
+				: [];
+		if (openTasks.length > 0 && !data.force)
+			throw new EpicHasOpenTasksError(current.key, openTasks.length);
 		const epic: Epic = {
 			...current,
 			title: data.title ?? current.title,
@@ -132,9 +164,18 @@ export class EpicService {
 			targetDate: data.targetDate === undefined ? current.targetDate : data.targetDate,
 			externalRef:
 				data.externalRef === undefined ? current.externalRef : normalizeRef(data.externalRef),
+			archivedAt:
+				data.archived === undefined
+					? current.archivedAt
+					: data.archived
+						? (current.archivedAt ?? now())
+						: null,
 			updatedAt: now()
 		};
-		this.deps.repos.epics.update(epic);
+		transaction(this.deps.db, () => {
+			for (const task of openTasks) this.tasks.cancel(task.id, { reason: 'Epic archived' }, actor);
+			this.deps.repos.epics.update(epic);
+		});
 		this.deps.events.emit({
 			type: 'epic.updated',
 			projectId: epic.projectId,

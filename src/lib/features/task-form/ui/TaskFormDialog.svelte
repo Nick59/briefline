@@ -10,6 +10,8 @@
 	import type { EditorView } from '@codemirror/view';
 	import { page } from '$app/state';
 	import { displayKey } from '#lib/shared/domain/display-key.ts';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
@@ -19,16 +21,18 @@
 	import { ChoiceSelect } from '#lib/shared/ui/choice-select/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
 	import { PRIORITIES, PRIORITY_LABELS, type Priority } from '#lib/shared/domain/constants.ts';
-	import type { Task } from '#lib/shared/domain/types.ts';
+	import type { EpicSummary, Task } from '#lib/shared/domain/types.ts';
 
 	interface Props {
 		epicId: string;
 		/** Edit this task instead of creating one. */
 		task?: Task;
+		/** The project's epics; with more than one, an edited task can be moved between them. */
+		epics?: EpicSummary[];
 		trigger: Snippet<[{ props: Record<string, unknown> }]>;
 	}
 
-	let { epicId, task, trigger }: Props = $props();
+	let { epicId, task, epics = [], trigger }: Props = $props();
 
 	let open = $state(false);
 	let title = $state('');
@@ -36,6 +40,7 @@
 	let description = $state('');
 	let priority = $state<Priority>('medium');
 	let assignee = $state('');
+	let epic = $state('');
 	let busy = $state(false);
 	let descriptionEl = $state<EditorView | null>(null);
 	// A new task has no id yet, so its images go to the project.
@@ -54,6 +59,7 @@
 			description = task?.description ?? '';
 			priority = task?.priority ?? 'medium';
 			assignee = task?.assignee ?? '';
+			epic = task?.epicId ?? '';
 		}
 	});
 
@@ -67,9 +73,27 @@
 			priority,
 			assignee: assignee || null
 		};
-		const outcome = task
+		let outcome = task
 			? await runOperation('update_task', { task: task.id, ...fields }, { success: 'Task updated' })
 			: await runOperation('create_task', { epic: epicId, ...fields }, { success: 'Task created' });
+		const destination = epics.find((e) => e.id === epic);
+		if (task && outcome.ok && destination && epic !== task.epicId) {
+			// The old URL no longer matches the task, so skip the refresh and navigate instead.
+			outcome = await runOperation(
+				'move_task',
+				{ task: task.id, epic },
+				{ success: 'Task moved', refresh: false }
+			);
+			if (outcome.ok && page.params.project) {
+				await goto(
+					resolve('/projects/[project]/epics/[epic]/tasks/[task]', {
+						project: page.params.project,
+						epic: destination.key,
+						task: task.key
+					})
+				);
+			}
+		}
 		busy = false;
 		if (outcome.ok) open = false;
 	}
@@ -104,6 +128,15 @@
 						options={PRIORITIES.map((p) => ({ value: p, label: PRIORITY_LABELS[p] }))}
 					/>
 				</Field>
+				{#if task && epics.length > 1}
+					<Field label="Epic" for="task-epic">
+						<ChoiceSelect
+							id="task-epic"
+							bind:value={epic}
+							options={epics.map((e) => ({ value: e.id, label: `${displayKey(e)} · ${e.title}` }))}
+						/>
+					</Field>
+				{/if}
 				<Field label="Assignee" for="task-assignee">
 					<Input id="task-assignee" bind:value={assignee} placeholder="agent name or person" />
 				</Field>

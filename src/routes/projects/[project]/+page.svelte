@@ -9,6 +9,7 @@
 <ProjectPage
 	project={data.project}
 	epics={data.epics}
+	archivedEpics={data.archivedEpics}
 	specs={data.specs}
 	selectedSpec={data.selectedSpec}
 	activity={data.activity}

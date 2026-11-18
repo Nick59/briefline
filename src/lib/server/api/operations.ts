@@ -137,11 +137,14 @@ export const operations: Operation[] = [
 			ready: z
 				.union([z.boolean(), z.enum(['true', 'false']).transform((v) => v === 'true')])
 				.optional()
-				.describe('Only list the epics ready to work on')
+				.describe('Only list the epics ready to work on'),
+			archived: z.boolean().optional().describe('List archived epics instead of active ones')
 		}),
-		run: (app, { project, ready }) => ({
+		run: (app, { project, ready, archived }) => ({
 			...app.projects.get(project),
-			epics: ready ? app.epics.workToDo(project) : app.epics.list(project),
+			epics: ready
+				? app.epics.workToDo(project)
+				: app.epics.list(project, { archived: archived ?? false }),
 			specs: app.specs.listForProject(project)
 		})
 	}),
@@ -366,8 +369,19 @@ export const operations: Operation[] = [
 		path: '/epics/{epic}',
 		tag: 'Epics',
 		summary: 'Update an epic, including its linked external ticket',
+		description:
+			'archived: true hides the epic from the project board and work lists, archived: false restores it (cancelled tasks stay cancelled). archived: true returns 409 epic_has_open_tasks while unfinished tasks remain; force: true cancels them first (reason "Epic archived").',
 		input: updateEpicSchema.extend({ epic }),
 		run: (app, input, { actor }) => app.epics.update(input.epic, pick(input, 'epic'), actor)
+	}),
+	defineOperation({
+		name: 'archive_done_epics',
+		method: 'POST',
+		path: '/projects/{project}/epics/archive-done',
+		tag: 'Epics',
+		summary: 'Archive every completed epic of a project',
+		input: z.object({ project }),
+		run: (app, { project }, { actor }) => ({ archived: app.epics.archiveDone(project, actor) })
 	}),
 	defineOperation({
 		name: 'approve_epic_specs',

@@ -309,7 +309,10 @@ export const createEpicSchema = z.object({
 	specs: z.array(createSpecSchema).max(20).optional().describe('Specs attached to the epic')
 });
 
-export const updateEpicSchema = z.object(epicFields).partial();
+export const updateEpicSchema = z.object(epicFields).partial().extend({
+	force: z.boolean().optional(),
+	archived: z.boolean().optional()
+});
 
 export type CreateProjectInput = z.input<typeof createProjectSchema>;
 export type UpdateProjectInput = z.input<typeof updateProjectSchema>;

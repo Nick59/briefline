@@ -83,6 +83,62 @@ describe('epics', () => {
 });
 
 describe('tasks', () => {
+	describe('placement by priority', () => {
+		function setup(priorities: string[]) {
+			const { app } = testApp();
+			app.projects.create({ key: 'PMA', name: 'PM' }, 'test');
+			const epic = app.epics.create('PMA', { title: 'E' }, 'test');
+			for (const [i, priority] of priorities.entries()) {
+				app.tasks.create(
+					epic.id,
+					{ title: `${priority}${i}`, priority: priority as never },
+					'test'
+				);
+			}
+			return { app, epic };
+		}
+		const titles = (app: ReturnType<typeof setup>['app'], epicId: string) =>
+			app.epics.detail(epicId).tasks.map((t) => t.title);
+
+		it('places an urgent task above medium and low tasks', () => {
+			const { app, epic } = setup(['medium', 'low']);
+			app.tasks.create(epic.id, { title: 'U', priority: 'urgent' }, 'test');
+			expect(titles(app, epic.id)).toEqual(['U', 'medium0', 'low1']);
+		});
+
+		it('appends a low task last', () => {
+			const { app, epic } = setup(['high', 'medium']);
+			app.tasks.create(epic.id, { title: 'L', priority: 'low' }, 'test');
+			expect(titles(app, epic.id)).toEqual(['high0', 'medium1', 'L']);
+		});
+
+		it('keeps creation order within the same priority', () => {
+			const { app, epic } = setup(['high', 'low']);
+			app.tasks.create(epic.id, { title: 'H2', priority: 'high' }, 'test');
+			expect(titles(app, epic.id)).toEqual(['high0', 'H2', 'low1']);
+		});
+
+		it('orders a create_epic batch by priority, then input order', () => {
+			const { app } = testApp();
+			app.projects.create({ key: 'PMA', name: 'PM' }, 'test');
+			const epic = app.epics.create(
+				'PMA',
+				{
+					title: 'E',
+					tasks: [
+						{ title: 'a', priority: 'low' },
+						{ title: 'b', priority: 'urgent' },
+						{ title: 'c', priority: 'low' },
+						{ title: 'd', priority: 'urgent' },
+						{ title: 'e' }
+					]
+				},
+				'test'
+			);
+			expect(epic.tasks.map((t) => t.title)).toEqual(['b', 'd', 'e', 'a', 'c']);
+		});
+	});
+
 	it('moves a stage, logs it, and ignores no-op moves', () => {
 		const { app } = withEpic();
 		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done', note: 'All green' }, 'ci-bot');
@@ -277,5 +333,73 @@ describe('spec versions', () => {
 		app.specs.delete(spec.id, 'test');
 		expect(db.prepare('SELECT COUNT(*) AS n FROM spec_versions').get()).toEqual({ n: 0 });
 		expect(() => app.specs.versions(spec.id)).toThrow(NotFoundError);
+	});
+});
+
+describe('archiving epics', () => {
+	function finish(app: ReturnType<typeof withEpic>['app'], task: string) {
+		for (const stage of ['dev', 'test', 'deploy'] as const)
+			app.tasks.setStage(task, { stage, status: 'done' }, 'test');
+	}
+
+	it('archives only done epics and hides them from the default list', () => {
+		const { app, epic } = withEpic();
+		const empty = app.epics.create('PMA', { title: 'Empty' }, 'test');
+		const cancelledOnly = app.epics.create(
+			'PMA',
+			{ title: 'Cancelled', tasks: [{ title: 'X' }] },
+			'test'
+		);
+		app.tasks.cancel(cancelledOnly.tasks[0].id, {}, 'test');
+		const done = app.epics.create('PMA', { title: 'Done', tasks: [{ title: 'D' }] }, 'test');
+		finish(app, done.tasks[0].id);
+		app.tasks.setStage(epic.tasks[0].id, { stage: 'dev', status: 'in_progress' }, 'test');
+
+		const archived = app.epics.archiveDone('PMA', 'test');
+		expect(archived.map((e) => e.id)).toEqual([done.id]);
+		expect(app.epics.list('PMA').map((e) => e.id)).toEqual([epic.id, empty.id, cancelledOnly.id]);
+		expect(app.epics.list('PMA', { archived: true }).map((e) => e.id)).toEqual([done.id]);
+		expect(app.epics.workToDo('PMA').map((e) => e.id)).not.toContain(done.id);
+		expect(app.epics.archiveDone('PMA', 'test')).toEqual([]);
+	});
+
+	it('restores an archived epic with update archived: false', () => {
+		const { app } = withEpic();
+		const done = app.epics.create('PMA', { title: 'Done', tasks: [{ title: 'D' }] }, 'test');
+		finish(app, done.tasks[0].id);
+		app.epics.archiveDone('PMA', 'test');
+		expect(app.epics.get(done.id).archivedAt).not.toBeNull();
+		app.epics.update(done.id, { archived: false }, 'test');
+		expect(app.epics.get(done.id).archivedAt).toBeNull();
+		expect(app.epics.list('PMA', { archived: true })).toEqual([]);
+	});
+
+	it('refuses to archive an epic with unfinished tasks unless forced, then cancels only those', () => {
+		const { app } = withEpic();
+		const target = app.epics.create(
+			'PMA',
+			{ title: 'Mixed', tasks: [{ title: 'Done' }, { title: 'Open' }, { title: 'Dropped' }] },
+			'test'
+		);
+		const [doneTask, openTask, dropped] = target.tasks;
+		finish(app, doneTask.id);
+		app.tasks.cancel(dropped.id, {}, 'test');
+		expect(() => app.epics.update(target.id, { archived: true }, 'test')).toThrow(
+			expect.objectContaining({ status: 409, code: 'epic_has_open_tasks' })
+		);
+		expect(app.epics.get(target.id).archivedAt).toBeNull();
+
+		app.epics.update(target.id, { archived: true, force: true }, 'test');
+		expect(app.epics.get(target.id).archivedAt).not.toBeNull();
+		expect(app.tasks.get(openTask.id).cancelledAt).not.toBeNull();
+		expect(app.tasks.get(doneTask.id).cancelledAt).toBeNull();
+	});
+
+	it('archives an epic without unfinished tasks without force', () => {
+		const { app } = withEpic();
+		const target = app.epics.create('PMA', { title: 'Clean', tasks: [{ title: 'D' }] }, 'test');
+		finish(app, target.tasks[0].id);
+		app.epics.update(target.id, { archived: true }, 'test');
+		expect(app.epics.get(target.id).archivedAt).not.toBeNull();
 	});
 });

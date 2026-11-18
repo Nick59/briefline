@@ -52,7 +52,7 @@ describe('migration that removes phases', () => {
 		]);
 		expect(db.prepare('PRAGMA foreign_keys').get()).toEqual({ foreign_keys: 1 });
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 	});
 
 	it('still cascades task deletion to specs afterwards', () => {
@@ -85,7 +85,7 @@ describe('headers column migration', () => {
 		expect(db.prepare('SELECT id, headers_ciphertext FROM ticketing_connections').all()).toEqual([
 			{ id: 'c1', headers_ciphertext: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 	});
 });
 
@@ -113,7 +113,7 @@ describe('project specs migration', () => {
 			)
 		).toThrow();
 		expect(db.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM specs').all()).toEqual([{ id: 's2' }]);
 	});
@@ -132,7 +132,7 @@ describe('project specs migration', () => {
 		expect(db.prepare('SELECT status, answer FROM epic_questions').all()).toEqual([
 			{ status: 'open', answer: null }
 		]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 		db.exec("DELETE FROM epics WHERE id = 'e1'");
 		expect(db.prepare('SELECT id FROM epic_questions').all()).toEqual([]);
 	});
@@ -181,7 +181,7 @@ describe('activity cursor and profile migrations', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(tables).toEqual(expect.arrayContaining(['activity_counter', 'user_profile']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 	});
 });
 
@@ -242,7 +242,7 @@ describe('agent sessions migration', () => {
 			db.prepare("SELECT name FROM sqlite_master WHERE type = 'index'").all() as { name: string }[]
 		).map((row) => row.name);
 		expect(indexes).toEqual(expect.arrayContaining(['agent_sessions_started', 'activity_session']));
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 	});
 });
 
@@ -270,7 +270,7 @@ describe('task comments migration', () => {
 		db.exec('PRAGMA foreign_keys = ON');
 		db.exec("DELETE FROM tasks WHERE id = 't1'");
 		expect(db.prepare('SELECT id FROM task_comments').all()).toEqual([]);
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 23 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
 	});
 });
 

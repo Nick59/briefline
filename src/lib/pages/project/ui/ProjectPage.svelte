@@ -15,7 +15,8 @@
 	} from '#lib/shared/domain/types.ts';
 	import { computeProgress } from '#lib/shared/domain/progress.ts';
 	import { statusTone } from '#lib/shared/config/tokens/index.ts';
-	import { pluralize } from '#lib/shared/lib/format.ts';
+	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
+	import { formatDate, pluralize } from '#lib/shared/lib/format.ts';
 	import { ProgressRing } from '#lib/shared/ui/progress/index.ts';
 	import { StageProgressList } from '#lib/entities/epic/index.ts';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
@@ -26,6 +27,7 @@
 	import { ToneBadge } from '#lib/shared/ui/tone-badge/index.ts';
 	import type { PullStatus } from '#lib/shared/domain/pull-status.ts';
 	import { TicketPullStatus } from '#lib/features/pull-tickets/index.ts';
+	import { ArchiveDoneEpicsButton, RestoreEpicButton } from '#lib/features/archive-epics/index.ts';
 	import { EpicFormDialog } from '#lib/features/epic-form/index.ts';
 	import { ActivityFeed } from '#lib/widgets/activity-feed/index.ts';
 	import { SyncLog } from '#lib/widgets/sync-log/index.ts';
@@ -35,6 +37,7 @@
 	interface Props {
 		project: Project;
 		epics: (EpicSummary & { tasks: Task[] })[];
+		archivedEpics: EpicSummary[];
 		specs: SpecSummary[];
 		selectedSpec: Spec | null;
 		activity: PageView<Activity>;
@@ -42,7 +45,16 @@
 		pullStatus: PullStatus | null;
 	}
 
-	let { project, epics, specs, selectedSpec, activity, syncJobs, pullStatus }: Props = $props();
+	let {
+		project,
+		epics,
+		archivedEpics,
+		specs,
+		selectedSpec,
+		activity,
+		syncJobs,
+		pullStatus
+	}: Props = $props();
 
 	const tasks = $derived(epics.flatMap((e) => e.tasks).filter((t) => !t.cancelledAt));
 	const progress = $derived(computeProgress(tasks));
@@ -72,6 +84,10 @@
 			</div>
 		{/snippet}
 		{#snippet actions()}
+			<ArchiveDoneEpicsButton
+				projectKey={project.key}
+				count={epics.filter((e) => e.progress.status === 'done').length}
+			/>
 			<Button
 				href={resolve('/projects/[project]/settings', { project: project.key })}
 				variant="outline"><SettingsIcon />Settings</Button
@@ -112,6 +128,32 @@
 				</EmptyState>
 			{:else}
 				<ProjectTimeline {epics} projectKey={project.key} />
+			{/if}
+			{#if archivedEpics.length > 0}
+				<details class="mt-6 rounded-xl border bg-card">
+					<summary class="cursor-pointer px-4 py-3 text-sm font-medium">
+						Archived epics ({archivedEpics.length})
+					</summary>
+					<ul class="divide-y border-t">
+						{#each archivedEpics as epic (epic.id)}
+							<li class="flex flex-wrap items-center gap-2 px-4 py-2">
+								<KeyChip value={displayKey(epic)} title={displayKeyTitle(epic)} />
+								<a
+									href={resolve('/projects/[project]/epics/[epic]', {
+										project: project.key,
+										epic: epic.key
+									})}
+									class="min-w-0 flex-1 truncate text-sm font-medium hover:underline focus-visible:underline focus-visible:outline-none"
+									>{epic.title}</a
+								>
+								<span class="text-xs text-muted-foreground"
+									>Archived since {formatDate(epic.archivedAt, true)}</span
+								>
+								<RestoreEpicButton {epic} />
+							</li>
+						{/each}
+					</ul>
+				</details>
 			{/if}
 		</Section>
 		<div class="space-y-8">

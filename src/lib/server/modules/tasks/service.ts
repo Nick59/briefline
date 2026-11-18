@@ -1,5 +1,5 @@
 import { ANONYMOUS_ACTORS, isHumanActor } from '#lib/shared/domain/actors.ts';
-import { STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
+import { PRIORITIES, STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
 	cancelTaskSchema,
 	createTaskSchema,
@@ -55,6 +55,13 @@ export class TaskService {
 		const { repos } = this.deps;
 		const project = requireProject(repos, epic.projectId);
 		const timestamp = now();
+		const siblings = repos.tasks.listByEpic(epic.id);
+		const rank = PRIORITIES.indexOf(data.priority);
+		// Slot before the first task with a lower priority; same priority keeps creation order.
+		const lower = siblings.find((t) => PRIORITIES.indexOf(t.priority) < rank);
+		const position = lower ? lower.position : repos.tasks.nextPosition(epic.id);
+		for (const t of siblings)
+			if (t.position >= position) repos.tasks.setPosition(t.id, t.position + 1);
 		const task: Task = {
 			id: newId(),
 			epicId: epic.id,
@@ -68,7 +75,7 @@ export class TaskService {
 			externalRef: data.externalRef
 				? { ...data.externalRef, url: data.externalRef.url ?? null }
 				: null,
-			position: repos.tasks.nextPosition(epic.id),
+			position,
 			commentCount: 0,
 			cancelledAt: null,
 			createdAt: timestamp,
@@ -80,7 +87,7 @@ export class TaskService {
 
 	create(epicIdOrKey: string, input: CreateTaskInput, actor: string): Task {
 		const epic = requireEpic(this.deps.repos, epicIdOrKey);
-		const task = this.insert(epic, input);
+		const task = transaction(this.deps.db, () => this.insert(epic, input));
 		this.#emit('task.created', epic, task, actor);
 		return task;
 	}
