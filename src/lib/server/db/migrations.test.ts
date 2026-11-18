@@ -343,6 +343,7 @@ describe('spec approval migration', () => {
 			specsApprovedBy: null
 		});
 		expect(app.tasks.get('SHOP-1').stages.dev).toBe('in_progress');
+		app.tasks.setStage('SHOP-1', { stage: 'dev', status: 'done' }, 'test');
 		expect(() =>
 			app.tasks.setStage('SHOP-1', { stage: 'test', status: 'in_progress' }, 'test')
 		).not.toThrow();

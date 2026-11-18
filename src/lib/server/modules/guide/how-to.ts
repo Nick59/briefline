@@ -22,6 +22,7 @@ Typical flow for an agent:
    Questions are threads: a person can open one too, and anyone can add replies over time. Read the replies in each question's \`messages\` (get_epic), reply or act on threads a person opened, and add details or findings with reply_to_question.
    When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Approval is a one-time gate: later spec changes keep the epic approved. Tasks cannot be started while an epic has open questions, whoever opened them. Read the answers and follow them; an ignored question means use your judgement.
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
+   A stage can start only once every earlier stage is done (test needs dev, deploy needs dev and test); moving a stage back to todo resets the later stages.
    A task that will not be done: update_task { cancelled: true, cancelReason }; it stays visible but leaves the progress. cancelled: false restores it.
    Read a task's comments in get_task; people comment too, so act on their comments, and use add_task_comment to record findings, decisions or blockers on the task as you work.
 4. Attach your specs/plans as markdown with add_spec { project | epic | task }, always including the \`brief\` argument:
@@ -93,11 +94,11 @@ A spec is a markdown document attached to a project, an epic or a task.
 - Project specs hold context for every epic: architecture, conventions, product goals. get_project returns them: read them before planning. Epic and task specs hold plans for that work (get_epic, get_task). add_spec takes exactly one of project, epic or task.
 - brief is required over MCP whenever you create a spec or change its content: a plain-language summary for non-engineers (summary, whyItMatters, whatChanges, acceptance, risks, openQuestions, glossary, effort S/M/L/XL, readingMinutes). Write it for the user's profile (at the end of the MCP instructions), describe outcomes not code, and never invent requirements. update_spec { spec, brief } rewrites it alone.
 - Diagrams: use mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
-- Images: upload_attachment sends a PNG, JPEG, GIF or WebP up to 10 MB as base64 and returns markdown to embed in specs, task descriptions and comments.
+- Images: upload_attachment sends a PNG, JPEG, GIF or WebP up to 10 MB as base64 and returns markdown to embed in specs, task descriptions and comments. To see an image, list_attachments then get_attachment.
 - Versions: every content change keeps the previous version; people read the history in the dashboard.
 - create_epic accepts tasks and specs in one call.
 
-Tools: add_spec, get_spec, update_spec, delete_spec, upload_attachment, create_epic, approve_epic_specs`;
+Tools: add_spec, get_spec, update_spec, delete_spec, upload_attachment, list_attachments, get_attachment, create_epic, approve_epic_specs`;
 
 const TICKETS = `# External tickets
 

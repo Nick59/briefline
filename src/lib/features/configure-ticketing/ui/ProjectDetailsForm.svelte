@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import {
 		AddImageButton,
 		imageCommand,
@@ -21,9 +22,13 @@
 	let descriptionEl = $state<EditorView | null>(null);
 	const imageTarget = $derived<ImageTarget>({ type: 'project', id: project.id });
 
+	// Reset only when switching project; a reload of the same project keeps unsaved edits.
 	$effect.pre(() => {
-		name = project.name;
-		description = project.description;
+		void project.id;
+		untrack(() => {
+			name = project.name;
+			description = project.description;
+		});
 	});
 
 	async function submit(event: SubmitEvent) {

@@ -204,7 +204,7 @@ curl -X PUT ${origin}/api/v1/tasks/SHOP-3/stages/dev \\
 - OpenAPI 3.1: [\`/api/v1/openapi.json\`](${origin}/api/v1/openapi.json)
 - Ids and keys are interchangeable: \`SHOP\`, \`SHOP-E1\` and \`SHOP-12\` work wherever an id is expected.
 - Send \`X-Actor\` so the activity log and ticket comments show who made the change.
-- Upload an image with \`upload_attachment\` (\`POST /api/v1/attachments\`, base64 \`data\`) and paste the returned \`markdown\` (\`![name](/attachments/<id>)\`) into a spec, task description or comment. PNG, JPEG, GIF or WebP, up to 10 MB.
+- Upload an image with \`upload_attachment\` (\`POST /api/v1/attachments\`, base64 \`data\`) and paste the returned \`markdown\` (\`![name](/attachments/<id>)\`) into a spec, task description or comment. PNG, JPEG, GIF or WebP, up to 10 MB. To see an image, MCP agents call \`list_attachments\` then \`get_attachment\` (\`GET /api/v1/attachments/<id>\` returns base64 \`data\`).
 - Errors are JSON: \`{ "error": { "code", "message", "issues" } }\`.
 
 > [!TIP]

@@ -141,17 +141,79 @@ describe('tasks', () => {
 
 	it('moves a stage, logs it, and ignores no-op moves', () => {
 		const { app } = withEpic();
+		app.tasks.setStage('PMA-1', { stage: 'dev', status: 'done' }, 'ci-bot');
 		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done', note: 'All green' }, 'ci-bot');
 		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done' }, 'ci-bot');
 		const moves = app.activity
 			.forTask('PMA-1')
 			.items.filter((a) => a.action === 'task.stage_changed');
-		expect(moves).toHaveLength(1);
+		expect(moves).toHaveLength(2);
 		expect(moves[0]).toMatchObject({
 			actor: 'ci-bot',
 			message: 'Moved PMA-1 to Tests · Done',
 			data: { note: 'All green' }
 		});
+	});
+});
+
+describe('stage rules', () => {
+	const stagesOf = (app: ReturnType<typeof withEpic>['app'], key = 'PMA-1') =>
+		app.tasks.get(key).stages;
+
+	it('refuses deploy until dev and test are done', () => {
+		const { app } = withEpic();
+		app.tasks.setStage('PMA-1', { stage: 'dev', status: 'done' }, 'test');
+		expect(() =>
+			app.tasks.setStage('PMA-1', { stage: 'deploy', status: 'in_progress' }, 'test')
+		).toThrow(InvalidInputError);
+		expect(() => app.tasks.update('PMA-1', { stages: { deploy: 'done' } }, 'test')).toThrow(
+			InvalidInputError
+		);
+		app.tasks.setStage('PMA-1', { stage: 'test', status: 'done' }, 'test');
+		app.tasks.setStage('PMA-1', { stage: 'deploy', status: 'in_progress' }, 'test');
+		expect(stagesOf(app)).toEqual({ dev: 'done', test: 'done', deploy: 'in_progress' });
+	});
+
+	it('resets test and deploy when dev goes back to todo, one event per changed stage', () => {
+		const { app } = withEpic();
+		app.tasks.update('PMA-1', { stages: { dev: 'done', test: 'done', deploy: 'done' } }, 'test');
+		app.tasks.setStage('PMA-1', { stage: 'dev', status: 'todo', note: 'redo' }, 'test');
+		expect(stagesOf(app)).toEqual({ dev: 'todo', test: 'todo', deploy: 'todo' });
+		const moves = app.activity
+			.forTask('PMA-1')
+			.items.filter((a) => a.action === 'task.stage_changed')
+			.slice(0, 3);
+		expect(moves.map((m) => (m.data as { stage: string }).stage).sort()).toEqual([
+			'deploy',
+			'dev',
+			'test'
+		]);
+		expect(moves.filter((m) => (m.data as { note?: string }).note === 'redo')).toHaveLength(1);
+	});
+
+	it('applies both rules in update', () => {
+		const { app } = withEpic();
+		app.tasks.update('PMA-1', { stages: { dev: 'done', test: 'done', deploy: 'done' } }, 'test');
+		app.tasks.update('PMA-1', { stages: { dev: 'todo' } }, 'test');
+		expect(stagesOf(app)).toEqual({ dev: 'todo', test: 'todo', deploy: 'todo' });
+		expect(() =>
+			app.tasks.update('PMA-1', { stages: { dev: 'done', deploy: 'in_progress' } }, 'test')
+		).toThrow('finish test before deploy');
+	});
+
+	it('rejects in_progress on test while dev is not done', () => {
+		const { app } = withEpic();
+		expect(() =>
+			app.tasks.setStage('PMA-1', { stage: 'test', status: 'in_progress' }, 'test')
+		).toThrow('finish dev before test');
+		expect(stagesOf(app)).toEqual({ dev: 'todo', test: 'todo', deploy: 'todo' });
+	});
+
+	it('resets deploy to todo when test goes back to todo', () => {
+		const { app } = withEpic();
+		app.tasks.update('PMA-1', { stages: { dev: 'done', test: 'done', deploy: 'done' } }, 'test');
+		app.tasks.setStage('PMA-1', { stage: 'test', status: 'todo' }, 'test');
+		expect(stagesOf(app)).toEqual({ dev: 'done', test: 'todo', deploy: 'todo' });
 	});
 });
 
@@ -215,6 +277,7 @@ describe('moving tasks on the board', () => {
 		app.tasks.create(epic.key, { title: 'Docs' }, 'test');
 		const before = positions(app, epic.key);
 		app.tasks.move('PMA-1', { stage: 'dev', status: 'done' }, 'test');
+		app.tasks.setStage('PMA-3', { stage: 'dev', status: 'done' }, 'test');
 		app.tasks.setStage('PMA-3', { stage: 'test', status: 'in_progress' }, 'test');
 		expect(order(app, epic.key)).toEqual(['PMA-1', 'PMA-2', 'PMA-3']);
 		expect(positions(app, epic.key)).toEqual(before);
@@ -222,6 +285,7 @@ describe('moving tasks on the board', () => {
 
 	it('changes column and position in one step', () => {
 		const { app, epic } = withEpic();
+		app.tasks.setStage('PMA-2', { stage: 'dev', status: 'done' }, 'agent');
 		const moved = app.tasks.move(
 			'PMA-2',
 			{ stage: 'test', status: 'in_progress', beforeTask: 'PMA-1' },

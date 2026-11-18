@@ -12,7 +12,7 @@
 	import { displayKey } from '#lib/shared/domain/display-key.ts';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
@@ -52,14 +52,17 @@
 				: null
 	);
 
+	// Reset only on open; live reloads replace props and must not wipe unsaved edits.
 	$effect(() => {
 		if (open) {
-			title = task?.title ?? '';
-			summary = task?.summary ?? '';
-			description = task?.description ?? '';
-			priority = task?.priority ?? 'medium';
-			assignee = task?.assignee ?? '';
-			epic = task?.epicId ?? '';
+			untrack(() => {
+				title = task?.title ?? '';
+				summary = task?.summary ?? '';
+				description = task?.description ?? '';
+				priority = task?.priority ?? 'medium';
+				assignee = task?.assignee ?? '';
+				epic = task?.epicId ?? '';
+			});
 		}
 	});
 

@@ -4,6 +4,9 @@ import type { Transport } from '../core/events.ts';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
+export type McpContent =
+	{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string };
+
 export interface OperationContext {
 	actor: string;
 	/** Set when the call arrives as an MCP tool call. */
@@ -29,6 +32,8 @@ export interface Operation<S extends z.ZodObject = z.ZodObject> {
 		/** Fields marked required in the tool's input schema. */
 		required?: string[];
 		/** Returns an error message when the call must be refused. */
+		/** Replaces the default JSON text content of the MCP result. */
+		content?(value: unknown): McpContent[];
 		check?(input: z.output<S>): string | null;
 	};
 	readOnly: boolean;

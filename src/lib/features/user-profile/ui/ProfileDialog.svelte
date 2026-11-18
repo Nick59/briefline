@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
@@ -42,11 +43,13 @@
 
 	$effect(() => {
 		if (!open) return;
-		name = profile?.name ?? '';
-		role = profile?.role ?? 'developer';
-		roleOther = profile?.roleOther ?? '';
-		codingLevel = profile?.codingLevel ?? 'intermediate';
-		language = profile?.language ?? '';
+		untrack(() => {
+			name = profile?.name ?? '';
+			role = profile?.role ?? 'developer';
+			roleOther = profile?.roleOther ?? '';
+			codingLevel = profile?.codingLevel ?? 'intermediate';
+			language = profile?.language ?? '';
+		});
 	});
 
 	async function submit(event: SubmitEvent) {

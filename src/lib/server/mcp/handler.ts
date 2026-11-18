@@ -1,7 +1,7 @@
 import type { Container } from '../container.ts';
 import { execute, toFailure } from '../api/execute.ts';
 import { inputJsonSchema } from '../api/openapi.ts';
-import type { Operation } from '../api/operation.ts';
+import type { McpContent, Operation } from '../api/operation.ts';
 import { codingLevelPhrase, roleLabel } from '#lib/shared/domain/profile-guidance.ts';
 import { operations, operationsByName } from '../api/operations.ts';
 import { MCP_INSTRUCTIONS } from '../modules/guide/how-to.ts';
@@ -84,9 +84,13 @@ async function callTool(app: Container, params: Record<string, unknown>, actor: 
 			value !== null && typeof value === 'object' && !Array.isArray(value)
 				? value
 				: { items: value };
+		const content: McpContent[] = op.mcp?.content?.(value) ?? [
+			{ type: 'text', text: JSON.stringify(value, null, 2) }
+		];
+		if (op.mcp?.content && 'data' in structured) delete (structured as { data?: unknown }).data;
 		return {
 			result: {
-				content: [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+				content,
 				structuredContent: structured
 			}
 		};

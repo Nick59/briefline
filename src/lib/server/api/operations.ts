@@ -31,7 +31,8 @@ import { SYNC_JOB_STATUSES } from '#lib/shared/domain/constants.ts';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../modules/activity/repository.ts';
 import { summarySchema } from '../modules/sessions/service.ts';
 import type { Page } from '#lib/shared/domain/types.ts';
-import { InvalidInputError } from '../core/errors.ts';
+import { existsSync, readFileSync } from 'node:fs';
+import { InvalidInputError, NotFoundError } from '../core/errors.ts';
 import { HOW_TO_TOPICS, howTo } from '../modules/guide/how-to.ts';
 import { defineOperation, type Operation } from './operation.ts';
 
@@ -463,7 +464,7 @@ export const operations: Operation[] = [
 		tag: 'Tasks',
 		summary: 'Move a task to todo, in_progress or done in one stage (dev, test, deploy)',
 		description:
-			'This is the main progress signal. It updates the linked tickets when ticket sync is on. When an agent sets in_progress on a task without an assignee, it becomes the assignee (a soft claim). If another agent already holds the task the call still succeeds and the response carries `claimedBy`: back off or coordinate on the task comments.',
+			'This is the main progress signal. A stage can start only once every earlier stage is done (test needs dev, deploy needs dev and test); moving a stage back to todo resets the later stages. It updates the linked tickets when ticket sync is on. When an agent sets in_progress on a task without an assignee, it becomes the assignee (a soft claim). If another agent already holds the task the call still succeeds and the response carries `claimedBy`: back off or coordinate on the task comments.',
 		input: setStageStatusSchema.extend({ task, stage: stageSchema, status: workStatusSchema }),
 		run: (app, { task, ...input }, { actor }) => {
 			const updated = app.tasks.setStage(task, input, actor);
@@ -551,7 +552,6 @@ export const operations: Operation[] = [
 	}),
 	defineOperation({
 		name: 'list_attachments',
-		mcp: { excluded: true },
 		method: 'GET',
 		path: '/attachments',
 		tag: 'Attachments',
@@ -576,6 +576,40 @@ export const operations: Operation[] = [
 				uploadedBy: a.uploadedBy,
 				createdAt: a.createdAt
 			}));
+		}
+	}),
+	defineOperation({
+		name: 'get_attachment',
+		method: 'GET',
+		path: '/attachments/{attachment}',
+		tag: 'Attachments',
+		summary: 'Get an uploaded image',
+		description:
+			'Over MCP returns the image itself so you can see it; over REST returns the metadata with the bytes base64 encoded in `data`. Find ids with list_attachments.',
+		input: z.object({ attachment: z.string().min(1).describe('Attachment id') }),
+		mcp: {
+			content: (value) => {
+				const { data, ...meta } = value as { data: string; mime: string };
+				return [
+					{ type: 'image', data, mimeType: meta.mime },
+					{ type: 'text', text: JSON.stringify(meta, null, 2) }
+				];
+			}
+		},
+		run: (app, { attachment }) => {
+			const a = app.attachments.get(attachment);
+			const file = app.attachments.path(a.id);
+			if (!existsSync(file)) throw new NotFoundError('Attachment', a.id);
+			return {
+				id: a.id,
+				filename: a.filename,
+				mime: a.mime,
+				size: a.size,
+				uploadedBy: a.uploadedBy,
+				createdAt: a.createdAt,
+				url: `/attachments/${a.id}`,
+				data: readFileSync(file).toString('base64')
+			};
 		}
 	}),
 	defineOperation({

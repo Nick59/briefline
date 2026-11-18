@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { execute } from '../../api/execute.ts';
 import { operationsByName } from '../../api/operations.ts';
@@ -156,6 +156,68 @@ describe('attachment operations', () => {
 			'claude'
 		)) as { result: { structuredContent: { markdown: string } } };
 		expect(reply.result.structuredContent.markdown).toMatch(/^!\[a\.png\]\(\/attachments\//);
+	});
+});
+
+interface McpResult {
+	content: { type: string; data: string; mimeType: string }[];
+	structuredContent: object;
+}
+
+describe('get_attachment', () => {
+	const mcp = (app: ReturnType<typeof setup>['app'], name: string, args: object) =>
+		handleMcp(
+			app,
+			{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } },
+			'claude'
+		) as Promise<{ result: McpResult }>;
+
+	it('returns an image block over MCP and base64 data over operations', async () => {
+		const { app } = setup();
+		const { id } = app.attachments.upload(
+			{ target: { type: 'task', id: 'SHOP-1' }, filename: 'a.png', data: PNG },
+			'n'
+		);
+		const { result } = await mcp(app, 'get_attachment', { attachment: id });
+		expect(result.content[0].type).toBe('image');
+		expect(result.content[0].mimeType).toBe('image/png');
+		expect(Buffer.from(result.content[0].data, 'base64')).toEqual(PNG);
+		expect(result.structuredContent).toMatchObject({ id, mime: 'image/png' });
+		expect(result.structuredContent).not.toHaveProperty('data');
+		const rest = (await execute(
+			app,
+			operationsByName.get('get_attachment')!,
+			{ attachment: id },
+			{
+				actor: 'x'
+			}
+		)) as { data: string };
+		expect(rest.data).toBe(PNG.toString('base64'));
+	});
+
+	it('is not_found for an unknown id and a missing file', async () => {
+		const { app } = setup();
+		const { id } = app.attachments.upload(
+			{ target: { type: 'task', id: 'SHOP-1' }, filename: 'a.png', data: PNG },
+			'n'
+		);
+		const get = (attachment: string) =>
+			execute(app, operationsByName.get('get_attachment')!, { attachment }, { actor: 'x' });
+		await expect(get('nope')).rejects.toMatchObject({ status: 404 });
+		rmSync(app.attachments.path(id));
+		await expect(get(id)).rejects.toMatchObject({ status: 404 });
+	});
+
+	it('lists list_attachments in tools/list', async () => {
+		const { app } = setup();
+		const { result } = (await handleMcp(
+			app,
+			{ jsonrpc: '2.0', id: 1, method: 'tools/list' },
+			'claude'
+		)) as { result: { tools: { name: string }[] } };
+		const names = result.tools.map((t) => t.name);
+		expect(names).toContain('list_attachments');
+		expect(names).toContain('get_attachment');
 	});
 });
 

@@ -114,6 +114,7 @@ describe('session service', () => {
 			app.epics.approveSpecs('SH-E1', 'dashboard');
 			app.tasks.create('SH-E1', { title: 'C' }, 'claude');
 			app.tasks.setStage('SH-1', { stage: 'dev', status: 'done' }, 'claude');
+			app.tasks.setStage('SH-1', { stage: 'test', status: 'done' }, 'claude');
 			app.tasks.setStage('SH-1', { stage: 'deploy', status: 'done' }, 'claude');
 			app.specs.createForEpic('SH-E1', { title: 'Plan', content: 'x' }, 'claude');
 		});
@@ -125,7 +126,7 @@ describe('session service', () => {
 		const [session] = app.sessions.list().items;
 		expect(session.id).toBe(id);
 		expect(session.recap).toMatchObject({
-			stageChanges: 2,
+			stageChanges: 3,
 			tasksDone: 1,
 			tasksCreated: 1,
 			epicsCreated: 1,
@@ -133,7 +134,7 @@ describe('session service', () => {
 			specsUpdated: 0,
 			threadsOpened: 0
 		});
-		expect(session.activityCount).toBe(6);
+		expect(session.activityCount).toBe(7);
 	});
 
 	it('counts opened threads, replies and answers', () => {
@@ -185,7 +186,7 @@ describe('session service', () => {
 		const { app, id } = work();
 		const detail = app.sessions.get(id, { limit: 2 });
 		expect(detail.session.id).toBe(id);
-		expect(detail.activity.total).toBe(6);
+		expect(detail.activity.total).toBe(7);
 		expect(detail.activity.items).toHaveLength(2);
 		expect(detail.activity.items.every((a) => a.sessionId === id)).toBe(true);
 		expect(() => app.sessions.get('missing')).toThrow(/Session 'missing' was not found/);

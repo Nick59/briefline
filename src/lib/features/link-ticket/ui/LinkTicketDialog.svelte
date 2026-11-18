@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import * as Dialog from '#lib/shared/ui/primitives/dialog/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { Input } from '#lib/shared/ui/primitives/input/index.js';
@@ -22,11 +22,14 @@
 	let url = $state('');
 	let busy = $state(false);
 
+	// Reset only on open; live reloads replace props and must not wipe unsaved edits.
 	$effect(() => {
 		if (open) {
-			provider = current?.provider ?? defaultProvider ?? '';
-			key = current?.key ?? '';
-			url = current?.url ?? '';
+			untrack(() => {
+				provider = current?.provider ?? defaultProvider ?? '';
+				key = current?.key ?? '';
+				url = current?.url ?? '';
+			});
 		}
 	});
 

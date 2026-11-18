@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
 	import type { EditorView } from '@codemirror/view';
 	import {
@@ -74,11 +74,14 @@
 		tab = 'write';
 	}
 
+	// Reset only on open; live reloads replace props and must not wipe unsaved edits.
 	$effect(() => {
 		if (open) {
-			title = spec?.title ?? '';
-			kind = spec?.kind ?? 'spec';
-			content = spec?.content ?? '';
+			untrack(() => {
+				title = spec?.title ?? '';
+				kind = spec?.kind ?? 'spec';
+				content = spec?.content ?? '';
+			});
 		}
 	});
 

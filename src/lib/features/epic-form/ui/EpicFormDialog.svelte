@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { FormatToolbar } from '#lib/features/markdown-format/index.ts';
 	import { MarkdownEditor } from '#lib/shared/ui/markdown-editor/index.ts';
@@ -28,11 +28,14 @@
 	let busy = $state(false);
 	let summaryEl = $state<EditorView | null>(null);
 
+	// Reset only on open; live reloads replace props and must not wipe unsaved edits.
 	$effect(() => {
 		if (open) {
-			title = epic?.title ?? '';
-			summary = epic?.summary ?? '';
-			targetDate = epic?.targetDate ?? '';
+			untrack(() => {
+				title = epic?.title ?? '';
+				summary = epic?.summary ?? '';
+				targetDate = epic?.targetDate ?? '';
+			});
 		}
 	});
 

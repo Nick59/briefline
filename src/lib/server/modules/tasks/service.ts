@@ -12,7 +12,7 @@ import {
 	type SetStageStatusInput,
 	type UpdateTaskInput
 } from '#lib/shared/domain/schemas.ts';
-import type { Epic, Task, TaskDetail } from '#lib/shared/domain/types.ts';
+import type { Epic, StageStatuses, Task, TaskDetail } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
 import { InvalidInputError, OpenQuestionsError, SpecsNotApprovedError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
@@ -108,7 +108,7 @@ export class TaskService {
 			summary: data.summary ?? current.summary,
 			priority: data.priority ?? current.priority,
 			assignee: data.assignee === undefined ? current.assignee : data.assignee,
-			stages: { ...current.stages, ...data.stages },
+			stages: this.#nextStages(current, data.stages ?? {}),
 			externalRef:
 				data.externalRef === undefined
 					? current.externalRef
@@ -149,25 +149,27 @@ export class TaskService {
 		this.#assertCanChange(epic, current.stages[stage], status, actor);
 		const task: Task = {
 			...current,
-			stages: { ...current.stages, [stage]: status },
+			stages: this.#nextStages(current, { [stage]: status }),
 			updatedAt: now()
 		};
 		this.deps.repos.tasks.update(task);
-		this.deps.events.emit({
-			type: 'task.stage_changed',
-			projectId: epic.projectId,
-			epicId: epic.id,
-			taskId: task.id,
-			actor,
-			data: {
-				key: task.key,
-				title: task.title,
-				stage,
-				from: current.stages[stage],
-				to: status,
-				note
-			}
-		});
+		for (const changed of STAGES.filter((s) => current.stages[s] !== task.stages[s])) {
+			this.deps.events.emit({
+				type: 'task.stage_changed',
+				projectId: epic.projectId,
+				epicId: epic.id,
+				taskId: task.id,
+				actor,
+				data: {
+					key: task.key,
+					title: task.title,
+					stage: changed,
+					from: current.stages[changed],
+					to: task.stages[changed],
+					note: changed === stage ? note : undefined
+				}
+			});
+		}
 		return task;
 	}
 
@@ -277,6 +279,22 @@ export class TaskService {
 		const epic = requireEpic(this.deps.repos, task.epicId);
 		this.deps.repos.tasks.delete(task.id);
 		this.#emit('task.deleted', epic, task, actor);
+	}
+
+	/** A stage can start only once every earlier stage is done; moving a stage back to todo resets the later ones. */
+	#nextStages(task: Task, changes: Partial<StageStatuses>): StageStatuses {
+		const stages = { ...task.stages, ...changes };
+		STAGES.forEach((stage, i) => {
+			// Restarting a stage invalidates every later one.
+			if (changes[stage] === 'todo' && task.stages[stage] !== 'todo')
+				STAGES.slice(i + 1).forEach((later) => (stages[later] = 'todo'));
+		});
+		STAGES.forEach((stage, i) => {
+			const blocker = STAGES.slice(0, i).find((prev) => stages[prev] !== 'done');
+			if (stages[stage] !== 'todo' && blocker)
+				throw new InvalidInputError(`Task ${task.key}: finish ${blocker} before ${stage}`);
+		});
+		return stages;
 	}
 
 	#assertNotCancelled(task: Task) {
