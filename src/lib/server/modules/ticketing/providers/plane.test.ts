@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { connectProject, testApp, type FetchCall } from '../../../testing/app.ts';
+import type { RemoteTicket } from '../provider.ts';
 
 const UUID = '3f1c2a5e-1111-4222-8333-444455556666';
 const KEY = 'plane-secret-key-987';
@@ -136,5 +137,45 @@ describe('plane listProjects', () => {
 		const connection = app.connections.list()[0];
 		expect(await app.connections.listProjects(connection.id)).toEqual([projects[0]]);
 		expect(app.ticketing.providers().find((p) => p.id === 'plane')?.supportsProjects).toBe(true);
+	});
+});
+
+describe('plane fetchTicket html bodies', () => {
+	function fetchRemote(item: object, comments: object[]) {
+		const { app } = setup(
+			undefined,
+			UUID,
+			(call) =>
+				call.url.includes('/comments/')
+					? Response.json({ results: comments })
+					: Response.json({ id: 'wi', name: 'P', state: { id: 's1', group: 'started' }, ...item }),
+			{ PLANE_API_KEY: KEY }
+		);
+		const resolved = app.connections.forProject(app.projects.get('PMA'))!;
+		return (): Promise<RemoteTicket> =>
+			resolved.provider.fetchTicket!({
+				...resolved.context,
+				ref: { provider: 'plane', key: 'SOFT-1', url: null },
+				mapped: null
+			});
+	}
+
+	it('maps a comment that only has comment_html to plain text', async () => {
+		const run = fetchRemote({}, [
+			{
+				id: 'k1',
+				comment_html: '<p>Fix &amp; ship</p><p>a&nbsp;&lt;b&gt;<br>&quot;it&#39;s&quot;</p>',
+				created_at: '2026-01-01'
+			}
+		]);
+		expect((await run()).comments[0].body).toBe('Fix & ship\na <b>\n"it\'s"');
+	});
+
+	it('maps a work item that only has description_html to a plain text description', async () => {
+		const run = fetchRemote(
+			{ description_html: '<h2>Title</h2><ul><li>one</li><li>two</li></ul>' },
+			[]
+		);
+		expect((await run()).description).toBe('Title\none\ntwo');
 	});
 });

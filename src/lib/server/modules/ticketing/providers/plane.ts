@@ -94,7 +94,8 @@ async function fetchStates(ctx: ProviderContext): Promise<ProviderState[]> {
 
 interface PlaneComment {
 	id: string;
-	comment_stripped: string;
+	comment_stripped?: string;
+	comment_html?: string;
 	actor_detail?: { display_name: string };
 	created_at: string;
 }
@@ -156,6 +157,7 @@ export const planeProvider: TicketProvider = {
 			id: string;
 			name: string;
 			description_stripped?: string | null;
+			description_html?: string | null;
 			state?: string | { id: string; group?: string } | null;
 		};
 		let state: { id: string; group?: string } | null = null;
@@ -179,11 +181,13 @@ export const planeProvider: TicketProvider = {
 		);
 		return {
 			title: item.name,
-			description: item.description_stripped ?? null,
+			description:
+				item.description_stripped ??
+				(item.description_html ? htmlToText(item.description_html) : null),
 			state,
 			comments: comments.map((c) => ({
 				id: c.id,
-				body: c.comment_stripped,
+				body: c.comment_stripped ?? htmlToText(c.comment_html ?? ''),
 				author: c.actor_detail?.display_name ?? null,
 				createdAt: c.created_at
 			}))
@@ -245,4 +249,18 @@ export const planeProvider: TicketProvider = {
 
 function escapeHtml(text: string) {
 	return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function htmlToText(html: string) {
+	return html
+		.replace(/<br\s*\/?>|<\/(p|li|h[1-6]|div)>/gi, '\n')
+		.replace(/<[^>]*>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/&amp;/g, '&')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
