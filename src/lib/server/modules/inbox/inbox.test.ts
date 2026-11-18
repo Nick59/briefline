@@ -95,21 +95,6 @@ describe('inbox', () => {
 		expect(await run('get_inbox', {}, 'b')).toEqual([]);
 	});
 
-	it('dismisses an item for every agent and flags it afresh on the next change', async () => {
-		const { app, run, epic, actions } = setup();
-		const task = await run('create_task', { epic: epic.key, title: 'T' });
-		await run('ack_inbox', { items: [task.key] }, 'a');
-		expect(await run('dismiss_inbox', { items: [task.key] })).toEqual({ dismissed: [task.key] });
-		expect(await run('get_inbox', {}, 'b')).toEqual([]);
-		expect(app.db.prepare('SELECT COUNT(*) AS n FROM inbox_acks').get()).toEqual({ n: 0 });
-		expect(app.inbox.list('dashboard')).toEqual([]);
-
-		await run('add_task_comment', { task: task.key, body: 'Back' });
-		const [item] = await run('get_inbox', {}, 'a');
-		expect(actions(item)).toEqual(['task.commented']);
-		expect(item.ackedBy).toEqual([]);
-	});
-
 	it('flags an epic for the others of whoever opens a thread', async () => {
 		const { app, run, epic, actions } = setup();
 		await run(

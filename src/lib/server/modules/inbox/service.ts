@@ -135,16 +135,6 @@ export class InboxService {
 		};
 	}
 
-	/** Removes items for every agent; a later change flags them again. */
-	dismiss(items: string[]): { dismissed: string[] } {
-		const targets = items.map((item) => this.#resolve(item));
-		return {
-			dismissed: transaction(this.deps.db, () =>
-				targets.filter(({ target }) => this.deps.repos.inbox.remove(target)).map(({ key }) => key)
-			)
-		};
-	}
-
 	#resolve(item: string): { key: string; target: InboxTarget } {
 		const { repos } = this.deps;
 		const task = repos.tasks.find(item);

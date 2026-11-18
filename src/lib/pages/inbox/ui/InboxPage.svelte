@@ -1,6 +1,6 @@
 <script lang="ts">
 	import CheckIcon from '@lucide/svelte/icons/check';
-	import XIcon from '@lucide/svelte/icons/x';
+	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
 	import { resolve } from '$app/paths';
 	import { ActivityItem } from '#lib/entities/activity/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
@@ -21,9 +21,13 @@
 		busy = null;
 	}
 
-	async function dismiss(key: string) {
-		busy = key;
-		await runOperation('dismiss_inbox', { items: [key] }, { success: `Dismissed ${key}` });
+	async function markAllSeen() {
+		busy = 'all';
+		await runOperation(
+			'mark_inbox_seen',
+			{ items: items.map((item) => item.key) },
+			{ success: 'Marked everything seen' }
+		);
 		busy = null;
 	}
 </script>
@@ -32,6 +36,13 @@
 	<PageHeader title="Inbox">
 		{#snippet description()}
 			Changes agents made to tasks and threads since you last looked.
+		{/snippet}
+		{#snippet actions()}
+			{#if items.length > 0}
+				<Button variant="outline" disabled={busy !== null} onclick={markAllSeen}
+					><CheckCheckIcon />See all</Button
+				>
+			{/if}
 		{/snippet}
 	</PageHeader>
 
@@ -44,8 +55,8 @@
 		<ul class="grid gap-4">
 			{#each items as item (item.key)}
 				<li class="space-y-3 rounded-lg border p-4">
-					<div class="flex flex-wrap items-center justify-between gap-2">
-						<div class="min-w-0">
+					<div class="flex items-start justify-between gap-3">
+						<div class="min-w-0 flex-1">
 							<a
 								class="font-medium hover:underline"
 								href={item.kind === 'epic'
@@ -75,16 +86,9 @@
 								</p>
 							{/if}
 						</div>
-						<div class="flex gap-2">
+						<div class="flex shrink-0 gap-2">
 							<Button size="sm" disabled={busy === item.key} onclick={() => markSeen(item.key)}
 								><CheckIcon />Mark seen</Button
-							>
-							<Button
-								size="sm"
-								variant="outline"
-								title="Dismiss for everyone"
-								disabled={busy === item.key}
-								onclick={() => dismiss(item.key)}><XIcon />Dismiss</Button
 							>
 						</div>
 					</div>

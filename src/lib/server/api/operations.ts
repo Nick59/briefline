@@ -234,20 +234,6 @@ export const operations: Operation[] = [
 		run: (app, { items }, { actor }) => app.inbox.ack(actor, items)
 	}),
 	defineOperation({
-		name: 'dismiss_inbox',
-		method: 'POST',
-		path: '/inbox/dismiss',
-		tag: 'Inbox',
-		summary: 'Remove inbox items for every agent',
-		description:
-			'Deletes the items and all acknowledgements; a later change flags them again. An unknown key fails and dismisses nothing. Returns `dismissed`: the keys that were in the inbox.',
-		input: z.object({
-			items: z.array(z.string().min(1)).min(1).describe('Task or epic keys (e.g. PMA-12 or PMA-E1)')
-		}),
-		mcp: { excluded: true },
-		run: (app, { items }) => app.inbox.dismiss(items)
-	}),
-	defineOperation({
 		name: 'mark_inbox_seen',
 		method: 'POST',
 		path: '/inbox/seen',

@@ -56,7 +56,6 @@ The inbox lists tasks and epics that others (people and other agents) changed si
 - get_inbox { project? } returns items oldest first. Each has changes (others' activity after your last acknowledgement), seq, ackedBy (other agents that acknowledged it, with upToDate telling if they saw the latest change) and, for tasks, the assignee.
 - ack_inbox { items: [{ item, seq }] } with the seq you received, so a change that arrived meanwhile is not acknowledged unseen. A plain key acknowledges up to the latest change. It is safe to repeat; an unknown key fails and acknowledges nothing.
 - A later change by someone else shows the item again with only the new changes.
-- Dismissing an item for every agent is dashboard-only; there is no tool for it.
 
 Typical loop: get_inbox, act on each item's changes, ack_inbox with its seq.
 

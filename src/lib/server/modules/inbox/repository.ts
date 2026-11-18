@@ -94,13 +94,6 @@ export class InboxRepository {
 		).map((row) => ({ agent: row.agent, ackedSeq: row.acked_seq, ackedAt: row.acked_at }));
 	}
 
-	remove(target: InboxTarget): boolean {
-		const result = run(this.db, `DELETE FROM inbox WHERE ${column(target)} = :id`, {
-			id: idOf(target)
-		});
-		return Number(result.changes) > 0;
-	}
-
 	/** Items with activity after the viewer's acknowledgement by anyone outside `exclude`, oldest first. */
 	list(viewer: string, exclude: string[], projectId?: string): InboxRow[] {
 		const { join, where, params } = scope(projectId);
