@@ -105,7 +105,7 @@
 					id="epic-summary"
 					bind:view={summaryEl}
 					bind:value={summary}
-					maxlength={5000}
+					maxlength={50_000}
 					minRows={10}
 				/>
 			</Field>

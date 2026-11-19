@@ -291,7 +291,9 @@ export class TaskService {
 		});
 		STAGES.forEach((stage, i) => {
 			const blocker = STAGES.slice(0, i).find((prev) => stages[prev] !== 'done');
-			if (stages[stage] !== 'todo' && blocker)
+			// Stages saved before this rule existed stay editable while the update leaves them alone.
+			const touched = STAGES.slice(0, i + 1).some((s) => stages[s] !== task.stages[s]);
+			if (touched && stages[stage] !== 'todo' && blocker)
 				throw new InvalidInputError(`Task ${task.key}: finish ${blocker} before ${stage}`);
 		});
 		return stages;

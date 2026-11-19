@@ -217,6 +217,45 @@ describe('stage rules', () => {
 	});
 });
 
+describe('stage rules on stored state', () => {
+	const storeInvalidStages = (app: ReturnType<typeof withEpic>['app']) =>
+		app.db
+			.prepare(
+				"UPDATE tasks SET dev_status = 'todo', test_status = 'in_progress' WHERE key = 'PMA-1'"
+			)
+			.run();
+
+	it('accepts an update that leaves the stages alone', () => {
+		const { app } = withEpic();
+		storeInvalidStages(app);
+		expect(app.tasks.update('PMA-1', { title: 'Renamed' }, 'test').title).toBe('Renamed');
+		expect(app.tasks.get('PMA-1').stages).toEqual({
+			dev: 'todo',
+			test: 'in_progress',
+			deploy: 'todo'
+		});
+	});
+
+	it('still refuses a stage change that stays invalid', () => {
+		const { app } = withEpic();
+		storeInvalidStages(app);
+		expect(() => app.tasks.update('PMA-1', { stages: { deploy: 'done' } }, 'test')).toThrow(
+			InvalidInputError
+		);
+		expect(() => app.tasks.update('PMA-1', { stages: { test: 'done' } }, 'test')).toThrow(
+			InvalidInputError
+		);
+	});
+});
+
+describe('epic summary', () => {
+	it('accepts a 6000-character summary', () => {
+		const { app, epic } = withEpic();
+		const summary = 'x'.repeat(6000);
+		expect(app.epics.update(epic.id, { summary }, 'test').summary).toBe(summary);
+	});
+});
+
 describe('specs', () => {
 	it('keeps fields that a partial update leaves out', () => {
 		const { app, epic } = withEpic();
