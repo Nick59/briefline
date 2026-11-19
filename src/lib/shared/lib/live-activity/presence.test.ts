@@ -14,6 +14,12 @@ describe('presenceRows', () => {
 		});
 		expect(presenceRows(agents, at(20))[0]).toMatchObject({ status: 'offline', text: 'Offline' });
 	});
+	it('keeps agents seen under 24 h ago and drops the others', () => {
+		const agents = [{ actor: 'codex', lastSeenAt: seen, transport: 'mcp' as const }];
+		expect(presenceRows(agents, at(24 * 60 - 1))).toHaveLength(1);
+		expect(presenceRows(agents, at(24 * 60))).toHaveLength(0);
+		expect(presenceRows(agents, at(3 * 24 * 60))).toHaveLength(0);
+	});
 	it('never says 0 minutes', () => {
 		expect(presenceText('away', seen, at(5))).toBe('Last seen 5 min ago');
 	});
