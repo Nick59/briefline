@@ -88,5 +88,7 @@ export const CODING_LEVEL_LABELS: Record<CodingLevel, { label: string; hint: str
 /** An agent seen within this time is online; up to PRESENCE_OFFLINE_MS it was last seen; after that it is offline. */
 export const PRESENCE_ONLINE_MS = 5 * 60_000;
 export const PRESENCE_OFFLINE_MS = 20 * 60_000;
+/** Agents not seen for this long are hidden from the sidebar. */
+export const PRESENCE_VISIBLE_MS = 24 * 60 * 60 * 1000;
 /** Longest wait between database writes, and between presence events, for an agent that stays online. */
 export const PRESENCE_THROTTLE_MS = 30_000;

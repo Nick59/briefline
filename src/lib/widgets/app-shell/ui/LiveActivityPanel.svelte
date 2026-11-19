@@ -56,7 +56,7 @@
 
 	<div role="status" class="mt-1.5">
 		{#if shown.length === 0}
-			<p class="text-muted-foreground">No agent connected yet</p>
+			<p class="text-muted-foreground">No agent active in the last 24 hours</p>
 		{:else}
 			<ul class="space-y-1">
 				{#each shown as agent (agent.actor)}

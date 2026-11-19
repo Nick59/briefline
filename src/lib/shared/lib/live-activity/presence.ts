@@ -1,3 +1,4 @@
+import { PRESENCE_VISIBLE_MS } from '#lib/shared/domain/constants.ts';
 import {
 	presenceStatus,
 	type AgentPresence,
@@ -21,8 +22,10 @@ export function presenceText(status: PresenceStatus, lastSeenAt: string, now: nu
 }
 
 export function presenceRows(agents: AgentPresence[], now: number): PresenceRow[] {
-	return agents.map(({ actor, lastSeenAt }) => {
-		const status = presenceStatus(lastSeenAt, now);
-		return { actor, status, text: presenceText(status, lastSeenAt, now) };
-	});
+	return agents
+		.filter(({ lastSeenAt }) => now - Date.parse(lastSeenAt) < PRESENCE_VISIBLE_MS)
+		.map(({ actor, lastSeenAt }) => {
+			const status = presenceStatus(lastSeenAt, now);
+			return { actor, status, text: presenceText(status, lastSeenAt, now) };
+		});
 }
