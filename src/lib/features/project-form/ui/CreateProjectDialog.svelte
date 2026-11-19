@@ -8,6 +8,7 @@
 	import { Textarea } from '#lib/shared/ui/primitives/textarea/index.js';
 	import { Field } from '#lib/shared/ui/field/index.ts';
 	import { runOperation } from '#lib/shared/lib/run-operation.ts';
+	import { suggestProjectKey } from '../model/suggest-key.ts';
 	import type { Project } from '#lib/shared/domain/types.ts';
 	import type { Snippet } from 'svelte';
 
@@ -20,17 +21,7 @@
 	let description = $state('');
 	let busy = $state(false);
 
-	const suggestedKey = $derived(
-		name
-			.split(/\s+/)
-			.filter(Boolean)
-			.map((w) => w[0])
-			.join('')
-			.toUpperCase()
-			.replace(/[^A-Z0-9]/g, '')
-			.slice(0, 4)
-			.padEnd(2, 'X')
-	);
+	const suggestedKey = $derived(suggestProjectKey(name));
 	const effectiveKey = $derived(keyTouched ? key : name ? suggestedKey : '');
 
 	async function submit(event: SubmitEvent) {

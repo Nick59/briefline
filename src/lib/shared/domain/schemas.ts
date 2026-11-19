@@ -291,7 +291,7 @@ const planTaskSchema = createTaskSchema.extend({
 
 const epicFields = {
 	title: text(200).min(1),
-	summary: text(5000),
+	summary: text(50_000),
 	targetDate: isoDate.nullable(),
 	externalRef: externalRefSchema.nullable()
 };
