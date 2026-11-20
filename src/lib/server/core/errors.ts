@@ -61,3 +61,13 @@ export class EpicHasOpenTasksError extends DomainError {
 		);
 	}
 }
+
+export class TaskBlockedError extends DomainError {
+	constructor(taskKey: string, reason: string | null) {
+		super(
+			`Task ${taskKey} is blocked${reason ? `: ${reason}` : ''}. A person must unblock it in the Briefline UI before its stages can change.`,
+			409,
+			'task_blocked'
+		);
+	}
+}

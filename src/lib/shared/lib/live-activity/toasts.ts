@@ -12,6 +12,9 @@ export function notifyAgentEvent(event: LiveEvent) {
 	} else if (event.type === 'task.cancelled' || event.type === 'task.restored') {
 		const verb = event.type === 'task.cancelled' ? 'cancelled' : 'restored';
 		toast(`${event.actor} ${verb} ${event.key}`, { id });
+	} else if (event.type === 'task.blocked' || event.type === 'task.unblocked') {
+		const verb = event.type === 'task.blocked' ? 'blocked' : 'unblocked';
+		toast(`${event.actor} ${verb} ${event.key}`, { id });
 	} else if (event.type === 'spec.created') {
 		toast(`${event.actor} added spec "${event.title}"`, { id });
 	} else if (isCommentEvent(event.type)) {

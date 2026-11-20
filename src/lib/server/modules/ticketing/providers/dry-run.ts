@@ -35,5 +35,10 @@ export const dryRunProvider: TicketProvider = {
 	async syncComment(_ctx, comment) {
 		return comment.body === null ? null : comment.id;
 	},
+	async pushDescription(_ctx, markdown) {
+		return {
+			note: `Description: ${markdown.length > 200 ? `${markdown.slice(0, 200)}…` : markdown}`
+		};
+	},
 	async push() {}
 };

@@ -49,14 +49,22 @@ export class EpicService {
 			});
 	}
 
-	/** Epics an agent can work on now, in the user's order. */
+	/** Epics an agent can work on now, in the user's order. An epic whose unfinished tasks are all blocked has nothing to start. */
 	workToDo(projectIdOrKey: string): EpicSummary[] {
 		return this.list(projectIdOrKey).filter(
 			(epic) =>
 				epic.openQuestions === 0 &&
 				(!epic.specsRequired || epic.specsApprovedAt) &&
-				epic.progress.status !== 'done'
+				epic.progress.status !== 'done' &&
+				!this.#allOpenTasksBlocked(epic.id)
 		);
+	}
+
+	#allOpenTasksBlocked(epicId: string) {
+		const open = this.deps.repos.tasks
+			.listByEpic(epicId)
+			.filter((task) => !task.cancelledAt && taskOverallStatus(task.stages) !== 'done');
+		return open.length > 0 && open.every((task) => task.blockedAt);
 	}
 
 	/** Archives every finished epic of the project; an epic without active tasks is never done. */

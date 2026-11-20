@@ -179,3 +179,35 @@ describe('plane fetchTicket html bodies', () => {
 		expect((await run()).description).toBe('Title\none\ntwo');
 	});
 });
+
+describe('plane pushDescription', () => {
+	it('PATCHes description_html with the code block intact', async () => {
+		const { app, calls } = setup(
+			undefined,
+			UUID,
+			(call) =>
+				call.url.includes('/work-items/')
+					? Response.json({ id: 'issue-id' })
+					: Response.json({ results: [] }),
+			{ PLANE_API_KEY: KEY }
+		);
+		const resolved = app.connections.forProject(app.projects.get('PMA'))!;
+		await resolved.provider.pushDescription!(
+			{
+				...resolved.context,
+				ref: { provider: 'plane', key: 'SOFT-1', url: null },
+				mapped: null
+			},
+			'Run:\n\n```bash\necho "<hi>" && ls\n```\n\n<script>x</script>'
+		);
+		const patch = calls.find((c) => c.init.method === 'PATCH')!;
+		expect(patch.url).toBe(
+			`https://api.plane.so/api/v1/workspaces/acme/projects/${UUID}/issues/issue-id/`
+		);
+		const { description_html: html } = JSON.parse(String(patch.init.body));
+		expect(html).toContain(
+			'<pre><code class="language-bash">echo &quot;&lt;hi&gt;&quot; &amp;&amp; ls\n</code></pre>'
+		);
+		expect(html).not.toContain('<script>');
+	});
+});

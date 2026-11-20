@@ -200,7 +200,6 @@ export class TicketingConnectionService {
 		const { repos, events } = this.deps;
 		const current = requireProject(repos, projectIdOrKey);
 		const autoSync = data.autoSync ?? current.ticketing.autoSync;
-		const postComments = data.postComments ?? current.ticketing.postComments;
 		const autoPull = data.autoPull ?? current.ticketing.autoPull;
 		const pullMinutes = data.pullMinutes ?? current.ticketing.pullMinutes;
 		let next: Project['ticketing'];
@@ -212,7 +211,6 @@ export class TicketingConnectionService {
 				target: {},
 				statusMapping: {},
 				autoSync,
-				postComments,
 				autoPull,
 				pullMinutes
 			};
@@ -234,7 +232,6 @@ export class TicketingConnectionService {
 				),
 				statusMapping,
 				autoSync,
-				postComments,
 				autoPull,
 				pullMinutes
 			};

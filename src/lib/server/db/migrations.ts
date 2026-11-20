@@ -318,7 +318,22 @@ export const MIGRATIONS: Migration[] = [
 		seq INTEGER NOT NULL
 	);
 	`,
-	'ALTER TABLE epics ADD COLUMN archived_at TEXT;'
+	'ALTER TABLE epics ADD COLUMN archived_at TEXT;',
+	'ALTER TABLE projects DROP COLUMN ticketing_post_comments;',
+	`
+	CREATE TABLE ticket_description_hashes (
+		task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+		connection_id TEXT NOT NULL REFERENCES ticketing_connections(id) ON DELETE CASCADE,
+		ticket_key TEXT NOT NULL,
+		hash TEXT NOT NULL,
+		PRIMARY KEY (task_id, connection_id, ticket_key)
+	);
+	`,
+	`
+	ALTER TABLE tasks ADD COLUMN blocked_at TEXT;
+	ALTER TABLE tasks ADD COLUMN blocked_by TEXT;
+	ALTER TABLE tasks ADD COLUMN block_reason TEXT;
+	`
 ];
 
 const LEGACY_PROJECT_FIELDS: Record<string, string[]> = {

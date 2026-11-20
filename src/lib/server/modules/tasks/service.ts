@@ -1,11 +1,13 @@
 import { ANONYMOUS_ACTORS, isHumanActor } from '#lib/shared/domain/actors.ts';
 import { PRIORITIES, STAGES, type WorkStatus } from '#lib/shared/domain/constants.ts';
 import {
+	blockTaskSchema,
 	cancelTaskSchema,
 	createTaskSchema,
 	moveTaskSchema,
 	setStageStatusSchema,
 	updateTaskSchema,
+	type BlockTaskInput,
 	type CancelTaskInput,
 	type CreateTaskInput,
 	type MoveTaskInput,
@@ -14,7 +16,14 @@ import {
 } from '#lib/shared/domain/schemas.ts';
 import type { Epic, StageStatuses, Task, TaskDetail } from '#lib/shared/domain/types.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
-import { InvalidInputError, OpenQuestionsError, SpecsNotApprovedError } from '../../core/errors.ts';
+import {
+	ConflictError,
+	ForbiddenError,
+	InvalidInputError,
+	OpenQuestionsError,
+	SpecsNotApprovedError,
+	TaskBlockedError
+} from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
 import { transaction } from '../../db/connection.ts';
 import { requireEpic, requireProject, requireTask } from '../../core/lookup.ts';
@@ -78,6 +87,9 @@ export class TaskService {
 			position,
 			commentCount: 0,
 			cancelledAt: null,
+			blockedAt: null,
+			blockedBy: null,
+			blockReason: null,
 			createdAt: timestamp,
 			updatedAt: timestamp
 		};
@@ -96,7 +108,10 @@ export class TaskService {
 		const data = updateTaskSchema.parse(input);
 		const current = this.get(idOrKey);
 		const epic = requireEpic(this.deps.repos, current.epicId);
-		if (data.stages) this.#assertNotCancelled(current);
+		if (data.stages) {
+			this.#assertNotCancelled(current);
+			this.#assertNotBlocked(current);
+		}
 		for (const stage of STAGES) {
 			const to = data.stages?.[stage];
 			if (to) this.#assertCanChange(epic, current.stages[stage], to, actor);
@@ -144,6 +159,7 @@ export class TaskService {
 		const { stage, status, note } = setStageStatusSchema.parse(input);
 		const current = this.get(idOrKey);
 		this.#assertNotCancelled(current);
+		this.#assertNotBlocked(current);
 		if (current.stages[stage] === status) return current;
 		const epic = requireEpic(this.deps.repos, current.epicId);
 		this.#assertCanChange(epic, current.stages[stage], status, actor);
@@ -199,7 +215,10 @@ export class TaskService {
 		const target = destination ? requireEpic(repos, destination) : source;
 		if (target.projectId !== source.projectId)
 			throw new InvalidInputError('Tasks can only move within the same project');
-		if (stage && status) this.#assertNotCancelled(task);
+		if (stage && status) {
+			this.#assertNotCancelled(task);
+			this.#assertNotBlocked(task);
+		}
 		const transferring = target.id !== source.id;
 		const before = beforeTask ? this.get(beforeTask) : null;
 		if (before && before.epicId !== target.id) {
@@ -274,6 +293,60 @@ export class TaskService {
 		return task;
 	}
 
+	/** Idempotent: a task that is already blocked is returned as is, with its first reason. */
+	block(idOrKey: string, input: BlockTaskInput, actor: string): Task {
+		const { reason } = blockTaskSchema.parse(input);
+		const current = this.get(idOrKey);
+		if (current.cancelledAt)
+			throw new ConflictError(`Task ${current.key} is cancelled; restore it first`);
+		if (current.blockedAt) return current;
+		const epic = requireEpic(this.deps.repos, current.epicId);
+		const timestamp = now();
+		const task: Task = {
+			...current,
+			blockedAt: timestamp,
+			blockedBy: actor,
+			blockReason: reason ?? null,
+			updatedAt: timestamp
+		};
+		this.deps.repos.tasks.update(task);
+		this.deps.events.emit({
+			type: 'task.blocked',
+			projectId: epic.projectId,
+			epicId: epic.id,
+			taskId: task.id,
+			actor,
+			data: { key: task.key, title: task.title, reason }
+		});
+		return task;
+	}
+
+	/** Only a person lifts a block, so an agent cannot clear a blocker it was told to respect. Idempotent. */
+	unblock(idOrKey: string, actor: string): Task {
+		if (!isHumanActor(actor, this.deps.repos.profile.get()?.name))
+			throw new ForbiddenError('Only a person can unblock a task, from the Briefline UI');
+		const current = this.get(idOrKey);
+		if (!current.blockedAt) return current;
+		const epic = requireEpic(this.deps.repos, current.epicId);
+		const task: Task = {
+			...current,
+			blockedAt: null,
+			blockedBy: null,
+			blockReason: null,
+			updatedAt: now()
+		};
+		this.deps.repos.tasks.update(task);
+		this.deps.events.emit({
+			type: 'task.unblocked',
+			projectId: epic.projectId,
+			epicId: epic.id,
+			taskId: task.id,
+			actor,
+			data: { key: task.key, title: task.title }
+		});
+		return task;
+	}
+
 	delete(idOrKey: string, actor: string) {
 		const task = this.get(idOrKey);
 		const epic = requireEpic(this.deps.repos, task.epicId);
@@ -303,6 +376,10 @@ export class TaskService {
 		if (task.cancelledAt) {
 			throw new InvalidInputError(`Task ${task.key} is cancelled; restore it first`);
 		}
+	}
+
+	#assertNotBlocked(task: Task) {
+		if (task.blockedAt) throw new TaskBlockedError(task.key, task.blockReason);
 	}
 
 	/** Work that already started may continue; only starting a stage waits for questions and, when the epic has specs, their approval. */

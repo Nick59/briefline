@@ -5,6 +5,7 @@ import {
 	createProjectSchema,
 	createTicketingConnectionSchema,
 	createSpecSchema,
+	blockTaskSchema,
 	cancelTaskSchema,
 	createTaskSchema,
 	moveEpicSchema,
@@ -30,7 +31,7 @@ import {
 import { SYNC_JOB_STATUSES } from '#lib/shared/domain/constants.ts';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from '../modules/activity/repository.ts';
 import { summarySchema } from '../modules/sessions/service.ts';
-import type { Page } from '#lib/shared/domain/types.ts';
+import type { Page, Task } from '#lib/shared/domain/types.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { InvalidInputError, NotFoundError } from '../core/errors.ts';
 import { HOW_TO_TOPICS, howTo } from '../modules/guide/how-to.ts';
@@ -132,7 +133,7 @@ export const operations: Operation[] = [
 		tag: 'Projects',
 		summary: 'Get a project with its epics and specs',
 		description:
-			'ready: true limits epics to the ones you can start: no open questions, approved specs (or none), not done, in the order the user set. Start with the first one.',
+			'ready: true limits epics to the ones you can start: no open questions, approved specs (or none), not done, not fully blocked, in the order the user set. Start with the first one.',
 		input: z.object({
 			project,
 			ready: z
@@ -432,29 +433,47 @@ export const operations: Operation[] = [
 		method: 'PATCH',
 		path: '/tasks/{task}',
 		tag: 'Tasks',
-		summary: 'Update a task, or cancel and restore it',
+		summary: 'Update a task, or cancel, restore, block and unblock it',
 		description:
-			'cancelled: true drops a task that will not be done: it stays on the board but leaves epic and project progress, and its stage statuses are kept. cancelled: false restores it. A restore is applied before the other changes; stage changes on a cancelled task are refused.',
+			'cancelled: true drops a task that will not be done: it stays on the board but leaves epic and project progress, and its stage statuses are kept. cancelled: false restores it. A restore is applied before the other changes; stage changes on a cancelled task are refused. blocked: true pauses a task (blockReason says why); while it is blocked every stage change is refused with 409 task_blocked. blocked: false unblocks it and only a person can do that, from the Briefline UI; an agent gets 403.',
 		input: updateTaskSchema.extend({
 			task,
 			cancelled: z.boolean().optional(),
 			cancelReason: cancelTaskSchema.shape.reason.describe(
 				'Why the task was dropped; recorded in the activity log and ticket comment. Only with cancelled: true'
+			),
+			blocked: z.boolean().optional(),
+			blockReason: blockTaskSchema.shape.reason.describe(
+				'Why the task is blocked; recorded in the activity log and shown on the task. Only with blocked: true'
 			)
 		}),
-		run: (app, { task, cancelled, cancelReason, ...fields }, { actor }) => {
+		run: (app, { task, cancelled, cancelReason, blocked, blockReason, ...fields }, { actor }) => {
 			if (cancelReason !== undefined && cancelled !== true)
 				throw new InvalidInputError('cancelReason needs cancelled: true');
-			if (cancelled === undefined) return app.tasks.update(task, fields, actor);
-			if (cancelled === false) app.tasks.restore(task, actor);
-			else if (fields.stages) {
-				const current = app.tasks.get(task);
-				throw new InvalidInputError(`Task ${current.key} is cancelled; restore it first`);
+			if (blockReason !== undefined && blocked !== true)
+				throw new InvalidInputError('blockReason needs blocked: true');
+			if (cancelled === true && blocked === true)
+				throw new InvalidInputError('A task cannot be cancelled and blocked in one call');
+			if (blocked === false) app.tasks.unblock(task, actor);
+			const hasFields = Object.keys(fields).length > 0;
+			let result: Task;
+			if (cancelled === undefined) {
+				result =
+					hasFields || blocked === undefined
+						? app.tasks.update(task, fields, actor)
+						: app.tasks.get(task);
+			} else {
+				if (cancelled === false) app.tasks.restore(task, actor);
+				else if (fields.stages) {
+					const current = app.tasks.get(task);
+					throw new InvalidInputError(`Task ${current.key} is cancelled; restore it first`);
+				}
+				if (hasFields) app.tasks.update(task, fields, actor);
+				result = cancelled
+					? app.tasks.cancel(task, { reason: cancelReason }, actor)
+					: app.tasks.get(task);
 			}
-			if (Object.keys(fields).length) app.tasks.update(task, fields, actor);
-			return cancelled
-				? app.tasks.cancel(task, { reason: cancelReason }, actor)
-				: app.tasks.get(task);
+			return blocked ? app.tasks.block(task, { reason: blockReason }, actor) : result;
 		}
 	}),
 	defineOperation({
@@ -464,7 +483,7 @@ export const operations: Operation[] = [
 		tag: 'Tasks',
 		summary: 'Move a task to todo, in_progress or done in one stage (dev, test, deploy)',
 		description:
-			'This is the main progress signal. A stage can start only once every earlier stage is done (test needs dev, deploy needs dev and test); moving a stage back to todo resets the later stages. It updates the linked tickets when ticket sync is on. When an agent sets in_progress on a task without an assignee, it becomes the assignee (a soft claim). If another agent already holds the task the call still succeeds and the response carries `claimedBy`: back off or coordinate on the task comments.',
+			'This is the main progress signal. A stage can start only once every earlier stage is done (test needs dev, deploy needs dev and test); moving a stage back to todo resets the later stages. A blocked task refuses stage changes (409 task_blocked) until a person unblocks it. It updates the linked tickets when ticket sync is on. When an agent sets in_progress on a task without an assignee, it becomes the assignee (a soft claim). If another agent already holds the task the call still succeeds and the response carries `claimedBy`: back off or coordinate on the task comments.',
 		input: setStageStatusSchema.extend({ task, stage: stageSchema, status: workStatusSchema }),
 		run: (app, { task, ...input }, { actor }) => {
 			const updated = app.tasks.setStage(task, input, actor);
@@ -703,7 +722,7 @@ export const operations: Operation[] = [
 		path: '/specs',
 		tag: 'Specs',
 		summary: 'Attach a markdown spec to a project, epic or task',
-		description: `Send exactly one of project, epic or task. ${BRIEF_GUIDANCE}`,
+		description: `Send exactly one of project, epic or task. Specs are for plans, designs and reference; content the user must act on (a script to run, commands, manual steps) goes in the task description, not in a spec. ${BRIEF_GUIDANCE}`,
 		input: createSpecSchema.extend({
 			project: project.optional(),
 			epic: epic.optional(),

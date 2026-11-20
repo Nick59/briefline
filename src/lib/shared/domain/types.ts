@@ -34,7 +34,6 @@ export interface ProjectTicketing {
 	target: Record<string, string>;
 	statusMapping: StatusMapping;
 	autoSync: boolean;
-	postComments: boolean;
 	autoPull: boolean;
 	pullMinutes: 5 | 10;
 }
@@ -117,6 +116,10 @@ export interface Task {
 	commentCount: number;
 	/** Cancelled tasks stay visible but are left out of progress. */
 	cancelledAt: ISODate | null;
+	/** Blocked tasks refuse stage changes until a person unblocks them. */
+	blockedAt: ISODate | null;
+	blockedBy: string | null;
+	blockReason: string | null;
 	createdAt: ISODate;
 	updatedAt: ISODate;
 }

@@ -15,8 +15,10 @@ import { InvalidInputError, NotFoundError } from '../../core/errors.ts';
 import type { DomainEvent } from '../../core/events.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireEpic, requireProject } from '../../core/lookup.ts';
+import type { TaskService } from '../tasks/service.ts';
 import type { ResolvedConnection, TicketingConnectionService } from './connections.ts';
-import type { TicketProviderInfo, TicketUpdate } from './provider.ts';
+import { DescriptionHashes, hashDescription } from './description-hash.ts';
+import type { TicketContext, TicketProviderInfo, TicketUpdate } from './provider.ts';
 import type { TicketProviderRegistry } from './registry.ts';
 import type { SyncJobFilter } from './repository.ts';
 
@@ -48,13 +50,16 @@ export class TicketSyncService {
 	#inflight = new Set<Promise<unknown>>();
 	/** Last push per ticket. Pushes to one ticket run in order so an older status never lands last. */
 	#queues = new Map<string, Promise<unknown>>();
+	readonly #hashes: DescriptionHashes;
 
 	constructor(
 		private readonly deps: ServiceDeps,
 		private readonly registry: TicketProviderRegistry,
 		private readonly connections: TicketingConnectionService,
+		private readonly tasks: TaskService,
 		private readonly options: TicketSyncOptions
 	) {
+		this.#hashes = new DescriptionHashes(deps.db);
 		deps.events.subscribe((event) => this.#onEvent(event));
 	}
 
@@ -112,8 +117,8 @@ export class TicketSyncService {
 		if (!epic) return;
 		if (event.type === 'epic.created') {
 			for (const task of this.deps.repos.tasks.listByEpic(epic.id)) {
-				if (task.externalRef && task.description.trim())
-					this.#enqueueComment(
+				if (task.externalRef)
+					this.#enqueueDescription(
 						{
 							...event,
 							type: 'task.created',
@@ -121,8 +126,7 @@ export class TicketSyncService {
 							data: { key: task.key, title: task.title }
 						},
 						project,
-						epic,
-						true
+						epic
 					);
 			}
 		}
@@ -134,17 +138,20 @@ export class TicketSyncService {
 				(event.data.fields?.includes('description') || event.data.fields?.includes('externalRef')));
 		if (event.type === 'task.updated' && !descriptionSync) return;
 
+		if (descriptionSync) {
+			this.#enqueueDescription(event, project, epic);
+			if (event.type !== 'task.created') return;
+		}
 		if (
-			descriptionSync ||
 			event.type === 'task.commented' ||
 			event.type === 'task.comment_updated' ||
 			event.type === 'task.comment_deleted'
 		) {
-			this.#enqueueComment(event, project, epic, !!descriptionSync);
-			if (event.type !== 'task.created') return;
+			this.#enqueueComment(event, project, epic);
+			return;
 		}
 
-		const comment = project.ticketing.postComments ? this.#comment(event) : null;
+		const comment = this.#comment(event);
 		if (epic.externalRef?.provider === project.ticketing.provider) {
 			this.#background(
 				this.#enqueue(epic, null, epic.externalRef, this.#epicUpdate(epic, comment))
@@ -170,33 +177,50 @@ export class TicketSyncService {
 		}
 	}
 
-	#enqueueComment(event: DomainEvent, project: Project, epic: Epic, descriptionSync: boolean) {
-		if (!project.ticketing.postComments || !event.taskId) return;
+	#enqueueComment(event: DomainEvent, project: Project, epic: Epic) {
+		if (!event.taskId) return;
+		const task = this.deps.repos.tasks.find(event.taskId);
+		if (!task?.externalRef || task.externalRef.provider !== project.ticketing.provider) return;
+		this.#enqueueSync(project, epic, task, 'sync_comment', {
+			commentId: 'commentId' in event.data ? event.data.commentId : ''
+		});
+	}
+
+	#enqueueDescription(event: DomainEvent, project: Project, epic: Epic) {
+		if (!event.taskId) return;
 		const task = this.deps.repos.tasks.find(event.taskId);
 		if (!task?.externalRef || task.externalRef.provider !== project.ticketing.provider) return;
 		if (
-			descriptionSync &&
 			!task.description.trim() &&
 			(event.type === 'task.created' ||
 				(event.type === 'task.updated' && !event.data.fields?.includes('description')))
 		)
 			return;
+		// Linking adopts the ticket's description when it has one; a later edit pushes.
+		const linking =
+			event.type === 'task.created' ||
+			(event.type === 'task.updated' && !event.data.fields?.includes('description'));
+		this.#enqueueSync(project, epic, task, linking ? 'pull_description' : 'push_description', {});
+	}
+
+	#enqueueSync(
+		project: Project,
+		epic: Epic,
+		task: Task,
+		operation: 'sync_comment' | 'push_description' | 'pull_description',
+		payload: Record<string, unknown>
+	) {
 		const timestamp = now();
 		const job: SyncJob = {
 			id: newId(),
 			projectId: project.id,
 			epicId: epic.id,
 			taskId: task.id,
-			provider: task.externalRef.provider,
-			operation: 'sync_comment',
+			provider: task.externalRef!.provider,
+			operation,
 			payload: {
 				ref: task.externalRef,
-				commentId: descriptionSync
-					? `task-description:${task.id}`
-					: 'commentId' in event.data
-						? event.data.commentId
-						: '',
-				description: descriptionSync,
+				...payload,
 				connectionId: project.ticketing.connectionId
 			},
 			status: 'pending',
@@ -296,6 +320,108 @@ export class TicketSyncService {
 		return promise;
 	}
 
+	#connectionChanged(job: SyncJob, project: Project, result: SyncJob) {
+		const { connectionId } = job.payload as { connectionId: string };
+		if (connectionId === project.ticketing.connectionId && project.ticketing.autoSync) return false;
+		result.status = 'skipped';
+		result.lastError = 'Sync is disabled or the connection changed';
+		return true;
+	}
+
+	async #pushDescription(
+		job: SyncJob,
+		project: Project,
+		resolved: ResolvedConnection,
+		ref: ExternalRef,
+		result: SyncJob
+	) {
+		if (this.#connectionChanged(job, project, result)) return;
+		const task = job.taskId ? this.deps.repos.tasks.find(job.taskId) : undefined;
+		if (!task || task.externalRef?.provider !== ref.provider || task.externalRef.key !== ref.key) {
+			result.status = 'skipped';
+			result.lastError = 'Task no longer exists or its linked ticket changed';
+			return;
+		}
+		await this.#writeDescription(resolved, ref, task, result);
+	}
+
+	async #writeDescription(
+		resolved: ResolvedConnection,
+		ref: ExternalRef,
+		task: Task,
+		result: SyncJob
+	) {
+		const { provider, context } = resolved;
+		if (!provider.pushDescription) {
+			result.status = 'skipped';
+			result.lastError = 'Provider does not sync descriptions';
+			return;
+		}
+		const ticket = { ...context, ref, mapped: null };
+		// Read the current description at execution time so a retry never restores an older text.
+		const outcome = await provider.pushDescription(ticket, task.description.trim());
+		await this.#rememberRemoteDescription(resolved, ticket, task.id);
+		result.status = 'succeeded';
+		result.lastError = null;
+		result.message = outcome?.note ?? null;
+	}
+
+	/** On linking, the ticket's description wins when it has one; otherwise the Briefline one is pushed. */
+	async #pullDescription(
+		job: SyncJob,
+		project: Project,
+		resolved: ResolvedConnection,
+		ref: ExternalRef,
+		result: SyncJob
+	) {
+		if (this.#connectionChanged(job, project, result)) return;
+		const task = job.taskId ? this.deps.repos.tasks.find(job.taskId) : undefined;
+		if (!task || task.externalRef?.provider !== ref.provider || task.externalRef.key !== ref.key) {
+			result.status = 'skipped';
+			result.lastError = 'Task no longer exists or its linked ticket changed';
+			return;
+		}
+		const { provider, context } = resolved;
+		if (!provider.fetchTicket) {
+			result.status = 'skipped';
+			result.lastError = 'Provider cannot read tickets';
+			return;
+		}
+		const remote = await provider.fetchTicket({ ...context, ref, mapped: null });
+		const text = remote.description?.trim();
+		if (!text) {
+			if (task.description.trim()) await this.#writeDescription(resolved, ref, task, result);
+			else {
+				result.status = 'succeeded';
+				result.lastError = null;
+			}
+			return;
+		}
+		this.#hashes.set(task.id, resolved.connection.id, ref.key, hashDescription(text));
+		if (text !== task.description) this.tasks.update(task.id, { description: text }, 'ticket-sync');
+		result.status = 'succeeded';
+		result.lastError = null;
+		result.message = 'Description imported from the ticket';
+	}
+
+	/** Records what the ticket returns for the description just written, which is not the markdown itself. */
+	async #rememberRemoteDescription(
+		resolved: ResolvedConnection,
+		ticket: TicketContext,
+		taskId: string
+	) {
+		const { provider } = resolved;
+		if (!provider.fetchTicket) return;
+		const connectionId = resolved.connection.id;
+		try {
+			const remote = await provider.fetchTicket(ticket);
+			this.#hashes.set(taskId, connectionId, ticket.ref.key, hashDescription(remote.description));
+		} catch {
+			// Without a recorded hash the next pull stores the remote text instead of importing it.
+			this.#hashes.clear(taskId, connectionId, ticket.ref.key);
+		}
+	}
+
 	async #syncComment(
 		job: SyncJob,
 		project: Project,
@@ -303,29 +429,8 @@ export class TicketSyncService {
 		ref: ExternalRef,
 		result: SyncJob
 	) {
-		const { commentId, connectionId, description } = job.payload as {
-			description?: boolean;
-			commentId: string;
-			connectionId: string;
-		};
-		if (
-			connectionId !== project.ticketing.connectionId ||
-			!project.ticketing.postComments ||
-			!project.ticketing.autoSync
-		) {
-			result.status = 'skipped';
-			result.lastError = 'Comment sync is disabled or the connection changed';
-			return;
-		}
-		const task = job.taskId ? this.deps.repos.tasks.find(job.taskId) : undefined;
-		if (
-			description &&
-			(!task || task.externalRef?.provider !== ref.provider || task.externalRef.key !== ref.key)
-		) {
-			result.status = 'skipped';
-			result.lastError = 'Task no longer exists or its linked ticket changed';
-			return;
-		}
+		if (this.#connectionChanged(job, project, result)) return;
+		const { commentId, connectionId } = job.payload as { commentId: string; connectionId: string };
 		const { provider, context } = resolved;
 		if (!provider.syncComment)
 			throw new InvalidInputError('Provider does not support comment sync');
@@ -336,25 +441,14 @@ export class TicketSyncService {
 			.get(commentId, connectionId, ref.key) as { remote_id: string } | undefined;
 		// Read the current comment at execution time: queued edits and retries must never
 		// recreate deleted comments or replace a newer body with an old event snapshot.
-		const comment = description
-			? task?.description.trim()
-				? {
-						body: `**Briefline task description (${task.key})**\n\n${task.description}`,
-						author: null
-					}
-				: undefined
-			: this.deps.repos.comments.find(commentId);
+		const comment = this.deps.repos.comments.find(commentId);
 		if (comment || mapping) {
 			const remoteId = await provider.syncComment(
 				{ ...context, ref, mapped: null },
 				{
 					id: commentId,
 					remoteId: mapping?.remote_id ?? null,
-					body: comment
-						? description
-							? comment.body
-							: `${comment.body}\n\n_Comment by ${comment.author} from Briefline._`
-						: null
+					body: comment ? `${comment.body}\n\n_Comment by ${comment.author} from Briefline._` : null
 				}
 			);
 			if (comment && !remoteId) throw new InvalidInputError('Provider did not return a comment ID');
@@ -397,8 +491,14 @@ export class TicketSyncService {
 					result.status = 'skipped';
 					result.lastError = 'Project has no ticketing connection for this provider';
 				} else {
-					if (job.operation === 'sync_comment') {
+					// Jobs queued before descriptions had their own operation carry this flag.
+					const legacyDescription = (job.payload as { description?: boolean }).description;
+					if (job.operation === 'sync_comment' && !legacyDescription) {
 						await this.#syncComment(job, project, resolved, ref, result);
+					} else if (job.operation === 'pull_description') {
+						await this.#pullDescription(job, project, resolved, ref, result);
+					} else if (job.operation === 'push_description' || legacyDescription) {
+						await this.#pushDescription(job, project, resolved, ref, result);
 					} else {
 						const key = update.mappingKey ?? mappingKeyFor(update.status, update.stage);
 						const outcome = await provider.push(

@@ -27,13 +27,16 @@
 		class={cn(
 			'grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent',
 			taskTintClass(task.stages),
-			task.cancelledAt && 'opacity-60'
+			task.cancelledAt && 'opacity-60',
+			task.blockedAt && !task.cancelledAt && 'opacity-75'
 		)}
 	>
 		<KeyChip value={displayKey(task)} title={displayKeyTitle(task)} />
 		<span class={cn('truncate', task.cancelledAt && 'line-through')}>{task.title}</span>
 		{#if task.cancelledAt}
 			<ToneBadge tone="neutral">Cancelled</ToneBadge>
+		{:else if task.blockedAt}
+			<ToneBadge tone="warning">Blocked</ToneBadge>
 		{:else}
 			<TaskStageStrip stages={task.stages} size={12} />
 		{/if}
