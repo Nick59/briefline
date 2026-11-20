@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import MenuIcon from '@lucide/svelte/icons/menu';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import InboxIcon from '@lucide/svelte/icons/inbox';
@@ -12,6 +12,16 @@
 	import * as Sheet from '#lib/shared/ui/primitives/sheet/index.js';
 	import { Button } from '#lib/shared/ui/primitives/button/index.js';
 	import { cn } from '#lib/shared/lib/utils.ts';
+	import { readStored, writeStored } from '#lib/shared/lib/local-storage.ts';
+	import {
+		SIDEBAR_DEFAULT,
+		SIDEBAR_KEY_STEP,
+		SIDEBAR_MAX,
+		SIDEBAR_MIN,
+		SIDEBAR_STORAGE_KEY,
+		clampSidebarWidth,
+		parseSidebarWidth
+	} from '#lib/shared/lib/sidebar-width.ts';
 	import { QuickJumpTrigger } from '#lib/features/quick-jump/index.ts';
 	import LiveActivityPanel from './LiveActivityPanel.svelte';
 	import ProjectNav from './ProjectNav.svelte';
@@ -29,6 +39,54 @@
 	let { projects, activeProjectKey, activeEpics, profileName, inboxCount, children }: Props =
 		$props();
 	let mobileOpen = $state(false);
+	let sidebarWidth = $state(SIDEBAR_DEFAULT);
+	let resizing = $state(false);
+
+	onMount(() => {
+		sidebarWidth = parseSidebarWidth(readStored(SIDEBAR_STORAGE_KEY));
+	});
+
+	function setWidth(width: number, persist = true) {
+		sidebarWidth = clampSidebarWidth(width);
+		if (persist) writeStored(SIDEBAR_STORAGE_KEY, String(sidebarWidth));
+	}
+
+	function startResize(event: PointerEvent) {
+		if (event.button !== 0) return;
+		const handle = event.currentTarget as HTMLElement;
+		const startX = event.clientX;
+		const startWidth = sidebarWidth;
+		handle.setPointerCapture(event.pointerId);
+		resizing = true;
+		document.body.style.userSelect = 'none';
+		document.body.style.cursor = 'col-resize';
+
+		const onMove = (move: PointerEvent) => setWidth(startWidth + move.clientX - startX, false);
+		const end = () => {
+			handle.removeEventListener('pointermove', onMove);
+			handle.removeEventListener('pointerup', end);
+			handle.removeEventListener('pointercancel', end);
+			resizing = false;
+			document.body.style.userSelect = '';
+			document.body.style.cursor = '';
+			setWidth(sidebarWidth);
+		};
+		handle.addEventListener('pointermove', onMove);
+		handle.addEventListener('pointerup', end);
+		handle.addEventListener('pointercancel', end);
+	}
+
+	function resizeKey(event: KeyboardEvent) {
+		const step =
+			event.key === 'ArrowLeft'
+				? -SIDEBAR_KEY_STEP
+				: event.key === 'ArrowRight'
+					? SIDEBAR_KEY_STEP
+					: 0;
+		if (!step) return;
+		event.preventDefault();
+		setWidth(sidebarWidth + step);
+	}
 
 	const links = [
 		{
@@ -53,11 +111,11 @@
 </script>
 
 {#snippet sidebar(onnavigate?: () => void)}
-	<div class="flex h-full flex-col gap-5 p-3">
+	<div class="flex h-full flex-col gap-3 p-2.5">
 		<a
 			href={resolve('/')}
 			onclick={onnavigate}
-			class="flex items-center rounded-md px-2 py-2 focus-visible:outline-2 focus-visible:outline-ring"
+			class="flex items-center rounded-md px-2 py-1 focus-visible:outline-2 focus-visible:outline-ring"
 		>
 			<Brand />
 		</a>
@@ -70,7 +128,7 @@
 					onclick={onnavigate}
 					aria-current={active ? 'page' : undefined}
 					class={cn(
-						'flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground',
+						'flex items-center gap-2.5 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent hover:text-foreground',
 						active && 'bg-sidebar-accent font-medium text-sidebar-accent-foreground'
 					)}
 				>
@@ -84,12 +142,10 @@
 				</a>
 			{/each}
 		</nav>
-		<div class="min-h-0 flex-1 overflow-y-auto">
-			<ProjectNav {projects} {activeProjectKey} {activeEpics} {onnavigate} />
-		</div>
+		<ProjectNav {projects} {activeProjectKey} {activeEpics} {onnavigate} />
 		<LiveActivityPanel {onnavigate} />
-		<div class="flex items-center justify-between gap-2 border-t pt-3">
-			<span class="flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm text-muted-foreground">
+		<div class="flex items-center justify-between gap-2 border-t pt-2">
+			<span class="flex min-w-0 items-center gap-2 px-2 py-1 text-sm text-muted-foreground">
 				<UserIcon class="size-4 shrink-0" />
 				<span class="truncate">{profileName ?? 'Profile'}</span>
 			</span>
@@ -107,9 +163,33 @@
 	</div>
 {/snippet}
 
-<div class="min-h-dvh md:grid md:grid-cols-[16rem_minmax(0,1fr)]">
+<div
+	class="min-h-dvh md:grid md:grid-cols-[var(--sidebar-w)_minmax(0,1fr)]"
+	style="--sidebar-w: {sidebarWidth}px"
+>
 	<aside class="sticky top-0 hidden h-dvh border-r bg-sidebar md:block" aria-label="Sidebar">
 		{@render sidebar()}
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+		<div
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Resize sidebar"
+			aria-valuenow={sidebarWidth}
+			aria-valuemin={SIDEBAR_MIN}
+			aria-valuemax={SIDEBAR_MAX}
+			tabindex="0"
+			onpointerdown={startResize}
+			onkeydown={resizeKey}
+			ondblclick={() => setWidth(SIDEBAR_DEFAULT)}
+			class="group absolute inset-y-0 -right-[3px] z-30 w-1.5 cursor-col-resize touch-none focus-visible:outline-none"
+		>
+			<span
+				class={cn(
+					'mx-auto block h-full w-px bg-transparent transition-colors duration-150 group-hover:bg-brand group-focus-visible:bg-brand',
+					resizing && 'bg-brand'
+				)}
+			></span>
+		</div>
 	</aside>
 
 	<div class="flex min-w-0 flex-col">
