@@ -133,6 +133,10 @@ export const githubProvider: TicketProvider = {
 		const data = (await response.json()) as { id: number };
 		return data.id ? String(data.id) : null;
 	},
+	async pushDescription(ctx, markdown) {
+		const { repo, number } = parseGithubRef(ctx.ref.key, ctx.settings.repo);
+		await call(ctx, `/repos/${repo}/issues/${number}`, 'PATCH', { body: markdown });
+	},
 	async push(ctx, update) {
 		const { repo, number } = parseGithubRef(ctx.ref.key, ctx.settings.repo);
 		const mapped = resolveMapped(ctx, STATES);

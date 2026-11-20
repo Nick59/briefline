@@ -18,6 +18,9 @@ interface TaskRow {
 	position: number;
 	comment_count: number;
 	cancelled_at: string | null;
+	blocked_at: string | null;
+	blocked_by: string | null;
+	block_reason: string | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -40,6 +43,9 @@ const toTask = (row: TaskRow): Task => ({
 	position: row.position,
 	commentCount: row.comment_count,
 	cancelledAt: row.cancelled_at,
+	blockedAt: row.blocked_at,
+	blockedBy: row.blocked_by,
+	blockReason: row.block_reason,
 	createdAt: row.created_at,
 	updatedAt: row.updated_at
 });
@@ -108,9 +114,9 @@ export class TaskRepository {
 		run(
 			this.db,
 			`INSERT INTO tasks (id, epic_id, key, title, description, summary, priority, assignee, dev_status,
-			 test_status, deploy_status, external_ref, position, cancelled_at, created_at, updated_at)
+			 test_status, deploy_status, external_ref, position, cancelled_at, blocked_at, blocked_by, block_reason, created_at, updated_at)
 			 VALUES (:id, :epicId, :key, :title, :description, :summary, :priority, :assignee, :dev, :test,
-			 :deploy, :externalRef, :position, :cancelledAt, :createdAt, :updatedAt)`,
+			 :deploy, :externalRef, :position, :cancelledAt, :blockedAt, :blockedBy, :blockReason, :createdAt, :updatedAt)`,
 			{ ...this.#params(task), epicId: task.epicId, key: task.key, createdAt: task.createdAt }
 		);
 	}
@@ -120,7 +126,8 @@ export class TaskRepository {
 			this.db,
 			`UPDATE tasks SET epic_id = :epicId, title = :title, description = :description, summary = :summary,
 			 priority = :priority, assignee = :assignee, dev_status = :dev, test_status = :test, deploy_status = :deploy,
-			 external_ref = :externalRef, position = :position, cancelled_at = :cancelledAt, updated_at = :updatedAt WHERE id = :id`,
+			 external_ref = :externalRef, position = :position, cancelled_at = :cancelledAt, blocked_at = :blockedAt,
+			 blocked_by = :blockedBy, block_reason = :blockReason, updated_at = :updatedAt WHERE id = :id`,
 			this.#params(task)
 		);
 	}
@@ -148,6 +155,9 @@ export class TaskRepository {
 			externalRef: toJson(task.externalRef),
 			position: task.position,
 			cancelledAt: task.cancelledAt,
+			blockedAt: task.blockedAt,
+			blockedBy: task.blockedBy,
+			blockReason: task.blockReason,
 			updatedAt: task.updatedAt
 		};
 	}

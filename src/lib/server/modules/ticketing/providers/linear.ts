@@ -181,6 +181,15 @@ export const linearProvider: TicketProvider = {
 			throw new TicketProviderError('Linear comment creation failed');
 		return result.commentCreate.comment.id;
 	},
+	async pushDescription(ctx, markdown) {
+		const result = await graphql<{ issueUpdate: { success: boolean } }>(
+			ctx,
+			'mutation($id: String!, $description: String!) { issueUpdate(id: $id, input: { description: $description }) { success } }',
+			{ id: ctx.ref.key, description: markdown }
+		);
+		if (!result.issueUpdate.success)
+			throw new TicketProviderError('Linear description update failed');
+	},
 	async push(ctx, update) {
 		const { issue } = await graphql<IssueLookup>(
 			ctx,

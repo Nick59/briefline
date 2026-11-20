@@ -62,6 +62,16 @@ describe('ticket pull', () => {
 		expect(pushes(calls)).toEqual([]);
 	});
 
+	it('does not apply a remote state change to a blocked task', async () => {
+		const { app } = setup({ '7': remote({ state: 'closed', title: 'Renamed' }) });
+		app.tasks.block('SHOP-1', { reason: 'Waiting on design' }, 'claude');
+		await app.ticketPull.pullProject('SHOP');
+		expect(app.tasks.get('SHOP-1')).toMatchObject({
+			title: 'Renamed',
+			stages: { dev: 'todo', test: 'todo', deploy: 'todo' }
+		});
+	});
+
 	it('writes nothing when the ticket matches', async () => {
 		const { app } = setup();
 		const before = app.tasks.get('SHOP-1').updatedAt;
@@ -69,6 +79,47 @@ describe('ticket pull', () => {
 		await app.ticketPull.pullProject('SHOP');
 		expect(app.tasks.get('SHOP-1').updatedAt).toBe(before);
 		expect(app.activity.forTask('SHOP-1').items).toHaveLength(count);
+	});
+
+	it('does not overwrite a Briefline description while the ticket is unchanged since the last sync', async () => {
+		const { app, remotes } = setup({ '7': remote({ body: 'stale plain text' }) });
+		app.tasks.update('SHOP-1', { description: '# Markdown\n\n```sh\nls\n```' }, 'claude');
+		await app.ticketing.idle();
+		await app.ticketPull.pullProject('SHOP');
+		await app.ticketPull.pullProject('SHOP');
+		expect(app.tasks.get('SHOP-1').description).toBe('# Markdown\n\n```sh\nls\n```');
+		expect(remotes['7'].body).toBe('stale plain text');
+	});
+
+	it('records the hash on the first pull without overwriting an existing description', async () => {
+		const { app } = setup({ '7': remote({ body: 'old ticket text' }) });
+		app.tasks.update('SHOP-1', { description: 'Mine' }, 'test');
+		app.db.prepare('DELETE FROM ticket_description_hashes').run();
+		await app.ticketPull.pullProject('SHOP');
+		expect(app.tasks.get('SHOP-1').description).toBe('Mine');
+		expect(app.db.prepare('SELECT hash FROM ticket_description_hashes').all()).toHaveLength(1);
+	});
+
+	it('applies a real edit made in the ticket after the last sync', async () => {
+		const { app, remotes } = setup({ '7': remote({ body: 'stale plain text' }) });
+		app.tasks.update('SHOP-1', { description: 'Mine' }, 'claude');
+		await app.ticketing.idle();
+		await app.ticketPull.pullProject('SHOP');
+		remotes['7'].body = 'Edited in the tracker';
+		await app.ticketPull.pullProject('SHOP');
+		expect(app.tasks.get('SHOP-1').description).toBe('Edited in the tracker');
+		await app.ticketPull.pullProject('SHOP');
+		await app.ticketing.idle();
+		expect(app.tasks.get('SHOP-1').description).toBe('Edited in the tracker');
+	});
+
+	it('does not queue a push for a description written by a pull', async () => {
+		const { app, calls } = setup({ '7': remote({ body: 'Edited remotely' }) });
+		await app.ticketPull.pullProject('SHOP');
+		await app.ticketing.idle();
+		expect(app.tasks.get('SHOP-1').description).toBe('Edited remotely');
+		expect(app.ticketing.jobs({})).toEqual([]);
+		expect(pushes(calls)).toEqual([]);
 	});
 
 	it('imports a new comment once', async () => {

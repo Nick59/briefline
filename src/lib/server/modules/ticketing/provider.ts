@@ -74,6 +74,8 @@ export interface TicketProvider extends Omit<
 	ticketUrl(ref: ExternalRef, settings: Record<string, string>): string | null;
 	push(ctx: TicketContext, update: TicketUpdate): Promise<PushResult | void>;
 	syncComment?(ctx: TicketContext, comment: TicketCommentUpdate): Promise<string | null>;
+	/** Writes the task description into the ticket's own description field. Providers without it skip the job. */
+	pushDescription?(ctx: TicketContext, markdown: string): Promise<PushResult | void>;
 	/** The current title, description, state and comments of the linked ticket. */
 	fetchTicket?(ctx: TicketContext): Promise<RemoteTicket>;
 	/** States an issue can be moved to. Group values: backlog, unstarted, started, completed. */

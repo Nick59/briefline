@@ -39,7 +39,6 @@
 	let target = $state<Record<string, string>>({});
 	let selection = $state<Partial<Record<MappingKey, string>>>({});
 	let autoSync = $state(true);
-	let postComments = $state(true);
 	let autoPull = $state(false);
 	let pullMinutes = $state('10');
 	let busy = $state(false);
@@ -59,7 +58,6 @@
 			Object.entries(ticketing.statusMapping).map(([key, state]) => [key, state.id])
 		);
 		autoSync = ticketing.autoSync;
-		postComments = ticketing.postComments;
 		autoPull = ticketing.autoPull;
 		pullMinutes = String(ticketing.pullMinutes);
 	});
@@ -169,7 +167,6 @@
 						target: cleanTarget(),
 						statusMapping: provider?.supportsStates ? buildMapping() : {},
 						autoSync,
-						postComments,
 						autoPull: provider?.supportsPull ? autoPull : false,
 						pullMinutes: Number(pullMinutes)
 					}
@@ -259,12 +256,6 @@
 					<Switch id="ticketing-auto" bind:checked={autoSync} />
 					<Label for="ticketing-auto" class="font-normal"
 						>Sync task progress, descriptions and comments automatically</Label
-					>
-				</div>
-				<div class="flex items-center gap-3">
-					<Switch id="ticketing-comments" bind:checked={postComments} />
-					<Label for="ticketing-comments" class="font-normal"
-						>Post task descriptions, comments and status updates as comments</Label
 					>
 				</div>
 				{#if provider.supportsPull}

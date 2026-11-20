@@ -50,7 +50,6 @@ export class ProjectService {
 				target: {},
 				statusMapping: {},
 				autoSync: true,
-				postComments: true,
 				autoPull: false,
 				pullMinutes: 10
 			},

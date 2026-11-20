@@ -175,6 +175,14 @@ export const jiraProvider: TicketProvider = {
 		const data = (await response.json()) as { id: string };
 		return data.id;
 	},
+	// REST v2 takes the same plain-text body as comments, so the markdown goes in as written.
+	async pushDescription(ctx, markdown) {
+		const response = await request(ctx, `/rest/api/2/issue/${encodeURIComponent(ctx.ref.key)}`, {
+			method: 'PUT',
+			body: JSON.stringify({ fields: { description: markdown } })
+		});
+		await expectOk(response, 'Jira description update', ctx);
+	},
 	async push(ctx, update) {
 		const key = encodeURIComponent(ctx.ref.key);
 		let note: string | undefined;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
+	import { toast } from 'svelte-sonner';
 	import BanIcon from '@lucide/svelte/icons/ban';
 	import * as Tabs from '#lib/shared/ui/primitives/tabs/index.js';
 	import {
@@ -55,6 +56,13 @@
 		const [s, status] = zone.split(':') as [Stage, WorkStatus];
 		const plan = planDrop(tasks, id, s, status, beforeId);
 		if (!plan) return;
+		const dragged = tasks.find((t) => t.id === id);
+		if (dragged?.blockedAt && plan.status) {
+			toast.error(
+				`${dragged.key} is blocked${dragged.blockReason ? `: ${dragged.blockReason}` : ''}. Unblock it before moving it.`
+			);
+			return;
+		}
 
 		pending = { taskId: id, stage: s, plan };
 		await runOperation(

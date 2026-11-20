@@ -59,6 +59,10 @@ export function describeEvent(event: DomainEvent): string {
 			return `Cancelled task ${event.data.key}${event.data.reason ? ` — ${event.data.reason}` : ''}`;
 		case 'task.restored':
 			return `Restored task ${event.data.key}`;
+		case 'task.blocked':
+			return `Blocked task ${event.data.key}${event.data.reason ? `: ${event.data.reason}` : ''}`;
+		case 'task.unblocked':
+			return `Unblocked task ${event.data.key}`;
 		case 'task.stage_changed':
 			return `Moved ${event.data.key} to ${STAGE_LABELS[event.data.stage]} · ${STATUS_LABELS[event.data.to]}`;
 		case 'task.commented':

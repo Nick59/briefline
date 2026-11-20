@@ -14,14 +14,16 @@
 	let {
 		task,
 		stage,
-		disabled = false
-	}: { task: Task; stage: Stage; disabled?: boolean } = $props();
+		disabled = false,
+		disabledReason
+	}: { task: Task; stage: Stage; disabled?: boolean; disabledReason?: string } = $props();
 
 	const current = $derived(task.stages[stage]);
 	const tone = $derived(toneClasses[statusTone[current]]);
 </script>
 
 <div
+	title={disabled ? disabledReason : undefined}
 	class={cn(
 		'flex items-center justify-between gap-3 rounded-lg border p-2 pl-3 transition-colors',
 		tone.border,

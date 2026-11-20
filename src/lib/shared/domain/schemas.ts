@@ -96,7 +96,6 @@ export const setProjectTicketingSchema = z.object({
 	target: settingsRecord.optional().describe('Project-level provider fields'),
 	statusMapping: statusMappingSchema.optional(),
 	autoSync: z.boolean().optional(),
-	postComments: z.boolean().optional(),
 	autoPull: z.boolean().optional(),
 	pullMinutes: z.union([z.literal(5), z.literal(10)]).optional()
 });
@@ -159,6 +158,12 @@ export const cancelTaskSchema = z.object({
 	reason: text(2000)
 		.optional()
 		.describe('Why the task was dropped; recorded in the activity log and ticket comment')
+});
+
+export const blockTaskSchema = z.object({
+	reason: text(2000)
+		.optional()
+		.describe('Why the task is blocked; recorded in the activity log and shown on the task')
 });
 
 export const briefSchema = z.object({
@@ -321,6 +326,7 @@ export type UpdateEpicInput = z.input<typeof updateEpicSchema>;
 export type CreateTaskInput = z.input<typeof createTaskSchema>;
 export type UpdateTaskInput = z.input<typeof updateTaskSchema>;
 export type CancelTaskInput = z.input<typeof cancelTaskSchema>;
+export type BlockTaskInput = z.input<typeof blockTaskSchema>;
 export type SetStageStatusInput = z.input<typeof setStageStatusSchema>;
 export type MoveProjectInput = z.input<typeof moveProjectSchema>;
 export type MoveEpicInput = z.input<typeof moveEpicSchema>;

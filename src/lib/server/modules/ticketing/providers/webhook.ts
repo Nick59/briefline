@@ -64,6 +64,9 @@ export const webhookProvider: TicketProvider = {
 		});
 		return comment.body === null ? null : comment.id;
 	},
+	async pushDescription(ctx, markdown) {
+		await send(ctx, 'ticket.description', { description: markdown });
+	},
 	async push(ctx, update) {
 		await send(ctx, 'ticket.update', { update });
 	}

@@ -12,6 +12,7 @@ import {
 	type ProviderState,
 	type TicketProvider
 } from '../provider.ts';
+import { markdownToHtml } from '../markdown-html.ts';
 
 const CLOUD_API = 'https://api.plane.so';
 const CLOUD_APP = 'https://app.plane.so';
@@ -215,6 +216,17 @@ export const planeProvider: TicketProvider = {
 		if (comment.body === null) return null;
 		const data = (await response.json()) as { id: string };
 		return data.id;
+	},
+	async pushDescription(ctx, markdown) {
+		const projectId = await resolveProjectId(ctx);
+		const lookup = await request(ctx, `/work-items/${encodeURIComponent(ctx.ref.key)}/`);
+		await expectOk(lookup, 'Plane find work item', ctx);
+		const { id } = (await lookup.json()) as { id: string };
+		const response = await request(ctx, `/projects/${projectId}/issues/${id}/`, {
+			method: 'PATCH',
+			body: JSON.stringify({ description_html: markdownToHtml(markdown) || '<p></p>' })
+		});
+		await expectOk(response, 'Plane update description', ctx);
 	},
 	async push(ctx, update) {
 		const projectId = await resolveProjectId(ctx);

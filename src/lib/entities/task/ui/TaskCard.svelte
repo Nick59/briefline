@@ -2,6 +2,7 @@
 	import { displayKey, displayKeyTitle } from '#lib/shared/domain/display-key.ts';
 	import type { Snippet } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
+	import HandIcon from '@lucide/svelte/icons/hand';
 	import MessageSquareIcon from '@lucide/svelte/icons/message-square';
 	import UserIcon from '@lucide/svelte/icons/user-round';
 	import type { Task } from '#lib/shared/domain/types.ts';
@@ -28,6 +29,7 @@
 		'group relative rounded-lg border bg-card p-3 shadow-xs transition-[border-color,box-shadow,background-color] duration-(--duration-fast) hover:border-foreground/20 hover:shadow-sm',
 		taskTintClass(task.stages),
 		task.cancelledAt && 'opacity-60',
+		task.blockedAt && !task.cancelledAt && 'border-dashed border-warning/50 opacity-75',
 		live?.isChanged(task.key) && 'bg-brand/15 duration-1500 motion-reduce:transition-none',
 		className
 	)}
@@ -39,6 +41,8 @@
 			<TaskStageStrip stages={task.stages} size={12} />
 			{#if task.cancelledAt}
 				<ToneBadge tone="neutral">Cancelled</ToneBadge>
+			{:else if task.blockedAt}
+				<ToneBadge tone="warning"><HandIcon class="size-3" />Blocked</ToneBadge>
 			{/if}
 		</div>
 		{#if actions}

@@ -24,6 +24,7 @@ Typical flow for an agent:
 3. As you work, call set_task_stage_status (e.g. stage=dev status=in_progress, then done; then test...).
    A stage can start only once every earlier stage is done (test needs dev, deploy needs dev and test); moving a stage back to todo resets the later stages.
    A task that will not be done: update_task { cancelled: true, cancelReason }; it stays visible but leaves the progress. cancelled: false restores it.
+   A task that cannot proceed right now: update_task { blocked: true, blockReason }; while it is blocked its stage changes are refused (409 task_blocked) and only a person can unblock it, in the Briefline UI.
    Read a task's comments in get_task; people comment too, so act on their comments, and use add_task_comment to record findings, decisions or blockers on the task as you work.
 4. Attach your specs/plans as markdown with add_spec { project | epic | task }, always including the \`brief\` argument:
    the plain-language summary for non-engineers is written by you, in the same call (update_spec { spec, brief } rewrites it alone).
@@ -42,6 +43,7 @@ Briefline tracks software work for humans and agents. Hierarchy: Project > Epic 
 - Keys: a project is PMA, an epic PMA-E1, a task PMA-12. Keys and ids are interchangeable wherever an id is expected.
 - Stages: every task has three, dev, test and deploy. Each is todo, in_progress or done. Progress of epics and projects is computed from them.
 - Cancelled tasks: update_task { cancelled: true, cancelReason } keeps the task on the board but takes it out of the progress; cancelled: false restores it. Stage changes on a cancelled task are refused.
+- Blocked tasks: update_task { blocked: true, blockReason } pauses a task and refuses its stage changes (409 task_blocked); an agent may block to report a blocker but cannot unblock, only a person can. A blocked task is not startable: skip it, and an epic whose unfinished tasks are all blocked is left out of ready: true.
 - People and agents: people use the dashboard (actors dashboard, seed and the name on the user profile). Everything else is an agent. Agents name themselves with register_agent.
 - User profile: the user's name, role, coding level and language plus a guidance string are at the end of the MCP instructions. Specs carry a plain-language brief for non-engineers, so write it for that reader and adapt your tone to the profile.
 - Sessions: every MCP connection is a session. Activity you cause is stored with it. Call get_last_session at the start to see what the previous session did, and set_session_summary before you end, with a short recap for the user's profile. It overwrites the previous summary.
@@ -52,7 +54,7 @@ const INBOX = `# Inbox
 
 The inbox lists tasks and epics that others (people and other agents) changed since you last acknowledged them. Your own changes never show.
 
-- Flagged by any actor. Tasks: created, updated, cancelled, restored, commented, comment edited or deleted, stage changed. Epics: a thread (question) added, edited, answered, ignored, reopened or replied to.
+- Flagged by any actor. Tasks: created, updated, cancelled, restored, blocked, unblocked, commented, comment edited or deleted, stage changed. Epics: a thread (question) added, edited, answered, ignored, reopened or replied to.
 - Per-agent state: acknowledging only clears the item for you. Other agents and the person still see it until they acknowledge too.
 - get_inbox { project? } returns items oldest first. Each has changes (others' activity after your last acknowledgement), seq, ackedBy (other agents that acknowledged it, with upToDate telling if they saw the latest change) and, for tasks, the assignee.
 - ack_inbox { items: [{ item, seq }] } with the seq you received, so a change that arrived meanwhile is not acknowledged unseen. A plain key acknowledges up to the latest change. It is safe to repeat; an unknown key fails and acknowledges nothing.
@@ -70,7 +72,7 @@ const AGENTS = `# Agents
 - Soft claim: set_task_stage_status with status in_progress makes you the assignee of an unassigned task. When another agent holds it, the call still succeeds and the response carries claimedBy; check it and pick other work. A claim is never overridden.
 - Meanwhile: tool responses may end with a second text item { meanwhile: { items, andMore } } holding up to 20 changes by other actors since your previous call (actor, message, target, createdAt), oldest first. andMore counts the rest.
 - list_agents shows every agent seen with status online (seen in the last 5 minutes), away (5 to 20 minutes) or offline, plus repo, name and role for registered ones.
-- get_project { project, ready: true } lists only the epics you can start: no open questions, approved specs (or none), not done, in the user's board order.
+- get_project { project, ready: true } lists only the epics you can start: no open questions, approved specs (or none), not done, with at least one unblocked unfinished task, in the user's board order.
 
 Tools: register_agent, list_agents, get_project, set_task_stage_status, get_last_session`;
 
@@ -92,6 +94,7 @@ const SPECS = `# Specs
 A spec is a markdown document attached to a project, an epic or a task.
 
 - Project specs hold context for every epic: architecture, conventions, product goals. get_project returns them: read them before planning. Epic and task specs hold plans for that work (get_epic, get_task). add_spec takes exactly one of project, epic or task.
+- Specs are for plans, designs and reference. Content the user must act on (a script to run, commands, manual steps) goes in the task description, not in a spec.
 - brief is required over MCP whenever you create a spec or change its content: a plain-language summary for non-engineers (summary, whyItMatters, whatChanges, acceptance, risks, openQuestions, glossary, effort S/M/L/XL, readingMinutes). Write it for the user's profile (at the end of the MCP instructions), describe outcomes not code, and never invent requirements. update_spec { spec, brief } rewrites it alone.
 - Diagrams: use mermaid code blocks (flowchart, sequenceDiagram, stateDiagram-v2, erDiagram, gantt...); the dashboard renders them.
 - Images: upload_attachment sends a PNG, JPEG, GIF or WebP up to 10 MB as base64 and returns markdown to embed in specs, task descriptions and comments. To see an image, list_attachments then get_attachment.

@@ -28,6 +28,8 @@ export type DomainEvent = Scope &
 				data: { key: string; title: string; reason?: string };
 		  }
 		| { type: 'task.restored'; data: { key: string; title: string } }
+		| { type: 'task.blocked'; data: { key: string; title: string; reason?: string } }
+		| { type: 'task.unblocked'; data: { key: string; title: string } }
 		| {
 				type: 'task.commented' | 'task.comment_updated' | 'task.comment_deleted';
 				data: { key: string; title: string; commentId: string; body: string };

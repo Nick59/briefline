@@ -199,8 +199,7 @@ describe('migration to ticketing connections', () => {
 			JSON.stringify({
 				provider: 'plane',
 				settings: { workspaceSlug: 'acme', projectId },
-				autoSync: false,
-				postComments: true
+				autoSync: false
 			});
 		insert.run('1', 'ONE', 'One', plane('aaaaaaaa-1111-4222-8333-444455556666'));
 		insert.run('2', 'TWO', 'Two', plane('bbbbbbbb-1111-4222-8333-444455556666'));
@@ -211,8 +210,7 @@ describe('migration to ticketing connections', () => {
 			JSON.stringify({
 				provider: 'jira',
 				settings: { baseUrl: 'https://acme.atlassian.net', doneStatus: 'Shipped' },
-				autoSync: true,
-				postComments: false
+				autoSync: true
 			})
 		);
 		insert.run('4', 'FOU', 'Four', null);
@@ -254,9 +252,9 @@ describe('migration to ticketing connections', () => {
 		});
 		expect(byKey.ONE.ticketing_auto_sync).toBe(0);
 		expect(JSON.parse(byKey.THR.ticketing_target as string)).toEqual({ doneStatus: 'Shipped' });
-		expect(byKey.THR.ticketing_post_comments).toBe(0);
+		expect(byKey.THR).not.toHaveProperty('ticketing_post_comments');
 		expect(byKey.FOU.ticketing_connection_id).toBeNull();
-		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 24 });
+		expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 27 });
 	});
 
 	it('keeps migrated projects working: connection resolves and falls back to the environment', async () => {

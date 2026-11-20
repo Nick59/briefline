@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import SparklesIcon from '@lucide/svelte/icons/sparkles';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code-2';
@@ -26,7 +26,10 @@
 	}
 
 	let { spec, owner, extensions = [], chosen = false }: Props = $props();
-	let view = $state<'brief' | 'source'>('brief');
+	// Notes hold raw content such as scripts, which a brief would hide.
+	let view = $state<'brief' | 'source'>(
+		untrack(() => (spec.kind === 'notes' ? 'source' : 'brief'))
+	);
 
 	onMount(() => {
 		if (chosen && !spec.viewedAt) void markSpecViewed(spec.id);

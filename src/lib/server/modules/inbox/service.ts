@@ -13,6 +13,8 @@ const TASK_ACTIONS = new Set([
 	'task.updated',
 	'task.cancelled',
 	'task.restored',
+	'task.blocked',
+	'task.unblocked',
 	'task.commented',
 	'task.comment_updated',
 	'task.comment_deleted',

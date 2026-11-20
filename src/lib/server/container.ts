@@ -123,7 +123,7 @@ export function createContainer(
 		presence,
 		connections,
 		ticketPull: new TicketPullService(deps, connections, { tasks, epics, comments }, clock),
-		ticketing: new TicketSyncService(deps, registry, connections, {
+		ticketing: new TicketSyncService(deps, registry, connections, tasks, {
 			env,
 			fetch: fetchImpl,
 			publicUrl: env.PM_PUBLIC_URL ?? null

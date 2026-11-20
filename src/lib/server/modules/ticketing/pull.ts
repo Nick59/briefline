@@ -12,6 +12,7 @@ import type { CommentService } from '../comments/service.ts';
 import type { EpicService } from '../epics/service.ts';
 import type { TaskService } from '../tasks/service.ts';
 import type { ResolvedConnection, TicketingConnectionService } from './connections.ts';
+import { DescriptionHashes, hashDescription } from './description-hash.ts';
 import type { RemoteTicket } from './provider.ts';
 
 const ACTOR = 'ticket-sync';
@@ -39,13 +40,16 @@ export class TicketPullService {
 	#status = new Map<string, PullStatus>();
 	#listeners = new Set<PullListener>();
 	#inFlight = new Set<Promise<void>>();
+	readonly #hashes: DescriptionHashes;
 
 	constructor(
 		private readonly deps: ServiceDeps,
 		private readonly connections: TicketingConnectionService,
 		private readonly services: Services,
 		private readonly clock: () => number
-	) {}
+	) {
+		this.#hashes = new DescriptionHashes(deps.db);
+	}
 
 	start() {
 		this.stop();
@@ -234,9 +238,9 @@ export class TicketPullService {
 		} = {};
 		const title = remote.title.trim();
 		if (title && title !== task.title) input.title = title;
-		const description = remote.description?.trim();
+		const description = this.#remoteDescriptionEdit(resolved, ref, task, remote);
 		if (description && description !== task.description) input.description = description;
-		if (remote.state && !task.cancelledAt) {
+		if (remote.state && !task.cancelledAt && !task.blockedAt) {
 			const current = mappingKeyForTask(task.stages);
 			const key = mappingKeyFromState(remote.state, project.ticketing.statusMapping, current);
 			if (key && key !== current) input.stages = stagesFor(key);
@@ -247,6 +251,27 @@ export class TicketPullService {
 			changed = 1;
 		}
 		return changed + this.#importComments(resolved, ref, task, remote);
+	}
+
+	/**
+	 * The ticket's description, only when it changed there since Briefline last wrote or read it.
+	 * Otherwise the ticket holds a stale copy (Plane returns plain text, not our markdown) and the
+	 * Briefline text stays.
+	 */
+	#remoteDescriptionEdit(
+		resolved: ResolvedConnection,
+		ref: ExternalRef,
+		task: Task,
+		remote: RemoteTicket
+	): string | undefined {
+		const connectionId = resolved.connection.id;
+		const hash = hashDescription(remote.description);
+		const known = this.#hashes.get(task.id, connectionId, ref.key);
+		if (known === hash) return undefined;
+		this.#hashes.set(task.id, connectionId, ref.key, hash);
+		// A first sight of the ticket only fills an empty Briefline description.
+		if (known === undefined && task.description.trim()) return undefined;
+		return remote.description?.trim() || undefined;
 	}
 
 	#importComments(

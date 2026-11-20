@@ -1103,3 +1103,116 @@ describe('merged operations', () => {
 		}
 	});
 });
+
+describe('blocking tasks', () => {
+	const setup = () => {
+		const { app } = testApp();
+		app.projects.create({ key: 'shop', name: 'Shop' }, 'test');
+		app.epics.create(
+			'SHOP',
+			{ title: 'Checkout', tasks: [{ title: 'One' }, { title: 'Two' }] },
+			'test'
+		);
+		app.epics.approveSpecs('SHOP-E1', 'dashboard');
+		return app;
+	};
+	type App = ReturnType<typeof setup>;
+	const run = (app: App, name: string, input: object, actor = 'claude') =>
+		execute(app, operationsByName.get(name)!, input, { actor }) as Promise<any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+	it('blocks as an agent, unblocks as a person, and logs both', async () => {
+		const app = setup();
+		const blocked = await run(app, 'update_task', {
+			task: 'SHOP-1',
+			blocked: true,
+			blockReason: 'Waiting on API keys'
+		});
+		expect(blocked).toMatchObject({ blockedBy: 'claude', blockReason: 'Waiting on API keys' });
+		expect(blocked.blockedAt).not.toBeNull();
+		expect(app.activity.forProject('SHOP').items[0].message).toBe(
+			'Blocked task SHOP-1: Waiting on API keys'
+		);
+
+		const unblocked = await run(
+			app,
+			'update_task',
+			{ task: 'SHOP-1', blocked: false },
+			'dashboard'
+		);
+		expect(unblocked).toMatchObject({ blockedAt: null, blockedBy: null, blockReason: null });
+		expect(app.activity.forProject('SHOP').items[0].message).toBe('Unblocked task SHOP-1');
+	});
+
+	it('refuses every stage change with 409 task_blocked while blocked', async () => {
+		const app = setup();
+		await run(app, 'update_task', { task: 'SHOP-1', blocked: true, blockReason: 'No keys' });
+		const refused = expect.objectContaining({
+			status: 409,
+			body: { error: expect.objectContaining({ code: 'task_blocked' }) }
+		});
+		const message = expect.stringContaining('No keys');
+		for (const attempt of [
+			() => run(app, 'set_task_stage_status', { task: 'SHOP-1', stage: 'dev', status: 'done' }),
+			() => run(app, 'update_task', { task: 'SHOP-1', stages: { dev: 'done' } }),
+			() => run(app, 'move_task', { task: 'SHOP-1', stage: 'dev', status: 'done' }, 'dashboard')
+		]) {
+			await expect(attempt()).rejects.toEqual(refused);
+			await expect(attempt()).rejects.toHaveProperty('message', message);
+		}
+		await expect(
+			run(app, 'move_task', { task: 'SHOP-1', beforeTask: 'SHOP-2' })
+		).resolves.toBeTruthy();
+		await run(app, 'update_task', { task: 'SHOP-1', blocked: false }, 'dashboard');
+		await expect(
+			run(app, 'set_task_stage_status', { task: 'SHOP-1', stage: 'dev', status: 'done' })
+		).resolves.toBeTruthy();
+	});
+
+	it('refuses an agent unblocking, with 403', async () => {
+		const app = setup();
+		await run(app, 'update_task', { task: 'SHOP-1', blocked: true });
+		for (const actor of ['claude', 'mcp', 'api'])
+			await expect(
+				run(app, 'update_task', { task: 'SHOP-1', blocked: false }, actor)
+			).rejects.toMatchObject({
+				status: 403,
+				message: 'Only a person can unblock a task, from the Briefline UI'
+			});
+		expect(app.tasks.get('SHOP-1').blockedAt).not.toBeNull();
+	});
+
+	it('refuses blocking a cancelled task with 409', async () => {
+		const app = setup();
+		await run(app, 'update_task', { task: 'SHOP-1', cancelled: true });
+		await expect(run(app, 'update_task', { task: 'SHOP-1', blocked: true })).rejects.toMatchObject({
+			status: 409,
+			body: { error: { message: 'Task SHOP-1 is cancelled; restore it first' } }
+		});
+		expect(app.tasks.get('SHOP-1').blockedAt).toBeNull();
+	});
+
+	it('is idempotent, and rejects blockReason without blocked: true', async () => {
+		const app = setup();
+		const first = await run(app, 'update_task', { task: 'SHOP-1', blocked: true });
+		const again = await run(app, 'update_task', {
+			task: 'SHOP-1',
+			blocked: true,
+			blockReason: 'x'
+		});
+		expect(again.blockedAt).toBe(first.blockedAt);
+		const logged = app.activity.forProject('SHOP').items.filter((i) => i.action === 'task.blocked');
+		expect(logged).toHaveLength(1);
+		await expect(run(app, 'update_task', { task: 'SHOP-1', blockReason: 'x' })).rejects.toThrow(
+			'blockReason'
+		);
+	});
+
+	it('leaves an epic with only blocked unfinished tasks out of the ready list', async () => {
+		const app = setup();
+		expect(app.epics.workToDo('SHOP').map((e) => e.key)).toEqual(['SHOP-E1']);
+		await run(app, 'update_task', { task: 'SHOP-1', blocked: true });
+		expect(app.epics.workToDo('SHOP')).toHaveLength(1);
+		await run(app, 'update_task', { task: 'SHOP-2', blocked: true });
+		expect(app.epics.workToDo('SHOP')).toHaveLength(0);
+	});
+});

@@ -4,6 +4,7 @@ import { linearProvider } from './providers/linear.ts';
 import { webhookProvider } from './providers/webhook.ts';
 import type { TicketContext } from './provider.ts';
 import { describe, expect, it } from 'vitest';
+import { hashDescription } from './description-hash.ts';
 import { connectProject, testApp, type FetchCall } from '../../testing/app.ts';
 
 function setup(respond: (call: FetchCall) => Response = () => Response.json({ id: 42 })) {
@@ -51,11 +52,11 @@ describe('task comment sync', () => {
 		).toBe(true);
 	});
 
-	it.each(['autoSync', 'postComments'] as const)('respects %s being disabled', async (flag) => {
+	it('respects autoSync being disabled', async () => {
 		const { app, calls } = setup();
 		app.connections.setProjectTicketing(
 			'SHOP',
-			{ connectionId: app.projects.get('SHOP').ticketing.connectionId, [flag]: false },
+			{ connectionId: app.projects.get('SHOP').ticketing.connectionId, autoSync: false },
 			'test'
 		);
 		app.comments.add('SHOP-1', { body: 'Private' }, 'claude');
@@ -106,51 +107,59 @@ describe('task comment sync', () => {
 		expect(app.ticketing.jobs({ status: 'failed' })[0].attempts).toBe(3);
 	});
 
-	it('manages the full task description as a separate comment and removes it when cleared', async () => {
+	const writes = (calls: FetchCall[]) => calls.filter((call) => call.init.method !== 'GET');
+	const bodies = (calls: FetchCall[]) => writes(calls).map((c) => JSON.parse(String(c.init.body)));
+
+	it('pushes the full task description into the ticket body, not as a comment', async () => {
 		const { app, calls } = setup();
 		const body = 'Technical details\n'.repeat(100);
 		app.tasks.update('SHOP-1', { description: body }, 'test');
 		await app.ticketing.idle();
-		expect(JSON.parse(String(calls[0].init.body)).body).toContain(body.trim());
-		app.tasks.update('SHOP-1', { description: 'Latest' }, 'test');
-		await app.ticketing.idle();
+		expect(writes(calls)).toHaveLength(1);
+		expect(writes(calls)[0]).toMatchObject({
+			url: 'https://api.github.com/repos/acme/shop/issues/7',
+			init: { method: 'PATCH' }
+		});
+		expect(bodies(calls)[0]).toEqual({ body: body.trim() });
 		app.tasks.update('SHOP-1', { description: '' }, 'test');
 		await app.ticketing.idle();
-		expect(calls.map((call) => call.init.method)).toEqual(['POST', 'PATCH', 'DELETE']);
-		expect(calls.every((call) => call.url.includes('/comments'))).toBe(true);
-		expect(app.db.prepare('SELECT * FROM ticket_comments').all()).toEqual([]);
+		expect(bodies(calls)[1]).toEqual({ body: '' });
+		expect(calls.some((call) => call.url.includes('/comments') && call.init.method !== 'GET')).toBe(
+			false
+		);
+		expect(app.ticketing.jobs({}).map((j) => j.operation)).toEqual([
+			'push_description',
+			'push_description'
+		]);
 	});
 
-	it.each([404, 405, 501, 401, 403, 503])(
-		'only falls back for missing or unsupported editing (%s)',
-		async (status) => {
-			const { app, calls } = setup((call) =>
-				call.init.method === 'PATCH' ? new Response('error', { status }) : Response.json({ id: 42 })
-			);
-			app.tasks.update('SHOP-1', { description: 'First' }, 'test');
-			await app.ticketing.idle();
-			app.tasks.update('SHOP-1', { description: 'Second' }, 'test');
-			await app.ticketing.idle();
-			expect(calls.map((call) => call.init.method)).toEqual(
-				[404, 405, 501].includes(status) ? ['POST', 'PATCH', 'POST'] : ['POST', 'PATCH']
-			);
-		}
-	);
+	it('records the description the ticket returns after a push', async () => {
+		const { app } = setup((call) =>
+			call.init.method === 'GET' && call.url.endsWith('/issues/7')
+				? Response.json({ title: 'Task', body: 'stored remotely', state: 'open' })
+				: call.init.method === 'GET'
+					? Response.json([])
+					: Response.json({ id: 42 })
+		);
+		app.tasks.update('SHOP-1', { description: '# Mine' }, 'test');
+		await app.ticketing.idle();
+		const row = app.db.prepare('SELECT hash FROM ticket_description_hashes').get() as {
+			hash: string;
+		};
+		expect(row.hash).toBe(hashDescription('stored remotely'));
+	});
 
-	it.each(['autoSync', 'postComments'] as const)(
-		'does not publish descriptions when %s is disabled',
-		async (flag) => {
-			const { app, calls } = setup();
-			app.connections.setProjectTicketing(
-				'SHOP',
-				{ connectionId: app.projects.get('SHOP').ticketing.connectionId, [flag]: false },
-				'test'
-			);
-			app.tasks.update('SHOP-1', { description: 'Private' }, 'test');
-			await app.ticketing.idle();
-			expect(calls).toEqual([]);
-		}
-	);
+	it('does not publish descriptions when autoSync is disabled', async () => {
+		const { app, calls } = setup();
+		app.connections.setProjectTicketing(
+			'SHOP',
+			{ connectionId: app.projects.get('SHOP').ticketing.connectionId, autoSync: false },
+			'test'
+		);
+		app.tasks.update('SHOP-1', { description: 'Private' }, 'test');
+		await app.ticketing.idle();
+		expect(calls).toEqual([]);
+	});
 
 	it('syncs existing descriptions on first linking and ignores retries after relinking', async () => {
 		let failing = true;
@@ -171,32 +180,71 @@ describe('task comment sync', () => {
 		const count = calls.length;
 		await app.ticketing.retry(failed.id);
 		expect(calls).toHaveLength(count);
-		expect(JSON.parse(String(calls.at(-1)!.init.body)).body).toContain('Latest');
+		expect(bodies(calls).at(-1)).toEqual({ body: 'Latest' });
 	});
 
-	it('initializes descriptions for tasks created with an epic', async () => {
-		const { app, calls } = setup();
+	const remoteIssue = (body: string | null) => (call: FetchCall) =>
+		call.init.method !== 'GET'
+			? Response.json({ id: 42 })
+			: call.url.includes('/comments')
+				? Response.json([])
+				: Response.json({ title: 'Task', body, state: 'open' });
+
+	const nested = (key: string, description: string) => ({
+		title: 'Second',
+		tasks: [{ title: 'Nested', description, externalRef: { provider: 'github', key } }]
+	});
+
+	it('pushes the Briefline description of a task created with an epic when the ticket has none', async () => {
+		const { app, calls } = setup(remoteIssue(null));
+		app.epics.create('SHOP', nested('#11', 'Initial details'), 'test');
+		await app.ticketing.idle();
+		expect(writes(calls)).toHaveLength(1);
+		expect(writes(calls)[0].url).toBe('https://api.github.com/repos/acme/shop/issues/11');
+		expect(bodies(calls)[0]).toEqual({ body: 'Initial details' });
+	});
+
+	it('replaces the Briefline description with the ticket description on link, without pushing', async () => {
+		const { app, calls } = setup(remoteIssue('From the ticket'));
+		app.epics.create('SHOP', nested('#11', 'Initial details'), 'test');
+		await app.ticketing.idle();
+		expect(app.tasks.get('SHOP-2').description).toBe('From the ticket');
+		expect(writes(calls)).toEqual([]);
+		expect(app.ticketing.jobs({}).map((j) => j.operation)).toEqual(['pull_description']);
+		expect(app.db.prepare('SELECT hash FROM ticket_description_hashes').all()).toEqual([
+			{ hash: hashDescription('From the ticket') }
+		]);
+	});
+
+	it('adopts the ticket description when an existing task is linked or relinked', async () => {
+		const { app, calls } = setup(remoteIssue('Remote text'));
+		app.tasks.update('SHOP-1', { description: 'Mine' }, 'test');
+		await app.ticketing.idle();
+		app.tasks.update('SHOP-1', { externalRef: { provider: 'github', key: '#8' } }, 'test');
+		await app.ticketing.idle();
+		expect(app.tasks.get('SHOP-1').description).toBe('Remote text');
+		expect(writes(calls)).toHaveLength(1);
+		expect(app.ticketing.jobs({}).every((j) => j.status === 'succeeded')).toBe(true);
+	});
+
+	it('does nothing on link when the provider cannot read tickets', async () => {
+		const { app, calls } = testApp({}, () => Response.json({}));
+		app.projects.create({ key: 'HOOK', name: 'Hook' }, 'test');
+		connectProject(app, 'HOOK', 'webhook', { url: 'https://hooks.test/x' });
 		app.epics.create(
-			'SHOP',
+			'HOOK',
 			{
-				title: 'Second',
-				tasks: [
-					{
-						title: 'Nested',
-						description: 'Initial details',
-						externalRef: { provider: 'github', key: '#11' }
-					}
-				]
+				title: 'E',
+				tasks: [{ title: 'T', description: 'Mine', externalRef: { provider: 'webhook', key: 'K' } }]
 			},
 			'test'
 		);
 		await app.ticketing.idle();
-		expect(calls).toHaveLength(1);
-		expect(calls[0].url).toContain('/issues/11/comments');
-		expect(JSON.parse(String(calls[0].init.body)).body).toContain('Initial details');
+		expect(calls).toEqual([]);
+		expect(app.tasks.get('HOOK-1').description).toBe('Mine');
 	});
 
-	it('retries descriptions with current content and does not recreate cleared descriptions', async () => {
+	it('retries descriptions with current content and skips a retry after the task lost its link', async () => {
 		let failing = true;
 		const { app, calls } = setup(() =>
 			failing ? new Response('error', { status: 503 }) : Response.json({ id: 42 })
@@ -208,25 +256,35 @@ describe('task comment sync', () => {
 		await app.ticketing.idle();
 		failing = false;
 		await app.ticketing.retry(failed.id);
-		expect(JSON.parse(String(calls.at(-1)!.init.body)).body).toContain('Latest');
-		app.tasks.update('SHOP-1', { description: '' }, 'test');
+		expect(bodies(calls).at(-1)).toEqual({ body: 'Latest' });
+		app.tasks.update('SHOP-1', { externalRef: null }, 'test');
 		await app.ticketing.idle();
 		const count = calls.length;
-		await app.ticketing.retry(app.ticketing.jobs({ status: 'failed' })[0].id);
+		await app.ticketing.retry(failed.id);
 		expect(calls).toHaveLength(count);
 	});
 
-	it('does not create a replacement after an edit network error', async () => {
-		const { app, calls } = setup((call) => {
-			if (call.init.method === 'PATCH') throw new Error('network unavailable');
-			return Response.json({ id: 42 });
-		});
-		app.tasks.update('SHOP-1', { description: 'First' }, 'test');
+	it('keeps comment sync working for jobs queued before descriptions had their own operation', async () => {
+		const { app, calls } = setup();
+		app.tasks.update('SHOP-1', { description: 'Now' }, 'test');
 		await app.ticketing.idle();
-		app.tasks.update('SHOP-1', { description: 'Latest' }, 'test');
-		await app.ticketing.idle();
-		expect(calls.map((call) => call.init.method)).toEqual(['POST', 'PATCH']);
-		expect(app.ticketing.jobs({ status: 'failed' })).toHaveLength(1);
+		const job = app.ticketing.jobs({})[0];
+		app.db
+			.prepare('UPDATE sync_jobs SET operation = ?, payload = ?, status = ? WHERE id = ?')
+			.run(
+				'sync_comment',
+				JSON.stringify({ ...job.payload, description: true, commentId: 'task-description:x' }),
+				'failed',
+				job.id
+			);
+		const count = calls.length;
+		await app.ticketing.retry(job.id);
+		expect(writes(calls.slice(count)).map((c) => c.init.method)).toEqual(['PATCH']);
+	});
+
+	it('no longer exposes a postComments setting', () => {
+		const { app } = setup();
+		expect(app.projects.get('SHOP').ticketing).not.toHaveProperty('postComments');
 	});
 
 	it('does not sync ordinary task edits', async () => {
