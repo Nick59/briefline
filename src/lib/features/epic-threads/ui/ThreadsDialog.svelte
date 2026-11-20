@@ -67,7 +67,7 @@
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content
-		class="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-xl"
+		class="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-3xl lg:max-w-4xl"
 	>
 		<Dialog.Header class="pr-10">
 			<Dialog.Title>Threads</Dialog.Title>
