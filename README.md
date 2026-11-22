@@ -149,7 +149,7 @@ belongs to. Add them once to your global instructions file: `~/.claude/CLAUDE.md
 When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) name a Briefline project, track the work there through the `briefline` MCP server:
 
 - Before planning, read the project with `get_project` and the current epic with `get_epic`.
-- At the start of a session, call `register_agent` with your GitHub project (`owner/repo` from `git remote get-url origin`) and a short role name, then `get_last_session`, then `get_inbox`; handle each item, then `ack_inbox` it with the `seq` you received. Responses include a `meanwhile` block with what other agents and people changed since your last call.
+- At the start of a session, call `register_agent` with your GitHub project (`owner/repo` from `git remote get-url origin`) (plus `name` only when `.briefline/agent` exists or the user asked for one), then `get_last_session`, then `get_inbox`; handle each item, then `ack_inbox` it with the `seq` you received. Responses include a `meanwhile` block with what other agents and people changed since your last call.
 - Project-wide context (architecture, conventions, product goals) lives in project specs: read them with `get_project` before planning, and add new ones with `add_spec`.
 - Ask anything unclear with `add_epic_questions` before starting an epic. Questions are threads: people can open them too, and anyone adds details with `reply_to_question`. Tasks can't start while questions are open; read the answers and the replies (`messages`) with `get_epic` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single `create_epic` call.
@@ -229,10 +229,10 @@ dashboard, **Mark seen** (`mark_inbox_seen`, not an MCP tool) clears an item for
 
 ### Agents
 
-An MCP session names itself with `register_agent` (`POST /api/v1/agents/register`, `{ "repo": "acme/shop", "name": "backend-agent", "role": "optional" }`):
+An MCP session names itself with `register_agent` (`POST /api/v1/agents/register`, `{ "repo": "acme/shop", "name": "optional", "role": "optional" }`):
 `repo` is the GitHub project (`owner/repo` from `git remote get-url origin`, or the folder name), and the agent name becomes
-`shop:backend-agent` for every later request in that session. A name is held by one live session at a time (409 otherwise,
-free again when that session ends or is quiet for 20 minutes). An unregistered session whose `X-Actor` is already used by a
+`shop:agent` (or `shop:<name>`) for every later request in that session, so it carries over between sessions. When the name is held by a
+live session, the new one gets the lowest free suffix (`agent-2`, `agent-3`...); a holder that ended or is quiet for 20 minutes is replaced. An unregistered session whose `X-Actor` is already used by a
 live session gets `<actor>-2`, `-3`... `list_agents` and the session pages show `repo`, `name` and `role`.
 
 When an agent sets a task to `in_progress` with `set_task_stage_status` and the task has no assignee, it becomes the assignee;

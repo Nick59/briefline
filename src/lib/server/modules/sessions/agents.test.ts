@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PRESENCE_ONLINE_MS } from '#lib/shared/domain/constants.ts';
 import { execute } from '../../api/execute.ts';
 import { operationsByName } from '../../api/operations.ts';
-import { runInRequestContext } from '../../core/request-context.ts';
 import { handleMcpRequest } from '../../mcp/handler.ts';
 import { testApp } from '../../testing/app.ts';
 
@@ -54,36 +53,54 @@ describe('agent registration', () => {
 		expect(agents.find((a) => a.actor === 'briefline:backend-agent')?.repo).toBe('acme/briefline');
 	});
 
-	it('refuses a name held by a live session and frees it when that session ends', async () => {
+	it('defaults the name to agent and gives a second online session the next free suffix', async () => {
+		const { app } = testApp();
+		const first = await open(app, 'claude');
+		const second = await open(app, 'codex');
+		const third = await open(app, 'gemini');
+		const reg = async (actor: string, session: string) =>
+			JSON.parse(
+				(await call(app, actor, session, 'register_agent', { repo: 'acme/briefline' })).result
+					.content[0].text
+			);
+		expect(await reg('claude', first)).toMatchObject({ agent: 'briefline:agent', name: 'agent' });
+		expect(await reg('codex', second)).toMatchObject({
+			agent: 'briefline:agent-2',
+			name: 'agent-2'
+		});
+		expect(await reg('gemini', third)).toMatchObject({ agent: 'briefline:agent-3' });
+		expect(app.sessions.actorOf(second)).toBe('briefline:agent-2');
+
+		app.sessions.end(first);
+		const fourth = await open(app, 'claude');
+		expect(await reg('claude', fourth)).toMatchObject({ agent: 'briefline:agent' });
+	});
+
+	it('keeps the same default identity in the next session of a repo', async () => {
+		const { app } = testApp();
+		const first = await open(app, 'claude');
+		await call(app, 'claude', first, 'register_agent', { repo: 'acme/briefline' });
+		app.sessions.end(first);
+		const next = await open(app, 'claude');
+		await call(app, 'claude', next, 'register_agent', { repo: 'acme/briefline' });
+		expect(app.sessions.actorOf(next)).toBe('briefline:agent');
+	});
+
+	it('suffixes an explicit name held by a live session and frees it when that session ends', async () => {
 		const { app } = testApp();
 		const first = await open(app, 'claude');
 		const second = await open(app, 'codex');
 		await register(app, 'claude', first);
 
-		const clash = await register(app, 'codex', second);
-		expect(clash.result.isError).toBe(true);
-		expect(clash.result.content[0].text).toContain(
-			"An agent is already working under the name 'briefline:backend-agent'. Find another name."
-		);
-		await expect(
-			runInRequestContext({ sessionId: second }, () =>
-				execute(
-					app,
-					operationsByName.get('register_agent')!,
-					{ repo: 'acme/briefline', name: 'backend-agent' },
-					{ actor: 'codex' }
-				)
-			)
-		).rejects.toMatchObject({ status: 409 });
-
-		app.sessions.end(first);
 		expect((await register(app, 'codex', second)).result.isError).toBeUndefined();
+		expect(app.sessions.actorOf(second)).toBe('briefline:backend-agent-2');
+		expect(app.sessions.actorOf(first)).toBe('briefline:backend-agent');
 	});
 
 	describe('claiming a name by presence', () => {
 		afterEach(() => vi.useRealTimers());
 
-		it('refuses while the holder is online, accepts once it is past the online window, and ends it', async () => {
+		it('suffixes while the holder is online, claims the name once it is past the online window, and ends it', async () => {
 			vi.useFakeTimers({ toFake: ['Date'] });
 			const { app } = testApp();
 			const first = await open(app, 'claude');
@@ -91,7 +108,9 @@ describe('agent registration', () => {
 			await register(app, 'claude', first);
 
 			vi.setSystemTime(Date.now() + PRESENCE_ONLINE_MS - 1000);
-			expect((await register(app, 'codex', second)).result.isError).toBe(true);
+			await register(app, 'codex', second);
+			expect(app.sessions.actorOf(second)).toBe('briefline:backend-agent-2');
+			expect(app.sessions.get(first).session.endedAt).toBeNull();
 
 			vi.setSystemTime(Date.now() + 2000);
 			expect((await register(app, 'codex', second)).result.isError).toBeUndefined();

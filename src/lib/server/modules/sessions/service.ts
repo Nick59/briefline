@@ -3,7 +3,7 @@ import type { Activity, Page, SessionSummary } from '#lib/shared/domain/types.ts
 import { ANONYMOUS_ACTORS, isHumanActor } from '#lib/shared/domain/actors.ts';
 import { PRESENCE_OFFLINE_MS, PRESENCE_ONLINE_MS } from '#lib/shared/domain/constants.ts';
 import type { ServiceDeps } from '../../core/deps.ts';
-import { ConflictError, InvalidInputError, NotFoundError } from '../../core/errors.ts';
+import { InvalidInputError, NotFoundError } from '../../core/errors.ts';
 import { newId, now } from '../../core/ids.ts';
 import { requireProject } from '../../core/lookup.ts';
 import { currentSessionId } from '../../core/request-context.ts';
@@ -61,29 +61,29 @@ export class SessionService {
 		return this.deps.repos.sessions.actorOf(id);
 	}
 
-	/** Names the current MCP session as an agent; the name is held by one online session at a time; an away or offline holder is ended by a new claim. */
-	register(input: { repo: string; name: string; role?: string }) {
+	/** Names the current MCP session as an agent (default `agent`); a name held by an online session gets the lowest free `-<n>` suffix; an away or offline holder is ended by the claim. */
+	register(input: { repo: string; name?: string; role?: string }) {
 		const { repos } = this.deps;
 		const id = currentSessionId();
 		if (!id)
 			throw new InvalidInputError(
 				'This call is not part of an agent session. Call register_agent over MCP after initialize.'
 			);
-		const agent = `${input.repo.split('/').pop()}:${input.name}`;
-		if (ANONYMOUS_ACTORS.has(agent) || isHumanActor(agent, repos.profile.get()?.name))
-			throw new InvalidInputError(`'${agent}' is the name of a person and cannot be an agent`);
-		if (this.#held(agent, id, PRESENCE_ONLINE_MS))
-			throw new ConflictError(
-				`An agent is already working under the name '${agent}'. Find another name.`
-			);
+		const base = `${input.repo.split('/').pop()}:${input.name ?? 'agent'}`;
+		if (ANONYMOUS_ACTORS.has(base) || isHumanActor(base, repos.profile.get()?.name))
+			throw new InvalidInputError(`'${base}' is the name of a person and cannot be an agent`);
+		let n = 1;
+		while (this.#held(n === 1 ? base : `${base}-${n}`, id, PRESENCE_ONLINE_MS)) n++;
+		const agent = n === 1 ? base : `${base}-${n}`;
+		const name = agent.slice(agent.indexOf(':') + 1);
 		repos.sessions.endHolders(agent, id, now());
 		repos.sessions.register(id, agent, {
 			repo: input.repo,
-			name: input.name,
+			name,
 			role: input.role ?? null
 		});
 		repos.sessions.setCursor(id, repos.activity.head());
-		return { agent, repo: input.repo, name: input.name, role: input.role ?? null, session: id };
+		return { agent, repo: input.repo, name, role: input.role ?? null, session: id };
 	}
 
 	/** What other actors did since the session's last response; null when nothing, or on the first call. */

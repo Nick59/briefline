@@ -14,7 +14,7 @@ Model: Project > Epic > Task.
 Call how_to for the concepts (how_to { topic } for inbox, agents, threads, specs, tickets).
 Every task moves through three stages: dev, test, deploy. Each stage is todo, in_progress or done.
 Typical flow for an agent:
-0. Call register_agent with your GitHub project (owner/repo from git remote) and a short role name, then get_last_session, then get_inbox; handle each item, then ack_inbox it with the seq you received. Responses include a \`meanwhile\` block with what other agents and people changed since your last call.
+0. If .briefline/agent exists in the repo root, call register_agent { repo, name: <its trimmed content> }; otherwise call register_agent { repo } (identity becomes <repo>:agent), with repo = your GitHub project (owner/repo from git remote). If the user gives you a different name, register with it and write that name to .briefline/agent. Never write a suffixed name (agent-2) to the file. Then get_last_session, then get_inbox; handle each item, then ack_inbox it with the seq you received. Responses include a \`meanwhile\` block with what other agents and people changed since your last call.
    The user's profile is at the end of these instructions: adapt your tone and every spec \`brief\` to the user's role and coding level.
 1. list_projects, then get_project to see its epics and project specs (ready: true lists only the epics you can start, in the user's order), then get_epic to read the plan and the current board.
 2. When you plan new work, call create_epic with tasks and specs in one call.
@@ -44,7 +44,7 @@ Briefline tracks software work for humans and agents. Hierarchy: Project > Epic 
 - Stages: every task has three, dev, test and deploy. Each is todo, in_progress or done. Progress of epics and projects is computed from them.
 - Cancelled tasks: update_task { cancelled: true, cancelReason } keeps the task on the board but takes it out of the progress; cancelled: false restores it. Stage changes on a cancelled task are refused.
 - Blocked tasks: update_task { blocked: true, blockReason } pauses a task and refuses its stage changes (409 task_blocked); an agent may block to report a blocker but cannot unblock, only a person can. A blocked task is not startable: skip it, and an epic whose unfinished tasks are all blocked is left out of ready: true.
-- People and agents: people use the dashboard (actors dashboard, seed and the name on the user profile). Everything else is an agent. Agents name themselves with register_agent.
+- People and agents: people use the dashboard (actors dashboard, seed and the name on the user profile). Everything else is an agent. Agents register with register_agent (default name agent).
 - User profile: the user's name, role, coding level and language plus a guidance string are at the end of the MCP instructions. Specs carry a plain-language brief for non-engineers, so write it for that reader and adapt your tone to the profile.
 - Sessions: every MCP connection is a session. Activity you cause is stored with it. Call get_last_session at the start to see what the previous session did, and set_session_summary before you end, with a short recap for the user's profile. It overwrites the previous summary.
 
@@ -66,8 +66,8 @@ Tools: get_inbox, ack_inbox, get_task, get_epic`;
 
 const AGENTS = `# Agents
 
-- register_agent { repo, name, role? }: repo is owner/repo from git remote get-url origin (the folder name when there is none), name is a short role such as backend-agent. Your actor becomes <repo without owner>:<name>, e.g. briefline:backend-agent, for every later call in the session. MCP sessions only. Call it first.
-- Uniqueness: a name is held by one online session at a time (409 otherwise). A name whose session is away or offline can be claimed, which ends that session, so reuse the same name next session. Names of people cannot be agents.
+- register_agent { repo, name?, role? }: repo is owner/repo from git remote get-url origin (the folder name when there is none). name defaults to agent, so your actor is <repo without owner>:agent, e.g. briefline:agent, for every later call in the session. Pass name only when .briefline/agent exists in the repo root (use its trimmed content) or the user asked for a specific name; then write that name to the file. Never write a suffixed name (agent-2) to the file. MCP sessions only. Call it first.
+- Uniqueness: when a name is held by an online session, you get the lowest free suffix (agent-2, agent-3...) instead of an error. A name whose session is away or offline is claimed, which ends that session, so the same name carries over next session. Names of people cannot be agents.
 - Unregistered sessions whose client name is already used by a live session get a distinct name such as claude-2, claude-3.
 - Soft claim: set_task_stage_status with status in_progress makes you the assignee of an unassigned task. When another agent holds it, the call still succeeds and the response carries claimedBy; check it and pick other work. A claim is never overridden.
 - Meanwhile: tool responses may end with a second text item { meanwhile: { items, andMore } } holding up to 20 changes by other actors since your previous call (actor, message, target, createdAt), oldest first. andMore counts the rest.

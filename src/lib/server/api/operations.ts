@@ -258,7 +258,7 @@ export const operations: Operation[] = [
 		tag: 'Sessions',
 		summary: 'Name this MCP session as an agent working in a GitHub project',
 		description:
-			'Call first in a session. `repo` is the GitHub project, owner/repo from `git remote get-url origin` (the folder name when there is no remote); `name` is a short role name such as backend-agent. Your agent name becomes `<repo without owner>:<name>` (e.g. briefline:backend-agent) for every later call in the session. A name is held by one online session at a time (409 otherwise); a name whose session is away or offline can be claimed, which ends that session. MCP sessions only.',
+			'Call first in a session. `repo` is owner/repo from `git remote get-url origin` (the folder name without a remote); `name` defaults to `agent`, so your agent name is `<repo without owner>:agent` (e.g. briefline:agent) for every later call in the session. Pass `name` only when `.briefline/agent` exists in the repo root (use its content) or the user asked for a specific name. A name held by an online session gets the lowest free suffix (`agent-2`...) instead of a 409; an away or offline holder is ended by the claim. MCP sessions only.',
 		input: z.object({
 			repo: z
 				.string()
@@ -269,10 +269,11 @@ export const operations: Operation[] = [
 			name: z
 				.string()
 				.regex(/^[\w.-]{1,40}$/, 'Use letters, digits, dot, dash or underscore (max 40)')
-				.describe('Short role name, e.g. backend-agent'),
+				.optional()
+				.describe('Default agent; see description'),
 			role: z.string().max(200).optional().describe('What this agent does')
 		}),
-		mcp: { required: ['repo', 'name'] },
+		mcp: { required: ['repo'] },
 		run: (app, input) => app.sessions.register(input)
 	}),
 	defineOperation({
