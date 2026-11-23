@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	indentListItems,
 	insertLink,
+	toggleCode,
 	toggleTask,
 	toggleLinePrefix,
 	toggleWrap
@@ -89,5 +90,33 @@ describe('indentListItems', () => {
 	it('indents list lines only', () => {
 		expect(run('- |a', indentListItems(1)).text).toBe('  - a');
 		expect(run('|plain', indentListItems(1)).handled).toBe(false);
+	});
+});
+
+describe('toggleCode', () => {
+	it('wraps a single-line selection with one backtick', () => {
+		expect(run('say |hi| now', toggleCode).marked).toBe('say `|hi|` now');
+	});
+
+	it('turns a multi-line selection into a fenced block', () => {
+		expect(run('|a\nb|', toggleCode).text).toBe('```\na\nb\n```');
+	});
+
+	it('expands the selection to the full lines', () => {
+		expect(run('x|x\nyy|y', toggleCode).text).toBe('```\nxx\nyyy\n```');
+	});
+
+	it('unwraps a fenced block when run again', () => {
+		const fenced = run('|a\nb|', toggleCode);
+		const again = run('|' + fenced.text + '|', toggleCode);
+		expect(again.marked).toBe('|a\nb|');
+	});
+
+	it('inserts an empty fence on an empty line', () => {
+		expect(run('|', toggleCode).marked).toBe('```\n|\n```');
+	});
+
+	it('pads with blank lines when the surrounding lines have text', () => {
+		expect(run('top\n|a\nb|\nbottom', toggleCode).text).toBe('top\n\n```\na\nb\n```\n\nbottom');
 	});
 });

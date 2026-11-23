@@ -16,6 +16,7 @@
 		insertLink,
 		toggleLinePrefix,
 		toggleTask,
+		toggleCode,
 		toggleWrap
 	} from '#lib/shared/ui/markdown-editor/index.ts';
 	import { cn } from '#lib/shared/lib/utils.js';
@@ -38,7 +39,7 @@
 			icon: StrikethroughIcon,
 			run: toggleWrap('~~')
 		},
-		{ label: 'Code', title: 'Code', icon: CodeIcon, run: toggleWrap('`') },
+		{ label: 'Code', title: 'Code', icon: CodeIcon, run: toggleCode },
 		{ label: 'Link', title: 'Link (Ctrl or ⌘ + K)', icon: LinkIcon, run: insertLink },
 		{ label: 'Quote', title: 'Quote', icon: QuoteIcon, run: toggleLinePrefix('quote') },
 		{ label: 'Bullet list', title: 'Bullet list', icon: ListIcon, run: toggleLinePrefix('bullet') },

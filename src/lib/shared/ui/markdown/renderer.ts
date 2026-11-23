@@ -42,7 +42,7 @@ export interface MarkdownRenderer {
 }
 
 export function createMarkdownRenderer(extensions: MarkdownExtension[]): MarkdownRenderer {
-	const marked = new Marked({ gfm: true, async: false });
+	const marked = new Marked({ gfm: true, breaks: true, async: false });
 	// Marked gives later extensions priority, so the safety layer goes last.
 	for (const extension of [...extensions, safety]) {
 		if (extension.marked) marked.use(extension.marked);

@@ -76,6 +76,83 @@ export const toggleWrap =
 		return true;
 	};
 
+const FENCE = '```';
+
+export const toggleCode: StateCommand = (target) => {
+	const { state } = target;
+	const isEmptyLine = (from: number, to: number) =>
+		from === to && state.doc.lineAt(from).text === '';
+	const singleLine = (from: number, to: number) =>
+		state.doc.lineAt(from).number === state.doc.lineAt(to).number;
+	if (
+		state.selection.ranges.every(
+			(range) => singleLine(range.from, range.to) && !isEmptyLine(range.from, range.to)
+		)
+	) {
+		return toggleWrap('`')(target);
+	}
+	target.dispatch(
+		state.update(
+			state.changeByRange((range) => {
+				if (isEmptyLine(range.from, range.to)) {
+					return {
+						changes: { from: range.from, insert: `${FENCE}\n\n${FENCE}` },
+						range: EditorSelection.cursor(range.from + FENCE.length + 1)
+					};
+				}
+				if (singleLine(range.from, range.to)) {
+					return {
+						changes: [
+							{ from: range.from, insert: '`' },
+							{ from: range.to, insert: '`' }
+						],
+						range: EditorSelection.range(range.from + 1, range.to + 1)
+					};
+				}
+				const first = state.doc.lineAt(range.from);
+				const last = state.doc.lineAt(range.to);
+				if (
+					first.text.startsWith(FENCE) &&
+					last.text.trim() === FENCE &&
+					last.number > first.number
+				) {
+					const changes =
+						last.number === first.number + 1
+							? [{ from: first.from, to: last.to }]
+							: [
+									{ from: first.from, to: first.to + 1 },
+									{ from: last.from - 1, to: last.to }
+								];
+					return {
+						changes,
+						range: EditorSelection.range(
+							first.from,
+							Math.max(first.from, last.from - 1 - (first.to + 1 - first.from))
+						)
+					};
+				}
+				// A blank line keeps the fence from being read as part of the neighbouring paragraph.
+				const before =
+					first.number > 1 && state.doc.line(first.number - 1).text.trim() !== '' ? '\n' : '';
+				const after =
+					last.number < state.doc.lines && state.doc.line(last.number + 1).text.trim() !== ''
+						? '\n'
+						: '';
+				const shift = before.length + FENCE.length + 1;
+				return {
+					changes: [
+						{ from: first.from, insert: `${before}${FENCE}\n` },
+						{ from: last.to, insert: `\n${FENCE}${after}` }
+					],
+					range: EditorSelection.range(first.from + shift, last.to + shift)
+				};
+			}),
+			{ userEvent: 'input', scrollIntoView: true }
+		)
+	);
+	return true;
+};
+
 export const toggleLinePrefix =
 	(kind: LineKind): StateCommand =>
 	({ state, dispatch }) => {

@@ -7,6 +7,18 @@ const render = (md: string, extra: MarkdownExtension[] = []) =>
 	createMarkdownRenderer([...defaultMarkdownExtensions, ...extra]).render(md);
 
 describe('markdown renderer', () => {
+	it('keeps a single newline inside a paragraph as a line break', () => {
+		const html = render('line one\nline two');
+		expect(html).toContain('line one<br>');
+		expect(html).toContain('line two');
+		expect(html.match(/<p>/g)).toHaveLength(1);
+	});
+
+	it('still splits blank-line separated blocks into separate paragraphs', () => {
+		const html = render('a\n\nb');
+		expect(html.match(/<p>/g)).toHaveLength(2);
+	});
+
 	it('escapes raw HTML from untrusted markdown', () => {
 		const html = render('<img src=x onerror=alert(1)>\n\n<script>alert(1)</script>');
 		expect(html).not.toContain('<img src=x');
