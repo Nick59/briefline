@@ -138,6 +138,8 @@ ${fence(
 Header:   X-Actor: <your-agent-name>${tokenRequired ? '\nHeader:   Authorization: Bearer <token>' : ''}`
 )}
 
+Recommended: make the name \`<repo>:<name>\` and set it in the client config, e.g. in \`.mcp.json\`: \`"headers": { "X-Actor": "briefline:agent" }\`. The session is then registered from its first request and \`register_agent { repo }\` keeps that name; \`.briefline/agent\` stays the fallback for clients without headers.
+
 The server speaks JSON-RPC over \`POST /mcp\` and returns an \`Mcp-Session-Id\` header from \`initialize\`; clients that send it back get their changes grouped into a session. Check the client's docs for where it takes a URL and custom headers. Setup tools (projects, ticketing connections, profile) are hidden from the tool list by default; use \`${url}?tools=all\` to list them too.
 
 - Instructions: put the rules in the client's global instructions file, and name the project in the repository's \`AGENTS.md\`.
@@ -164,7 +166,7 @@ ${fence(
 
 When the repository's agent instructions (AGENTS.md, CLAUDE.md, GEMINI.md...) name a Briefline project, track the work there through the \`briefline\` MCP server:
 - Before planning, read the project with \`get_project\` and the current epic with \`get_epic\`.
-- At the start of a session, call \`register_agent\` with your GitHub project (\`owner/repo\` from \`git remote get-url origin\`) (plus \`name\` only when \`.briefline/agent\` exists or the user asked for one), then \`get_last_session\`, then \`get_inbox\`; handle each item, then \`ack_inbox\` it with the \`seq\` you received. Responses include a \`meanwhile\` block with what other agents and people changed since your last call.
+- At the start of a session, call \`register_agent\` with your GitHub project (\`owner/repo\` from \`git remote get-url origin\`); an \`X-Actor: <repo>:<name>\` header already registers you and keeps its name. Without the header, pass \`name\` only when \`.briefline/agent\` exists or the user asked for one. Then \`get_last_session\`, then \`get_inbox\`; handle each item, then \`ack_inbox\` it with the \`seq\` you received. Responses include a \`meanwhile\` block with what other agents and people changed since your last call.
 - Project-wide context (architecture, conventions, product goals) lives in project specs: read them with \`get_project\` before planning, and add new ones with \`add_spec\`.
 - Ask anything unclear with \`add_epic_questions\` before starting an epic. Questions are threads: people can open them too, and anyone adds details with \`reply_to_question\`. When an epic has specs, its tasks cannot start until a person approves them in the epic Specs header (specsApprovedAt must be set; otherwise 409 specs_not_approved); epics without specs need no approval. Tasks may be created in any stage. Approval is a one-time gate: later spec changes keep the epic approved. Tasks can't start while questions are open; read the answers and the replies (\`messages\`) with \`get_epic\` and follow them.
 - A plan for new work becomes one epic with its tasks and specs, created in a single \`create_epic\` call.

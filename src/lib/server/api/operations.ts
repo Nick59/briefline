@@ -258,7 +258,7 @@ export const operations: Operation[] = [
 		tag: 'Sessions',
 		summary: 'Name this MCP session as an agent working in a GitHub project',
 		description:
-			'Call first in a session. `repo` is owner/repo from `git remote get-url origin` (the folder name without a remote); `name` defaults to `agent`, so your agent name is `<repo without owner>:agent` (e.g. briefline:agent) for every later call in the session. Pass `name` only when `.briefline/agent` exists in the repo root (use its content) or the user asked for a specific name. A name held by an online session gets the lowest free suffix (`agent-2`...) instead of a 409; an away or offline holder is ended by the claim. MCP sessions only.',
+			'Call first in a session. `repo` is owner/repo from `git remote get-url origin` (the folder name without a remote); `name` defaults to the name the session already has (set by an `X-Actor: <repo>:<name>` header), else `agent`: your agent name is `<repo without owner>:<name>` (e.g. briefline:agent) for the session. Pass `name` only when `.briefline/agent` exists in the repo root (use its content) or the user asked for a specific name. A name held by an online session gets the lowest free suffix (`agent-2`...) instead of a 409; an away or offline holder is ended by the claim. MCP sessions only.',
 		input: z.object({
 			repo: z
 				.string()

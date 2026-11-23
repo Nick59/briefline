@@ -44,7 +44,7 @@ export class SessionService {
 
 	/** Creates a session and returns its id. An existing id is left as it is. */
 	start(actor: string, client: ClientInfo = {}, id = newId()): string {
-		this.deps.repos.sessions.insert(id, this.#distinctActor(actor, id), now(), client);
+		this.#insert(id, actor, now(), client);
 		return id;
 	}
 
@@ -52,7 +52,7 @@ export class SessionService {
 	touch(id: string, actor: string) {
 		const { sessions } = this.deps.repos;
 		const at = now();
-		if (!sessions.exists(id)) sessions.insert(id, this.#distinctActor(actor, id), at);
+		if (!sessions.exists(id)) this.#insert(id, actor, at);
 		sessions.touch(id, at);
 	}
 
@@ -69,21 +69,46 @@ export class SessionService {
 			throw new InvalidInputError(
 				'This call is not part of an agent session. Call register_agent over MCP after initialize.'
 			);
-		const base = `${input.repo.split('/').pop()}:${input.name ?? 'agent'}`;
-		if (ANONYMOUS_ACTORS.has(base) || isHumanActor(base, repos.profile.get()?.name))
+		const kept = repos.sessions.find(id)?.name;
+		const base = `${input.repo.split('/').pop()}:${input.name ?? kept ?? 'agent'}`;
+		if (this.#isPerson(base))
 			throw new InvalidInputError(`'${base}' is the name of a person and cannot be an agent`);
+		const { agent, name } = this.#claim(
+			id,
+			input.repo,
+			input.name ?? kept ?? 'agent',
+			input.role ?? null
+		);
+		return { agent, repo: input.repo, name, role: input.role ?? null, session: id };
+	}
+
+	/** The stored name keeps its `-<n>` suffix: a suffix cannot be told from a name that ends in a number. */
+	#insert(id: string, actor: string, at: string, client: ClientInfo = {}) {
+		const { sessions } = this.deps.repos;
+		const [, repo, name] = actor.match(/^([\w.-]{1,100}):([\w.-]{1,40})$/) ?? [];
+		if (!repo || this.#isPerson(actor)) {
+			sessions.insert(id, this.#distinctActor(actor, id), at, client);
+			return;
+		}
+		sessions.insert(id, actor, at, client);
+		this.#claim(id, repo, name, null);
+	}
+
+	#isPerson(actor: string) {
+		return ANONYMOUS_ACTORS.has(actor) || isHumanActor(actor, this.deps.repos.profile.get()?.name);
+	}
+
+	#claim(id: string, repo: string, name: string, role: string | null) {
+		const { repos } = this.deps;
+		const base = `${repo.split('/').pop()}:${name}`;
 		let n = 1;
 		while (this.#held(n === 1 ? base : `${base}-${n}`, id, PRESENCE_ONLINE_MS)) n++;
 		const agent = n === 1 ? base : `${base}-${n}`;
-		const name = agent.slice(agent.indexOf(':') + 1);
+		const stored = agent.slice(agent.indexOf(':') + 1);
 		repos.sessions.endHolders(agent, id, now());
-		repos.sessions.register(id, agent, {
-			repo: input.repo,
-			name,
-			role: input.role ?? null
-		});
+		repos.sessions.register(id, agent, { repo, name: stored, role });
 		repos.sessions.setCursor(id, repos.activity.head());
-		return { agent, repo: input.repo, name, role: input.role ?? null, session: id };
+		return { agent, name: stored };
 	}
 
 	/** What other actors did since the session's last response; null when nothing, or on the first call. */
